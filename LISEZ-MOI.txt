@@ -1,0 +1,173 @@
+================================================================================
+  🔐 DEAD DROP - APPLICATION DE MESSAGERIE SÉCURISÉE
+  Version: 0.0.1-alpha (Test)
+================================================================================
+
+Merci de tester Dead Drop !
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        🚀 DÉMARRAGE RAPIDE                               │
+└──────────────────────────────────────────────────────────────────────────┘
+
+1. DOUBLE-CLIQUEZ sur le fichier : LANCER_DEAD_DROP.bat
+   
+2. Attendez que l'application se lance (1-2 minutes la première fois)
+
+3. Une fenêtre de l'application s'ouvrira automatiquement
+
+C'est tout ! 🎉
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                     ⚙️ PRÉREQUIS (À INSTALLER AVANT)                     │
+└──────────────────────────────────────────────────────────────────────────┘
+
+Vous devez avoir installé :
+
+✓ Node.js v18 ou supérieur
+  → Télécharger : https://nodejs.org/
+  → Choisir la version "LTS" (recommandée)
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        📋 PREMIÈRE UTILISATION                           │
+└──────────────────────────────────────────────────────────────────────────┘
+
+Lors du premier lancement :
+
+1. Les dépendances seront installées automatiquement (2-5 minutes)
+   
+2. L'application démarrera avec 3 services :
+   - Backend (serveur) sur le port 4000
+   - Frontend (interface) sur le port 5173
+   - Fenêtre Electron (application de bureau)
+
+3. Créez votre compte :
+   - Cliquez sur "Créer un compte"
+   - Choisissez "Standard" (phrase de 12 ou 24 mots)
+   - NOTEZ BIEN votre phrase de récupération sur papier !
+   - Choisissez un nom d'utilisateur
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                    ✨ FONCTIONNALITÉS À TESTER                           │
+└──────────────────────────────────────────────────────────────────────────┘
+
+▸ Messagerie sécurisée
+  → Tous les messages sont chiffrés de bout en bout (E2E)
+  → Le serveur ne peut jamais lire vos messages
+
+▸ Time-Lock (Messages temporisés) ⏰
+  → Cliquez sur l'icône horloge lors de l'envoi
+  → Le message sera verrouillé jusqu'à l'heure choisie
+  → Impossible de le lire avant !
+
+▸ Burn After Reading (Auto-destruction) 🔥
+  → Cliquez sur l'icône flamme lors de l'envoi
+  → Le message s'autodétruira après lecture
+  → Choix : 5s, 30s, 1min, 5min
+
+▸ Authentification avancée 🎲
+  → Standard : Phrase BIP-39 (12 ou 24 mots)
+  → DiceKey : Clé physique Dice-Key (6 mots)
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         🛑 ARRÊTER L'APPLICATION                         │
+└──────────────────────────────────────────────────────────────────────────┘
+
+Pour arrêter Dead Drop :
+
+✓ Fermez simplement la fenêtre de l'application
+
+OU
+
+✓ Dans le terminal, appuyez sur Ctrl + C
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                       🐛 PROBLÈMES COURANTS                              │
+└──────────────────────────────────────────────────────────────────────────┘
+
+❌ "Node.js n'est pas installé"
+   → Installez Node.js v18+ depuis https://nodejs.org/
+
+❌ L'application ne démarre pas
+   → Vérifiez que les ports 4000 et 5173 sont libres
+   → Fermez toute autre application utilisant ces ports
+
+❌ "Port already in use"
+   → Un autre programme utilise le port
+   → Fermez toutes les applications et réessayez
+
+❌ La fenêtre ne s'ouvre pas
+   → Vérifiez les logs dans le terminal
+   → Essayez d'ouvrir manuellement : http://localhost:5173
+
+❌ Erreur lors de l'installation
+   → Supprimez le dossier "node_modules"
+   → Relancez LANCER_DEAD_DROP.bat
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                      📝 CE QU'IL FAUT TESTER                             │
+└──────────────────────────────────────────────────────────────────────────┘
+
+Merci de tester et noter :
+
+□ L'installation se passe sans erreurs
+□ L'application se lance correctement
+□ La fenêtre Electron s'ouvre
+□ Création de compte fonctionne
+□ Connexion avec phrase de récupération
+□ Envoi et réception de messages
+□ Time-Lock : créer un message verrouillé
+□ Burn After Reading : message auto-destructible
+□ L'interface est fluide et réactive
+□ Pas de bugs ou erreurs visibles
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                     📧 RAPPORTER UN PROBLÈME                             │
+└──────────────────────────────────────────────────────────────────────────┘
+
+Si vous rencontrez un bug, veuillez noter :
+
+1. Description du problème
+2. Étapes pour le reproduire
+3. Messages d'erreur (copiez-les depuis le terminal)
+4. Votre système : Windows 10/11, Node.js version
+
+Envoyez vos retours à : [VOTRE_EMAIL]
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         🔐 SÉCURITÉ                                      │
+└──────────────────────────────────────────────────────────────────────────┘
+
+⚠️ IMPORTANT :
+
+✓ Sauvegardez votre phrase de récupération sur PAPIER
+✓ Ne partagez JAMAIS votre phrase avec personne
+✓ Si vous perdez votre phrase, vos messages seront perdus
+✓ Ceci est une version TEST, ne l'utilisez pas pour des données critiques
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         ℹ️ INFORMATIONS                                  │
+└──────────────────────────────────────────────────────────────────────────┘
+
+Version        : 0.0.1-alpha
+Date           : 2025-11-09
+Statut         : Test privé
+Technologie    : Electron + React + Node.js
+Chiffrement    : AES-GCM-256 (bout en bout)
+
+
+================================================================================
+
+Merci de votre aide pour améliorer Dead Drop ! 🙏
+
+🔐 Your messages, your keys, zero trust.
+
+================================================================================

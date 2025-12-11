@@ -1,0 +1,114 @@
+{
+  "name": "cipher-pulse",
+  "version": "1.0.0",
+  "description": "Cipher Pulse - Secure E2E encrypted messenger with Time-Lock and DiceKey",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:bridge\" \"npm run dev:frontend\" \"npm run dev:electron\"",
+    "dev:bridge": "cd apps/bridge && npm run dev",
+    "dev:frontend": "cd apps/frontend && npm run dev",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "build:frontend": "cd apps/frontend && npm run build",
+    "build:bridge": "cd apps/bridge && npm run build",
+    "build:all": "npm run build:frontend && npm run build:bridge",
+    "build": "npm run build:all && electron-builder",
+    "build:win": "npm run build:all && electron-builder --win",
+    "build:mac": "npm run build:all && electron-builder --mac",
+    "build:linux": "npm run build:all && electron-builder --linux"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Oykdo/Project_Chimera.git"
+  },
+  "keywords": [
+    "secure",
+    "messaging",
+    "e2e",
+    "encryption",
+    "p2p",
+    "privacy"
+  ],
+  "author": "Project Chimera",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Oykdo/Project_Chimera/issues"
+  },
+  "homepage": "https://github.com/Oykdo/Project_Chimera#readme",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^30.5.1",
+    "electron-builder": "^25.1.7",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.projectchimera.deaddrop",
+    "productName": "Dead Drop",
+    "copyright": "Copyright © 2025 Project Chimera",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.cjs",
+      "apps/frontend/dist/**/*",
+      "apps/bridge/dist/**/*",
+      "apps/bridge/node_modules/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "apps/bridge/data",
+        "to": "data",
+        "filter": [
+          "!*.db",
+          "!*.db-*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Dead Drop"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.social-networking",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "assets/icon.png",
+      "category": "Network",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Oykdo",
+      "repo": "Project_Chimera"
+    }
+  }
+}

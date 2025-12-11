@@ -1,0 +1,162 @@
+import { app, BrowserWindow, ipcMain } from 'electron';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { fork } from 'node:child_process';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+let mainWindow = null;
+let backendProcess = null;
+
+// Prevent multiple instances
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+
+  app.whenReady().then(async () => {
+    try {
+      await startBackend();
+      await createWindow();
+    } catch (error) {
+      console.error('Failed to start application:', error);
+      app.quit();
+    }
+  });
+}
+
+async function startBackend() {
+  return new Promise((resolve, reject) => {
+    const backendPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'apps', 'bridge', 'dist', 'index.js')
+      : path.join(__dirname, 'apps', 'bridge', 'src', 'index.ts');
+
+    const options = {
+      cwd: app.isPackaged 
+        ? path.join(process.resourcesPath, 'apps', 'bridge')
+        : path.join(__dirname, 'apps', 'bridge'),
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        NODE_ENV: app.isPackaged ? 'production' : 'development',
+        PORT: '4001'
+      }
+    };
+
+    // Start backend server
+    if (app.isPackaged) {
+      backendProcess = fork(backendPath, [], options);
+    } else {
+      // In dev, use tsx to run TypeScript
+      backendProcess = fork(backendPath, [], {
+        ...options,
+        execArgv: ['--import', 'tsx']
+      });
+    }
+
+    backendProcess.on('error', (err) => {
+      console.error('Backend process error:', err);
+    });
+
+    backendProcess.on('exit', (code) => {
+      console.log(`Backend process exited with code ${code}`);
+      backendProcess = null;
+    });
+
+    // Wait for backend to be ready with health check
+    let attempts = 0;
+    const maxAttempts = 60; // 30 seconds max
+    const checkInterval = 500; // Check every 500ms
+
+    const checkHealth = setInterval(async () => {
+      attempts++;
+      try {
+        const http = await import('http');
+        const req = http.request({
+          hostname: 'localhost',
+          port: 4001,
+          path: '/health',
+          method: 'GET',
+          timeout: 1000
+        }, (res) => {
+          if (res.statusCode === 200) {
+            clearInterval(checkHealth);
+            console.log('Backend is ready');
+            resolve();
+          }
+        });
+        req.on('error', () => {
+          // Backend not ready yet, continue checking
+        });
+        req.end();
+      } catch (error) {
+        // Continue checking
+      }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(checkHealth);
+        console.error('Backend failed to start within 30 seconds');
+        reject(new Error('Backend startup timeout'));
+      }
+    }, checkInterval);
+  });
+}
+
+async function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: path.join(__dirname, 'preload.cjs')
+    },
+    autoHideMenuBar: true,
+    icon: path.join(__dirname, 'assets', 'icon.png')
+  });
+
+  // Security
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (e, url) => {
+    if (!url.startsWith('http://localhost') && !url.startsWith('file://')) {
+      e.preventDefault();
+    }
+  });
+
+  // Load app
+  if (app.isPackaged) {
+    await mainWindow.loadFile(path.join(__dirname, 'apps', 'frontend', 'dist', 'index.html'));
+  } else {
+    // Dev mode - load from Vite dev server
+    await mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools();
+  }
+}
+
+app.on('window-all-closed', () => {
+  if (backendProcess) {
+    backendProcess.kill();
+    backendProcess = null;
+  }
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});
+
+// Handle IPC if needed
+ipcMain.handle('get-app-path', () => app.getPath('userData'));

@@ -1,0 +1,6 @@
+{
+  "enabled": false,
+  "intervalHours": 24,
+  "compress": true,
+  "maxBackups": 7
+}
