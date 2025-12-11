@@ -13,6 +13,8 @@
  * - Server relay only as last resort
  */
 
+import { debugLogger } from '../debugLogger';
+
 const DB_NAME = 'cipher-pulse-p2p';
 const STORE_NAME = 'pending-messages';
 const DB_VERSION = 1;

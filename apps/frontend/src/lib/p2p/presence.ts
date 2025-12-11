@@ -13,6 +13,8 @@
  * - Works even if signaling server is down (for existing connections)
  */
 
+import { debugLogger } from '../debugLogger';
+
 export type PresenceStatus = 'online' | 'away' | 'busy' | 'offline';
 
 export interface PeerPresence {

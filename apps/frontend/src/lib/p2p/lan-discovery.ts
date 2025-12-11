@@ -19,6 +19,8 @@
  * - Can detect local peers via WebRTC ICE candidates
  */
 
+import { debugLogger } from '../debugLogger';
+
 export interface LANPeer {
   id: string;
   username?: string;
