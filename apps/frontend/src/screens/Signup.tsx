@@ -8,7 +8,7 @@ import { deriveAllKeysFromDice } from "../lib/kdf";
 import { generateCompleteKeySet, serializeKeySet, generateUserId, encodeKey } from "../lib/keyGeneration";
 import { API_BASE_URL } from "../config";
 
-import { debugLogger } from "../debugLogger";
+import { debugLogger } from "../lib/debugLogger";
 function SignupNew() {
   const { t } = useTranslation();
   const navigate = useNavigate();

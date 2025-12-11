@@ -2,7 +2,7 @@
  * Debug Logger - Conditional logging for development
  * 
  * Usage:
- *   import { debugLogger } from '@/lib/debugLogger';
+ *   import { debugLogger } from "./debugLogger";
  *   debugLogger.crypto('Shared secret generated', { prefix: '...' });
  * 
  * All debug logs are DISABLED in production builds automatically.

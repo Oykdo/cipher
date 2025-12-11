@@ -7,7 +7,7 @@
 
 import { useEffect } from 'react';
 
-import { debugLogger } from "../debugLogger";
+import { debugLogger } from "../lib/debugLogger";
 const KONAMI_CODE = [
   'ArrowUp',
   'ArrowUp',

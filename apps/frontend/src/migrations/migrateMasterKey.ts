@@ -9,7 +9,7 @@
 
 import { storeMasterKey, importRawKey } from '../lib/keyStore';
 
-import { debugLogger } from "../debugLogger";
+import { debugLogger } from "../lib/debugLogger";
 export interface MigrationResult {
   status: 'success' | 'not_needed' | 'failed';
   message: string;

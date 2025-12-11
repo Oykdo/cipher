@@ -16,7 +16,7 @@ import { getKeyVault } from '../lib/keyVault';
 import { initializeE2EE } from '../lib/e2ee/e2eeService';
 import { setSessionMasterKey } from '../lib/masterKeyResolver';
 import * as srp from 'secure-remote-password/client';
-import { debugLogger } from "../debugLogger";
+import { debugLogger } from "../lib/debugLogger";
 import '../styles/fluidCrypto.css';
 
 interface QuickUnlockProps {

@@ -8,7 +8,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { debugLogger } from "../debugLogger";
+import { debugLogger } from "../lib/debugLogger";
 import {
   DICE_SERIES_COUNT,
   DICE_PER_SERIES,

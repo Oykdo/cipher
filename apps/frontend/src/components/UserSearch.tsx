@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { apiv2 } from '../services/api-v2';
-import { debugLogger } from "../debugLogger";
+import { debugLogger } from "../lib/debugLogger";
 import '../styles/fluidCrypto.css';
 
 export interface UserSearchResult {

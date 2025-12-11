@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/auth';
 
-import { debugLogger } from "../debugLogger";
+import { debugLogger } from "../lib/debugLogger";
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
 
 interface UseSocketWithRefreshReturn {

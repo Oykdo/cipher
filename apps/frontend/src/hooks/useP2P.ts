@@ -19,7 +19,7 @@ import { P2PManager } from '../lib/p2p/p2p-manager';
 import { P2PMessage } from '../lib/p2p/webrtc';
 import { useAuthStore } from '../store/auth';
 
-import { debugLogger } from "../debugLogger";
+import { debugLogger } from "../lib/debugLogger";
 export interface UseP2POptions {
   signalingUrl?: string;
   signalingUrls?: string[]; // Multiple servers for failover

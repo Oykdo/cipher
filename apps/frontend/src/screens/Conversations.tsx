@@ -27,7 +27,7 @@ import { hasArchivedMessages } from '../lib/backup';
 import ConversationRequests from '../components/ConversationRequests';
 import { useP2P } from '../hooks/useP2P';
 import { P2P_CONFIG, SIGNALING_SERVERS } from '../config';
-import { debugLogger } from "../debugLogger";
+import { debugLogger } from "../lib/debugLogger";
 import '../styles/fluidCrypto.css';
 
 type ViewMode = 'list' | 'chat';
