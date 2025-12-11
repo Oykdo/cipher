@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth";
 import { authFetchV2WithRefresh } from "../../services/api-interceptor";
 import { LanguageSelector } from "../LanguageSelector";
-import { db } from "../../lib/db";
 
 export function GeneralSettings() {
     const { t, i18n } = useTranslation();
@@ -27,27 +26,38 @@ export function GeneralSettings() {
                 const data = await authFetchV2WithRefresh('/users/me');
                 setUserDetails(data);
                 
-                // Load stats from local DB
-                const userId = session?.user?.id;
-                if (userId) {
-                    try {
-                        // Count conversations
-                        const conversations = await db.conversations.toArray();
-                        const userConversations = conversations.filter(c => 
-                            c.participants.includes(userId)
-                        );
-                        
-                        // Count messages sent by this user
-                        const messages = await db.messages.toArray();
-                        const sentMessages = messages.filter(m => m.senderId === userId);
-                        
-                        setStats({
-                            conversationsCount: userConversations.length,
-                            messagesSent: sentMessages.length
-                        });
-                    } catch (dbErr) {
-                        console.error('Failed to load stats from DB:', dbErr);
+                // Load stats from API
+                try {
+                    // Fetch conversations to count them
+                    const conversationsData = await authFetchV2WithRefresh('/conversations');
+                    const conversationsCount = conversationsData?.conversations?.length || 0;
+                    
+                    // Count messages across all conversations
+                    let totalMessagesSent = 0;
+                    if (conversationsData?.conversations) {
+                        for (const conv of conversationsData.conversations) {
+                            try {
+                                const messagesData = await authFetchV2WithRefresh(`/conversations/${conv.id}/messages`);
+                                if (messagesData?.messages) {
+                                    // Count only messages sent by current user
+                                    const sentByUser = messagesData.messages.filter(
+                                        (m: any) => m.senderId === session?.user?.id
+                                    );
+                                    totalMessagesSent += sentByUser.length;
+                                }
+                            } catch (msgErr) {
+                                // Skip if conversation messages can't be loaded
+                                console.warn(`Failed to load messages for conversation ${conv.id}:`, msgErr);
+                            }
+                        }
                     }
+                    
+                    setStats({
+                        conversationsCount,
+                        messagesSent: totalMessagesSent
+                    });
+                } catch (statsErr) {
+                    console.error('Failed to load stats:', statsErr);
                 }
             } catch (err) {
                 console.error('Failed to load user details:', err);
