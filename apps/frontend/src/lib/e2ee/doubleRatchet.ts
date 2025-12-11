@@ -339,7 +339,7 @@ export function ratchetDecrypt(
   const { header, ciphertext, nonce } = message;
 
   // Diagnostic logs (non-sensitive)
-  debugLogger.debug(`🔓 [DR] Decrypting message #${header.messageNumber} from chain with pubkey prefix: ${header.publicKey.substring(0, 8);}...`);
+  debugLogger.debug(`🔓 [DR] Decrypting message #${header.messageNumber} from chain with pubkey prefix: ${header.publicKey.substring(0, 8)}...`);
   debugLogger.debug(`🔓 [DR] Current state: Nr=${state.Nr}, skippedKeys.size=${state.skippedKeys.size}`);
 
   // Prepare associated data
