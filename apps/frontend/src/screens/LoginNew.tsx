@@ -23,7 +23,7 @@ import '../styles/fluidCrypto.css';
 import CosmicLoader from '../components/CosmicLoader';
 
 
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 // Helper for delay
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 

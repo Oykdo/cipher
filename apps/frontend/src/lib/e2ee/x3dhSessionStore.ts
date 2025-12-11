@@ -18,7 +18,7 @@
 import _sodium from 'libsodium-wrappers';
 import { getExistingKeyVault } from '../keyVault';
 
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 // ============================================================================
 // TYPES
 // ============================================================================

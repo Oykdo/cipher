@@ -32,7 +32,7 @@ import {
 } from './x3dh';
 import { initializeAlice, initializeBob, type RatchetState } from './doubleRatchet';
 import { getExistingKeyVault } from '../keyVault';
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 // NOTE: These imports will be used when we fully integrate x3dhSessionStore
 // import { createDoubleRatchetSession } from './sessionManager';
 // import { storeHandshakeState, getHandshakeState, completeHandshake, failHandshake, createInitiatorHandshakeState, type X3DHHandshakeState } from './x3dhSessionStore';

@@ -9,7 +9,7 @@
 
 import _sodium from 'libsodium-wrappers';
 
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 // ============================================================================
 // TYPES
 // ============================================================================

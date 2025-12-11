@@ -32,7 +32,7 @@ import { decryptReceivedMessage } from '../e2ee/messagingIntegration';
 import { getMyFingerprint, isE2EEInitialized } from '../e2ee/e2eeService';
 import { useAuthStore } from '../../store/auth';
 
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 /**
  * Export all user data to encrypted backup file
  * 

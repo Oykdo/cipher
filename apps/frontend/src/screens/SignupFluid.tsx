@@ -23,7 +23,7 @@ import { getKeyVault } from '../lib/keyVault';
 import { API_BASE_URL } from '../config';
 import { createSafeHTML } from '../lib/sanitize';
 import { initializeE2EE } from '../lib/e2ee/e2eeService';
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 import '../styles/fluidCrypto.css';
 
 type Step = 'choose' | 'username' | 'standard-length' | 'standard-display' | 'standard-verify' | 'standard-welcome' | 'standard-password' | 'dicekey' | 'generating' | 'display';

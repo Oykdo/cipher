@@ -15,7 +15,7 @@ import '../styles/fluidCrypto.css';
 import { deriveAllKeysFromDice } from '../lib/kdfSimple';
 import { generateCompleteKeySet, generateUserId } from '../lib/keyGeneration';
 import { calculateSeriesChecksum, splitIntoSeries } from '../lib/diceKey';
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 import '../styles/fluidCrypto.css';
 
 // Helper function for encrypting dice rolls

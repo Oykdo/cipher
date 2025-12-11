@@ -19,7 +19,7 @@ import { StoreForwardQueue, getStoreForwardQueue, type QueuedMessage } from './s
 import { P2PPresenceManager, getPresenceManager, type PresenceStatus, type PeerPresence } from './presence';
 import { P2PKeyExchange, getKeyExchange, type KeyBundle, type KeyExchangeMessage } from './key-exchange';
 
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 export interface P2PManagerOptions {
   signalingUrl: string;
   signalingUrls?: string[]; // Multiple servers for failover

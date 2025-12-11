@@ -16,7 +16,7 @@
  */
 
 import SimplePeer from 'simple-peer';
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 import {
   encryptMessageForPeer,
   decryptMessageFromPeer,

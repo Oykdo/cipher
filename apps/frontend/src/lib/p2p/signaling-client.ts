@@ -21,7 +21,7 @@
 
 import { io, Socket } from 'socket.io-client';
 
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 export interface SignalingServerHealth {
   url: string;
   healthy: boolean;

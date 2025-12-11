@@ -7,7 +7,7 @@ import { BurnCountdown } from '../BurnCountdown';
 import { TimeLockCountdown } from '../TimeLockCountdown';
 import { BurnMessage } from '../BurnMessage';
 
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 interface MessageListProps {
   messages: MessageV2[];
   sessionUserId: string;

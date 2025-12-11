@@ -13,7 +13,7 @@ import {
 } from '../lib/e2ee/e2eeService';
 import { isHandshakeMessage } from '../lib/e2ee/x3dhManager';
 
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 interface UseX3DHHandshakeOptions {
   socket: Socket | null;
   connected: boolean;

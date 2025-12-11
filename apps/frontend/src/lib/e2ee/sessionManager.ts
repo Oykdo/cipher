@@ -21,7 +21,7 @@ import {
   type EncryptedData,
 } from './index';
 import { getExistingKeyVault } from '../keyVault';
-import { debugLogger } from '../lib/debugLogger';
+import { debugLogger } from "../debugLogger";
 import {
   ratchetEncrypt,
   ratchetDecrypt,
