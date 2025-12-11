@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth";
 import { authFetchV2WithRefresh } from "../../services/api-interceptor";
 import { LanguageSelector } from "../LanguageSelector";
+import { db } from "../../lib/db";
 
 export function GeneralSettings() {
     const { t, i18n } = useTranslation();
@@ -10,6 +11,7 @@ export function GeneralSettings() {
     const [userDetails, setUserDetails] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [stats, setStats] = useState({ conversationsCount: 0, messagesSent: 0 });
 
     const hasAccessToken = !!session?.accessToken;
 
@@ -24,6 +26,29 @@ export function GeneralSettings() {
             try {
                 const data = await authFetchV2WithRefresh('/users/me');
                 setUserDetails(data);
+                
+                // Load stats from local DB
+                const userId = session?.user?.id;
+                if (userId) {
+                    try {
+                        // Count conversations
+                        const conversations = await db.conversations.toArray();
+                        const userConversations = conversations.filter(c => 
+                            c.participants.includes(userId)
+                        );
+                        
+                        // Count messages sent by this user
+                        const messages = await db.messages.toArray();
+                        const sentMessages = messages.filter(m => m.senderId === userId);
+                        
+                        setStats({
+                            conversationsCount: userConversations.length,
+                            messagesSent: sentMessages.length
+                        });
+                    } catch (dbErr) {
+                        console.error('Failed to load stats from DB:', dbErr);
+                    }
+                }
             } catch (err) {
                 console.error('Failed to load user details:', err);
                 setError(err instanceof Error ? err.message : t('errors.unknown_error'));
@@ -33,7 +58,7 @@ export function GeneralSettings() {
         };
 
         void loadUserDetails();
-    }, [hasAccessToken]);
+    }, [hasAccessToken, session?.user?.id]);
 
     const formatDate = (timestamp: string | number) => {
         return new Date(timestamp).toLocaleString(i18n.language, {
@@ -136,19 +161,19 @@ export function GeneralSettings() {
                     <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800">
                         <div className="text-slate-400 text-sm mb-1">{t('settings.general_settings.stats_conversations')}</div>
                         <div className="text-white text-2xl font-bold">
-                            {userDetails.conversationsCount || 0}
+                            {stats.conversationsCount}
                         </div>
                     </div>
                     <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800">
                         <div className="text-slate-400 text-sm mb-1">{t('settings.general_settings.stats_messages_sent')}</div>
                         <div className="text-white text-2xl font-bold">
-                            {userDetails.messagesSent || 0}
+                            {stats.messagesSent}
                         </div>
                     </div>
                     <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800">
                         <div className="text-slate-400 text-sm mb-1">{t('settings.general_settings.stats_active_days')}</div>
                         <div className="text-white text-2xl font-bold">
-                            {userDetails.createdAt ? Math.floor((Date.now() - new Date(userDetails.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : 0}
+                            {userDetails.createdAt ? Math.floor((Date.now() - new Date(userDetails.createdAt).getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0}
                         </div>
                     </div>
                 </div>
