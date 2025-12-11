@@ -144,3 +144,8 @@ apps/*/public/avatars/*.glb
 *.example.js
 codebuff.json
 .factory/
+
+# =============================================================================
+# ARCHIVE (Development logs - not for production)
+# =============================================================================
+.archive/
