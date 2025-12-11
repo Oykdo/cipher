@@ -11,6 +11,7 @@
 
 import _sodium from 'libsodium-wrappers';
 
+import { debugLogger } from '../lib/debugLogger';
 // ============================================================================
 // Types
 // ============================================================================
@@ -219,12 +220,11 @@ export function initializeAlice(
 
   // Perform DH with Bob's public key
   const dhOut = DH(DHs.privateKey, bobPublicKey);
-  console.log(`🔐 [DR-INIT-ALICE] DH(my_priv, bob_pub) output prefix: ${_sodium.to_base64(dhOut.slice(0, 8))}`);
+  // SECURITY: crypto log removed
 
   // Derive RK and CKs
   const [RK, CKs] = KDF_RK(sharedSecret, dhOut);
-  console.log(`🔐 [DR-INIT-ALICE] Derived RK prefix: ${_sodium.to_base64(RK.slice(0, 8))}`);
-  console.log(`🔐 [DR-INIT-ALICE] Derived CKs prefix: ${_sodium.to_base64(CKs.slice(0, 8))}`);
+  // SECURITY: NEVER log root keys or chain keys (removed for production)
 
   return {
     DHs: DHs.privateKey,
@@ -292,11 +292,8 @@ export function ratchetEncrypt(
   plaintext: string
 ): DoubleRatchetMessage {
   // Diagnostic: log chain key state before derivation
-  const cksBefore = _sodium.to_base64(state.CKs.slice(0, 8));
-  console.log(`🔒 [DR-ENC] Encrypting message #${state.Ns} for ${state.peerUsername}`);
-  console.log(`🔒 [DR-ENC] CKs prefix before: ${cksBefore}`);
-  console.log(`🔒 [DR-ENC] DHs pub prefix: ${_sodium.to_base64(getDHPublicKey(state.DHs).slice(0, 8))}`);
-  console.log(`🔒 [DR-ENC] RK prefix: ${_sodium.to_base64(state.RK.slice(0, 8))}`);
+  // SECURITY: crypto log removed
+  // SECURITY: NEVER log key material (removed for production)
   
   // Derive message key
   const [newCKs, messageKey] = KDF_CK(state.CKs);
@@ -342,8 +339,8 @@ export function ratchetDecrypt(
   const { header, ciphertext, nonce } = message;
 
   // Diagnostic logs (non-sensitive)
-  console.log(`🔓 [DR] Decrypting message #${header.messageNumber} from chain with pubkey prefix: ${header.publicKey.substring(0, 8)}...`);
-  console.log(`🔓 [DR] Current state: Nr=${state.Nr}, skippedKeys.size=${state.skippedKeys.size}`);
+  debugLogger.debug(`🔓 [DR] Decrypting message #${header.messageNumber} from chain with pubkey prefix: ${header.publicKey.substring(0, 8);}...`);
+  debugLogger.debug(`🔓 [DR] Current state: Nr=${state.Nr}, skippedKeys.size=${state.skippedKeys.size}`);
 
   // Prepare associated data
   const ad = _sodium.from_string(JSON.stringify(header));
@@ -351,7 +348,7 @@ export function ratchetDecrypt(
   // Try skipped message keys first
   const plaintextFromSkipped = trySkippedMessageKeys(state, header, ciphertext, nonce, ad);
   if (plaintextFromSkipped) {
-    console.log(`🔓 [DR] Decrypted using skipped key for message #${header.messageNumber}`);
+    // SECURITY: Sensitive log removed
     return plaintextFromSkipped;
   }
 
@@ -364,30 +361,30 @@ export function ratchetDecrypt(
   // This handles the case where DHr was set but dhRatchet was never executed
   const ckrUninitialized = state.CKr.every(b => b === 0);
   if (ckrUninitialized && !needsDHRatchet) {
-    console.log(`🔓 [DR] CKr is uninitialized but DHr matches header - forcing DH ratchet`);
+    debugLogger.debug(`🔓 [DR] CKr is uninitialized but DHr matches header - forcing DH ratchet`);
     needsDHRatchet = true;
   }
   
-  console.log(`🔓 [DR] DH ratchet needed: ${needsDHRatchet}, DHr is ${state.DHr ? 'set' : 'null'}, CKr initialized: ${!ckrUninitialized}`);
+  debugLogger.debug(`🔓 [DR] DH ratchet needed: ${needsDHRatchet}, DHr is ${state.DHr ? 'set' : 'null'}, CKr initialized: ${!ckrUninitialized}`);
 
   if (needsDHRatchet) {
     // Skip message keys from previous chain before ratcheting
     // Only skip if we have a valid receiving chain (DHr set and CKr initialized)
     if (state.DHr !== null && !ckrUninitialized) {
-      console.log(`🔓 [DR] Skipping ${header.previousChainLength - state.Nr} keys from previous chain before DH ratchet`);
+      debugLogger.debug(`🔓 [DR] Skipping ${header.previousChainLength - state.Nr} keys from previous chain before DH ratchet`);
       skipMessageKeys(state, header.previousChainLength);
     } else {
-      console.log(`🔓 [DR] First message from peer or CKr uninitialized, no previous chain to skip`);
+      debugLogger.debug(`🔓 [DR] First message from peer or CKr uninitialized, no previous chain to skip`);
     }
     
     // Perform DH ratchet - this initializes CKr
     dhRatchet(state, headerPubKey);
-    console.log(`🔓 [DR] DH ratchet completed, CKr initialized, Nr=0`);
+    debugLogger.debug(`🔓 [DR] DH ratchet completed, CKr initialized, Nr=0`);
   }
 
   // Skip message keys if needed (for out-of-order messages within current chain)
   if (header.messageNumber > state.Nr) {
-    console.log(`🔓 [DR] Skipping ${header.messageNumber - state.Nr} keys in current chain (${state.Nr} -> ${header.messageNumber})`);
+    debugLogger.debug(`🔓 [DR] Skipping ${header.messageNumber - state.Nr} keys in current chain (${state.Nr} -> ${header.messageNumber});`);
     skipMessageKeys(state, header.messageNumber);
   }
 
@@ -401,7 +398,7 @@ export function ratchetDecrypt(
 
   // Diagnostic: log CKr before derivation
   const ckrBefore = _sodium.to_base64(state.CKr.slice(0, 8));
-  console.log(`🔓 [DR-DEC] CKr prefix before KDF: ${ckrBefore}`);
+  debugLogger.debug(`🔓 [DR-DEC] CKr prefix before KDF: ${ckrBefore}`);
 
   // Derive message key
   const [newCKr, messageKey] = KDF_CK(state.CKr);
@@ -412,7 +409,7 @@ export function ratchetDecrypt(
   state.Nr++;
   state.lastUpdate = Date.now();
 
-  console.log(`🔓 [DR-DEC] Message key derived, new Nr=${state.Nr}`);
+  // SECURITY: Sensitive log removed
 
   // Decrypt
   const ciphertextBytes = _sodium.from_base64(ciphertext);
@@ -426,21 +423,18 @@ export function ratchetDecrypt(
  * Perform DH ratchet step
  */
 function dhRatchet(state: RatchetState, headerPubKey: Uint8Array) {
-  console.log(`🔄 [DR-RATCHET] Starting DH ratchet`);
-  console.log(`🔄 [DR-RATCHET] Current RK prefix: ${_sodium.to_base64(state.RK.slice(0, 8))}`);
-  console.log(`🔄 [DR-RATCHET] My DHs pub prefix: ${_sodium.to_base64(getDHPublicKey(state.DHs).slice(0, 8))}`);
-  console.log(`🔄 [DR-RATCHET] Header pub prefix: ${_sodium.to_base64(headerPubKey.slice(0, 8))}`);
+  debugLogger.debug(`🔄 [DR-RATCHET] Starting DH ratchet`);
+  // SECURITY: NEVER log key material (removed for production)
   
   // Update peer's public key
   state.DHr = headerPubKey;
 
   // Perform DH and derive new RK and CKr
   const dhOut = DH(state.DHs, state.DHr);
-  console.log(`🔄 [DR-RATCHET] DH output prefix: ${_sodium.to_base64(dhOut.slice(0, 8))}`);
+  // SECURITY: Sensitive log removed}`);
   
   const [newRK, newCKr] = KDF_RK(state.RK, dhOut);
-  console.log(`🔄 [DR-RATCHET] Derived CKr prefix: ${_sodium.to_base64(newCKr.slice(0, 8))}`);
-  console.log(`🔄 [DR-RATCHET] New RK prefix: ${_sodium.to_base64(newRK.slice(0, 8))}`);
+  // SECURITY: NEVER log derived keys (removed for production)
   
   state.RK = newRK;
   state.CKr = newCKr;
@@ -450,18 +444,18 @@ function dhRatchet(state: RatchetState, headerPubKey: Uint8Array) {
   const newDHs = generateDHKeyPair();
   state.DHs = newDHs.privateKey;
   state.DHs_pub = newDHs.publicKey; // CRITICAL: Store the actual public key
-  console.log(`🔄 [DR-RATCHET] Generated new DHs, pub prefix: ${_sodium.to_base64(state.DHs_pub.slice(0, 8))}`);
+  // SECURITY: Sensitive log removed}`);
 
   // Perform DH again and derive new CKs
   const dhOut2 = DH(state.DHs, state.DHr);
   const [newRK2, newCKs] = KDF_RK(state.RK, dhOut2);
-  console.log(`🔄 [DR-RATCHET] Derived CKs prefix: ${_sodium.to_base64(newCKs.slice(0, 8))}`);
+  // SECURITY: NEVER log derived keys (removed for production)
   
   state.RK = newRK2;
   state.CKs = newCKs;
   state.Ns = 0;
   
-  console.log(`🔄 [DR-RATCHET] DH ratchet complete`);
+  debugLogger.debug(`🔄 [DR-RATCHET] DH ratchet complete`);
 }
 
 /**
@@ -473,14 +467,14 @@ function skipMessageKeys(state: RatchetState, until: number) {
   // Safety check: cannot skip if DHr is null (no peer key yet)
   if (state.DHr === null) {
     // This is normal for first message - not an error
-    console.log(`🔓 [DR] skipMessageKeys: DHr is null (first message), nothing to skip`);
+    debugLogger.debug(`🔓 [DR] skipMessageKeys: DHr is null (first message);, nothing to skip`);
     return;
   }
 
   // Safety check: cannot skip if CKr is not initialized (no receiving chain yet)
   if (state.CKr.every(b => b === 0)) {
     // This is normal before first DH ratchet - not an error
-    console.log(`🔓 [DR] skipMessageKeys: CKr not initialized (before first DH ratchet), nothing to skip`);
+    debugLogger.debug(`🔓 [DR] skipMessageKeys: CKr not initialized (before first DH ratchet);, nothing to skip`);
     return;
   }
 
@@ -494,7 +488,7 @@ function skipMessageKeys(state: RatchetState, until: number) {
     throw new Error(`Too many skipped messages (${toSkip} > ${MAX_SKIP}). Session may be desynchronized.`);
   }
 
-  console.log(`🔓 [DR] Storing ${toSkip} skipped keys (messages ${state.Nr} to ${until - 1})`);
+  debugLogger.debug(`🔓 [DR] Storing ${toSkip} skipped keys (messages ${state.Nr} to ${until - 1});`);
 
   while (state.Nr < until) {
     const [newCKr, messageKey] = KDF_CK(state.CKr);

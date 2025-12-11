@@ -16,6 +16,7 @@
  */
 
 import SimplePeer from 'simple-peer';
+import { debugLogger } from '../lib/debugLogger';
 import {
   encryptMessageForPeer,
   decryptMessageFromPeer,
@@ -68,7 +69,7 @@ export class P2PConnection {
    * Initialize WebRTC connection
    */
   async initialize(signalingSocket: any): Promise<void> {
-    console.log('🔌 [P2P] Initializing WebRTC connection', {
+    debugLogger.websocket('[P2P]...', {
       initiator: this.options.initiator,
       peerId: this.options.peerId,
     });
@@ -89,7 +90,7 @@ export class P2PConnection {
 
     // Handle signaling
     this.peer.on('signal', (signal) => {
-      console.log('📡 [P2P] Sending signal to peer', this.options.peerId);
+      debugLogger.debug('📡 [P2P] Sending signal to peer', this.options.peerId);
       signalingSocket.emit('p2p-signal', {
         to: this.options.peerId,
         signal,
@@ -98,7 +99,7 @@ export class P2PConnection {
 
     // Handle connection established
     this.peer.on('connect', () => {
-      console.log('✅ [P2P] Connected to peer', this.options.peerId);
+      debugLogger.info('✅ [P2P] Connected to peer', this.options.peerId);
       this.connected = true;
       this.options.onConnect?.();
       
@@ -138,7 +139,7 @@ export class P2PConnection {
           };
         }
         
-        console.log('📨 [P2P] Received message', {
+        debugLogger.debug('📨 [P2P] Received message', {
           type: message.type,
           messageId: message.messageId,
         });
@@ -152,7 +153,7 @@ export class P2PConnection {
 
     // Handle disconnection
     this.peer.on('close', () => {
-      console.log('🔌 [P2P] Disconnected from peer', this.options.peerId);
+      debugLogger.websocket('[P2P]...', this.options.peerId);
       this.connected = false;
       this.options.onDisconnect?.();
     });
@@ -166,7 +167,7 @@ export class P2PConnection {
     // Listen for signals from peer
     signalingSocket.on('p2p-signal', (data: any) => {
       if (data.from === this.options.peerId) {
-        console.log('📡 [P2P] Received signal from peer', this.options.peerId);
+        debugLogger.debug('📡 [P2P] Received signal from peer', this.options.peerId);
         this.peer?.signal(data.signal);
       }
     });
@@ -184,7 +185,7 @@ export class P2PConnection {
     const messageId = this.generateMessageId();
 
     if (!this.connected) {
-      console.log('⏳ [P2P] Queueing message (not connected yet)');
+      debugLogger.debug('⏳ [P2P] Queueing message (not connected yet);');
       this.messageQueue.push({
         ...message,
         timestamp,
@@ -221,7 +222,7 @@ export class P2PConnection {
       // Send via WebRTC Data Channel
       this.peer?.send(JSON.stringify(envelope));
       
-      console.log('📤 [P2P] Sent message', {
+      debugLogger.debug('📤 [P2P] Sent message', {
         type: message.type,
         messageId,
       });
@@ -285,7 +286,7 @@ export class P2PConnection {
    * Close connection
    */
   destroy(): void {
-    console.log('🔌 [P2P] Destroying connection', this.options.peerId);
+    debugLogger.websocket('[P2P]...', this.options.peerId);
     this.peer?.destroy();
     this.peer = null;
     this.connected = false;
@@ -339,7 +340,7 @@ export class P2PConnection {
   private async flushMessageQueue(): Promise<void> {
     if (this.messageQueue.length === 0) return;
 
-    console.log(`📤 [P2P] Flushing ${this.messageQueue.length} queued messages`);
+    debugLogger.debug(`📤 [P2P] Flushing ${this.messageQueue.length} queued messages`);
     
     for (const message of this.messageQueue) {
       try {

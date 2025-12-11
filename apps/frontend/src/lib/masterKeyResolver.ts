@@ -2,6 +2,7 @@ import type { AuthSession } from '../store/auth';
 import { getExistingKeyVault } from './keyVault';
 import { getMasterKeyHex as getLegacyMasterKeyHex } from './secureKeyAccess';
 
+import { debugLogger } from './debugLogger';
 /**
  * SECURITY FIX: Non-extractable CryptoKey cache
  * 
@@ -52,7 +53,7 @@ async function importAsNonExtractable(masterKeyHex: string): Promise<CryptoKey> 
 export async function setSessionMasterKey(masterKey: string): Promise<void> {
   try {
     cachedCryptoKey = await importAsNonExtractable(masterKey);
-    console.log('[masterKeyResolver] MasterKey cached as non-extractable CryptoKey');
+    // SECURITY: MasterKey cached (not logging for security)
   } catch (err) {
     console.error('[masterKeyResolver] Failed to import masterKey as CryptoKey', err);
     throw err;
@@ -64,7 +65,7 @@ export async function setSessionMasterKey(masterKey: string): Promise<void> {
  */
 export function clearSessionMasterKey(): void {
   cachedCryptoKey = null;
-  console.log('[masterKeyResolver] CryptoKey cache cleared');
+  debugLogger.debug('[masterKeyResolver] CryptoKey cache cleared');
 }
 
 /**
@@ -108,12 +109,12 @@ export async function resolveMasterKeyForSession(
     if (vault && username) {
       const stored = await vault.getData(`masterKey:${username}`);
       if (stored) {
-        console.log('[masterKeyResolver] Found masterKey in KeyVault (not caching string)');
+        // SECURITY: MasterKey found (not logging for security)
         // SECURITY: Do NOT cache the string - return directly
         // If CryptoKey not cached yet, cache it now
         if (!cachedCryptoKey) {
           cachedCryptoKey = await importAsNonExtractable(stored);
-          console.log('[masterKeyResolver] Cached as non-extractable CryptoKey');
+          // SECURITY: Cached (not logging for security)
         }
         return stored;
       }
@@ -126,12 +127,12 @@ export async function resolveMasterKeyForSession(
   try {
     const legacy = await getLegacyMasterKeyHex();
     if (legacy) {
-      console.log('[masterKeyResolver] Found masterKey in legacy storage (not caching string)');
+      // SECURITY: MasterKey found in legacy storage (not logging for security)
       // SECURITY: Do NOT cache the string - return directly
       // If CryptoKey not cached yet, cache it now
       if (!cachedCryptoKey) {
         cachedCryptoKey = await importAsNonExtractable(legacy);
-        console.log('[masterKeyResolver] Cached as non-extractable CryptoKey');
+        // SECURITY: Cached (not logging for security)
       }
       return legacy;
     }

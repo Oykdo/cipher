@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import { debugLogger } from '../lib/debugLogger';
 import '../styles/fluidCrypto.css';
 
 interface DiceKeyResultsProps {
@@ -61,7 +62,7 @@ export default function DiceKeyResults({
     const generateAvatar = async () => {
       try {
         setIsGenerating(true);
-        console.log('[DiceKeyResults] Generating avatar with', { checksums: checksums.length, userId });
+        debugLogger.debug('[DiceKeyResults] Generating avatar with', { checksums: checksums.length, userId });
         
         // Use relative URL - Vite proxy will forward to backend
         const response = await fetch('/api/generate-dicekey-avatar', {
@@ -70,7 +71,7 @@ export default function DiceKeyResults({
           body: JSON.stringify({ checksums, userId }),
         });
 
-        console.log('[DiceKeyResults] Response status:', response.status);
+        debugLogger.debug('[DiceKeyResults] Response status:', response.status);
         
         if (!response.ok) {
           const errorText = await response.text();
@@ -79,7 +80,7 @@ export default function DiceKeyResults({
         }
 
         const data = await response.json();
-        console.log('[DiceKeyResults] API Response:', data);
+        debugLogger.debug('[DiceKeyResults] API Response:', data);
         
         if (data.success && data.avatarUrl) {
           // Use relative URL - Vite proxy will forward to backend

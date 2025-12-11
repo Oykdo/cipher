@@ -27,6 +27,7 @@ import { hasArchivedMessages } from '../lib/backup';
 import ConversationRequests from '../components/ConversationRequests';
 import { useP2P } from '../hooks/useP2P';
 import { P2P_CONFIG, SIGNALING_SERVERS } from '../config';
+import { debugLogger } from '../lib/debugLogger';
 import '../styles/fluidCrypto.css';
 
 type ViewMode = 'list' | 'chat';
@@ -117,7 +118,7 @@ export default function Conversations() {
     signalingUrls: SIGNALING_SERVERS,
     onMessage: handleP2PMessage,
     onServerSwitch: (oldUrl: string, newUrl: string) => {
-      console.log(`🔄 [P2P] Switched signaling server: ${oldUrl} -> ${newUrl}`);
+      debugLogger.debug(`🔄 [P2P] Switched signaling server: ${oldUrl} -> ${newUrl}`);
     },
   });
 
@@ -127,7 +128,7 @@ export default function Conversations() {
       // Clear encryption key cache to regenerate with new logic
       import('../lib/encryption').then(({ clearKeyCache }) => {
         clearKeyCache();
-        console.log('🔑 [INIT] Encryption key cache cleared');
+        // SECURITY: Sensitive log removed
       });
       loadConversations();
     }
@@ -201,7 +202,7 @@ export default function Conversations() {
 
   // Listen for burned messages
   useSocketEvent(socket, 'message_burned', async (data) => {
-    console.log('🔥 Received burn event for message:', data.messageId);
+    debugLogger.debug('🔥 Received burn event for message:', data.messageId);
     
     // Cancel any pending burn timeout for this message (sender side)
     try {
@@ -216,7 +217,7 @@ export default function Conversations() {
     const isOwnMessage = message?.senderId === session?.user?.id;
     const isBurnMessage = message?.scheduledBurnAt && !isOwnMessage;
 
-    console.log('Burn event details:', {
+    debugLogger.debug('Burn event details:', {
       messageId: data.messageId,
       isOwnMessage,
       isBurnMessage,
@@ -227,7 +228,7 @@ export default function Conversations() {
     if (isBurnMessage) {
       // BurnMessage component handles its own animation via isBurnedFromServer prop
       // Just update the message state - the component will animate and then disappear
-      console.log('⚡ Updating BurnMessage state to burned');
+      debugLogger.debug('⚡ Updating BurnMessage state to burned');
       setMessages(prev => prev.map(msg =>
         msg.id === data.messageId
           ? { ...msg, isBurned: true, burnedAt: data.burnedAt }
@@ -235,7 +236,7 @@ export default function Conversations() {
       ));
     } else {
       // For sender's messages, use the old BurnAnimation overlay
-      console.log('⚡ Adding sender message to burning set');
+      debugLogger.debug('⚡ Adding sender message to burning set');
       setBurningMessages(prev => new Set(prev).add(data.messageId));
 
       // Update message state after animation
@@ -469,7 +470,7 @@ export default function Conversations() {
 
     // Check if peer is online for P2P
     if (!isPeerOnline(peerId)) {
-      console.log('📡 [P2P] Peer not online, will use server relay');
+      debugLogger.debug('📡 [P2P] Peer not online, will use server relay');
       return false;
     }
 
@@ -484,7 +485,7 @@ export default function Conversations() {
       await sendP2PMessage(peerId, peerUsername, conversationId, text);
 
       updateConnectionMode(conversationId, 'p2p');
-      console.log('✅ [P2P] Message sent via P2P (unified E2EE)');
+      debugLogger.info('✅ [P2P] Message sent via P2P (unified E2EE)');
       return true;
     } catch (error) {
       console.warn('⚠️ [P2P] P2P send failed, falling back to server:', error);
@@ -669,7 +670,7 @@ export default function Conversations() {
 
   // Handle burn message reveal - just start countdown, don't send to server yet
   const handleBurnReveal = useCallback(async (messageId: string) => {
-    console.log('🔓 Message revealed, starting countdown:', messageId);
+    debugLogger.debug('🔓 Message revealed, starting countdown:', messageId);
     // Countdown and animation handled by BurnMessage component
     // Server notification happens in handleBurnComplete after animation
   }, []);
@@ -678,7 +679,7 @@ export default function Conversations() {
   const handleBurnComplete = useCallback(async (messageId: string) => {
     if (!selectedConvId || !socket || !session?.user?.username) return;
 
-    console.log('🔥 Burn animation complete, notifying server:', messageId);
+    debugLogger.debug('🔥 Burn animation complete, notifying server:', messageId);
 
     try {
       let signedData = '';

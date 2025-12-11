@@ -9,6 +9,7 @@
 
 import _sodium from 'libsodium-wrappers';
 
+import { debugLogger } from '../lib/debugLogger';
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -190,7 +191,7 @@ export async function generateSignedPreKey(
   // This is the correct approach per Signal Protocol specification
   const signature = _sodium.crypto_sign_detached(message, signingPrivateKey);
   
-  console.log(`🔐 [X3DH] Generated SPK #${id} with Ed25519 signature`);
+  // SECURITY: crypto log removed
   
   return {
     id,
@@ -324,7 +325,7 @@ export async function x3dhInitiator(
   // Derive the shared secret using HKDF
   const sharedSecret = kdf(dhConcat, 'X3DH_SharedSecret');
   
-  console.log(`🔐 [X3DH] Initiator computed shared secret (prefix): ${_sodium.to_base64(sharedSecret.slice(0, 8))}`);
+  // SECURITY: NEVER log cryptographic material (removed for production)
   
   return sharedSecret;
 }
@@ -366,7 +367,7 @@ export async function x3dhResponder(
   // Derive the shared secret using HKDF
   const sharedSecret = kdf(dhConcat, 'X3DH_SharedSecret');
   
-  console.log(`🔐 [X3DH] Responder computed shared secret (prefix): ${_sodium.to_base64(sharedSecret.slice(0, 8))}`);
+  // SECURITY: NEVER log cryptographic material (removed for production)
   
   return sharedSecret;
 }
@@ -517,7 +518,7 @@ export function transitionHandshakeState(
       return createHandshakeSession(session.peerUsername); // Generates new sessionId
   }
   
-  console.log(`🔄 [X3DH] State transition: ${session.state} -> ${newSession.state} (event: ${event})`);
+  debugLogger.debug(`🔄 [X3DH] State transition: ${session.state} -> ${newSession.state} (event: ${event});`);
   
   return newSession;
 }

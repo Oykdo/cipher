@@ -21,6 +21,7 @@
 
 import { io, Socket } from 'socket.io-client';
 
+import { debugLogger } from '../lib/debugLogger';
 export interface SignalingServerHealth {
   url: string;
   healthy: boolean;
@@ -116,7 +117,7 @@ export class SignalingClient {
   private connectToServer(serverUrl: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const startTime = Date.now();
-      console.log('🔌 [SIGNALING] Connecting to server', serverUrl);
+      debugLogger.websocket('[SIGNALING]...', serverUrl);
 
       const timeout = setTimeout(() => {
         reject(new Error(`Connection timeout to ${serverUrl}`));
@@ -134,7 +135,7 @@ export class SignalingClient {
       this.socket.on('connect', () => {
         clearTimeout(timeout);
         const latency = Date.now() - startTime;
-        console.log(`✅ [SIGNALING] Connected to ${serverUrl} (${latency}ms)`);
+        debugLogger.info('✅ [SIGNALING] Connected to ${serverUrl} (${latency}ms)');
         
         this.connected = true;
         this.currentServerUrl = serverUrl;
@@ -158,7 +159,7 @@ export class SignalingClient {
       });
 
       this.socket.on('disconnect', (reason) => {
-        console.log('🔌 [SIGNALING] Disconnected from server:', reason);
+        debugLogger.websocket('[SIGNALING]...', reason);
         this.connected = false;
         
         // Auto-reconnect on unexpected disconnect
@@ -169,12 +170,12 @@ export class SignalingClient {
 
       // Peer presence events
       this.socket.on('peer-available', (data: { peerId: string }) => {
-        console.log('👤 [SIGNALING] Peer available', data.peerId);
+        debugLogger.debug('👤 [SIGNALING] Peer available', data.peerId);
         this.options.onPeerAvailable?.(data.peerId);
       });
 
       this.socket.on('peer-unavailable', (data: { peerId: string }) => {
-        console.log('👤 [SIGNALING] Peer unavailable', data.peerId);
+        debugLogger.debug('👤 [SIGNALING] Peer unavailable', data.peerId);
         this.options.onPeerUnavailable?.(data.peerId);
       });
 
@@ -193,7 +194,7 @@ export class SignalingClient {
    */
   private async handleDisconnect(): Promise<void> {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('⚠️ [SIGNALING] Max reconnect attempts reached, switching server');
+      debugLogger.debug('⚠️ [SIGNALING] Max reconnect attempts reached, switching server');
       this.markServerUnhealthy(this.currentServerUrl);
       this.reconnectAttempts = 0;
       
@@ -208,7 +209,7 @@ export class SignalingClient {
     }
 
     this.reconnectAttempts++;
-    console.log(`🔄 [SIGNALING] Reconnecting... (attempt ${this.reconnectAttempts})`);
+    debugLogger.debug(`🔄 [SIGNALING] Reconnecting... (attempt ${this.reconnectAttempts});`);
     
     setTimeout(async () => {
       try {
@@ -302,7 +303,7 @@ export class SignalingClient {
    * Disconnect from signaling server
    */
   disconnect(): void {
-    console.log('🔌 [SIGNALING] Disconnecting from server');
+    debugLogger.websocket('[SIGNALING]...');
     this.stopHealthChecks();
     this.socket?.disconnect();
     this.socket = null;
@@ -328,7 +329,7 @@ export class SignalingClient {
    * Request connection to peer
    */
   requestConnection(peerId: string): void {
-    console.log('📡 [SIGNALING] Requesting connection to peer', peerId);
+    debugLogger.debug('📡 [SIGNALING] Requesting connection to peer', peerId);
     this.socket?.emit('request-connection', { peerId });
   }
 
@@ -336,7 +337,7 @@ export class SignalingClient {
    * Notify peer availability
    */
   notifyAvailable(): void {
-    console.log('📡 [SIGNALING] Notifying availability');
+    debugLogger.debug('📡 [SIGNALING] Notifying availability');
     this.socket?.emit('peer-available');
   }
 
@@ -344,7 +345,7 @@ export class SignalingClient {
    * Notify peer unavailability
    */
   notifyUnavailable(): void {
-    console.log('📡 [SIGNALING] Notifying unavailability');
+    debugLogger.debug('📡 [SIGNALING] Notifying unavailability');
     this.socket?.emit('peer-unavailable');
   }
 }

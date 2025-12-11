@@ -8,6 +8,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import { debugLogger } from '../lib/debugLogger';
 import {
   DICE_SERIES_COUNT,
   DICE_PER_SERIES,
@@ -51,7 +52,7 @@ export default function DiceKeyInputFluid({ onComplete, onCancel }: DiceKeyInput
   const playSound = (type: 'click' | 'complete' | 'success') => {
     // Placeholder for sound effects
     // In production, load actual audio files
-    console.log(`🔊 Sound: ${type}`);
+    debugLogger.debug(`🔊 Sound: ${type}`);
   };
 
   // Trigger haptic feedback (if supported)

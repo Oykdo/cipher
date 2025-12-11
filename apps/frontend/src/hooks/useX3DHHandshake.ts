@@ -13,6 +13,7 @@ import {
 } from '../lib/e2ee/e2eeService';
 import { isHandshakeMessage } from '../lib/e2ee/x3dhManager';
 
+import { debugLogger } from '../lib/debugLogger';
 interface UseX3DHHandshakeOptions {
   socket: Socket | null;
   connected: boolean;
@@ -48,7 +49,7 @@ export function useX3DHHandshake({ socket, connected }: UseX3DHHandshakeOptions)
           timestamp: Date.now(),
         }, (response: { success: boolean; error?: string }) => {
           if (response?.success) {
-            console.log(`📤 [X3DH] Handshake message sent to ${peerUsername}`);
+            debugLogger.debug(`📤 [X3DH] Handshake message sent to ${peerUsername}`);
             resolve();
           } else {
             console.error(`❌ [X3DH] Failed to send handshake:`, response?.error);
@@ -66,7 +67,7 @@ export function useX3DHHandshake({ socket, connected }: UseX3DHHandshakeOptions)
     // Configure E2EE service
     setHandshakeMessageSender(sendHandshakeMessage);
     isConfigured.current = true;
-    console.log('🔐 [X3DH Hook] Handshake sender configured');
+    // SECURITY: crypto log removed
 
     return () => {
       isConfigured.current = false;
@@ -82,7 +83,7 @@ export function useX3DHHandshake({ socket, connected }: UseX3DHHandshakeOptions)
       handshakeData: string;
       timestamp: number;
     }) => {
-      console.log(`📨 [X3DH Hook] Received handshake from ${data.senderUsername}`);
+      debugLogger.debug(`📨 [X3DH Hook] Received handshake from ${data.senderUsername}`);
 
       try {
         // Process the handshake message
@@ -92,7 +93,7 @@ export function useX3DHHandshake({ socket, connected }: UseX3DHHandshakeOptions)
         );
 
         if (handled) {
-          console.log(`✅ [X3DH Hook] Handshake processed from ${data.senderUsername}`);
+          debugLogger.info('✅ [X3DH Hook] Handshake processed from ${data.senderUsername}');
         }
       } catch (error) {
         console.error(`❌ [X3DH Hook] Failed to process handshake:`, error);

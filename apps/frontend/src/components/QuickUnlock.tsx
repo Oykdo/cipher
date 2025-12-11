@@ -16,6 +16,7 @@ import { getKeyVault } from '../lib/keyVault';
 import { initializeE2EE } from '../lib/e2ee/e2eeService';
 import { setSessionMasterKey } from '../lib/masterKeyResolver';
 import * as srp from 'secure-remote-password/client';
+import { debugLogger } from '../lib/debugLogger';
 import '../styles/fluidCrypto.css';
 
 interface QuickUnlockProps {
@@ -156,9 +157,9 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
 
       // Initialize E2EE for message encryption
       try {
-        console.log('[QuickUnlock] Initializing E2EE for:', data.user.username);
+        debugLogger.debug('[QuickUnlock] Initializing E2EE for:', data.user.username);
         await initializeE2EE(data.user.username);
-        console.log('[QuickUnlock] E2EE initialized successfully');
+        debugLogger.debug('[QuickUnlock] E2EE initialized successfully');
       } catch (e2eeError) {
         console.error('[QuickUnlock] E2EE initialization failed:', e2eeError);
         // Don't block login, but show warning to user

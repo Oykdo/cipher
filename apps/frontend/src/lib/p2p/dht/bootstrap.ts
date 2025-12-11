@@ -82,7 +82,7 @@ export class BootstrapManager {
       failedAttempts: 0,
     });
     
-    console.log(`➕ [Bootstrap] Added node: ${url}`);
+    debugLogger.debug(`➕ [Bootstrap] Added node: ${url}`);
   }
 
   /**
@@ -90,7 +90,7 @@ export class BootstrapManager {
    */
   removeNode(url: string): void {
     this.nodes.delete(url);
-    console.log(`➖ [Bootstrap] Removed node: ${url}`);
+    debugLogger.debug(`➖ [Bootstrap] Removed node: ${url}`);
   }
 
   /**
@@ -110,7 +110,7 @@ export class BootstrapManager {
     let connected = 0;
     let failed = 0;
 
-    console.log(`🔗 [Bootstrap] Connecting to ${nodes.length} nodes...`);
+    debugLogger.debug(`🔗 [Bootstrap] Connecting to ${nodes.length} nodes...`);
 
     for (const node of nodes) {
       try {
@@ -126,7 +126,7 @@ export class BootstrapManager {
       }
     }
 
-    console.log(`✅ [Bootstrap] Connected: ${connected}, Failed: ${failed}`);
+    debugLogger.info('✅ [Bootstrap] Connected: ${connected}, Failed: ${failed}');
     return { connected, failed };
   }
 
@@ -155,7 +155,7 @@ export class BootstrapManager {
         // Try to get peer list
         await this.fetchPeersFromNode(node);
         
-        console.log(`✅ [Bootstrap] Connected to ${node.url} (${node.latency}ms)`);
+        debugLogger.info('✅ [Bootstrap] Connected to ${node.url} (${node.latency}ms)');
         return true;
       }
 
@@ -192,7 +192,7 @@ export class BootstrapManager {
             this.onPeerDiscovered?.(peer.id, peer.addresses);
           }
         }
-        console.log(`📥 [Bootstrap] Received ${data.peers.length} peers from ${node.url}`);
+        debugLogger.debug(`📥 [Bootstrap] Received ${data.peers.length} peers from ${node.url}`);
       }
     } catch (error) {
       // Peer list fetch is optional, don't fail connection
@@ -212,7 +212,7 @@ export class BootstrapManager {
       }
     }, this.config.healthCheckInterval);
 
-    console.log('🏥 [Bootstrap] Started health checks');
+    debugLogger.debug('🏥 [Bootstrap] Started health checks');
   }
 
   /**
@@ -223,7 +223,7 @@ export class BootstrapManager {
       clearInterval(this.healthCheckTimer);
       this.healthCheckTimer = null;
     }
-    console.log('⏹️ [Bootstrap] Stopped health checks');
+    debugLogger.debug('⏹️ [Bootstrap] Stopped health checks');
   }
 
   /**
@@ -244,7 +244,7 @@ export class BootstrapManager {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ peerId, addresses }),
         });
-        console.log(`📢 [Bootstrap] Announced to ${node.url}`);
+        debugLogger.debug(`📢 [Bootstrap] Announced to ${node.url}`);
       } catch (error) {
         console.warn(`⚠️ [Bootstrap] Announcement failed to ${node.url}`);
       }

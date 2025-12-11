@@ -9,15 +9,24 @@
  */
 
 const isDev = import.meta.env.DEV;
+const isProd = import.meta.env.PROD;
 
 // Feature flags for granular control
+// WARNING: crypto and e2ee should NEVER be enabled in production (security risk)
 const DEBUG_FLAGS = {
-  crypto: isDev && false, // ALWAYS false for security
-  e2ee: isDev && false,   // ALWAYS false for security
-  p2p: isDev && false,
-  websocket: isDev && false,
-  general: isDev && false,
+  crypto: isDev && false,     // ALWAYS false - NEVER log cryptographic material
+  e2ee: isDev && false,       // ALWAYS false - NEVER log keys or secrets
+  p2p: isDev && true,         // OK in dev - WebRTC debugging
+  websocket: isDev && true,   // OK in dev - Connection debugging
+  general: isDev && true,     // OK in dev - General debug info
 } as const;
+
+// Completely disable ALL debug logs in production (extra safety)
+if (isProd) {
+  Object.keys(DEBUG_FLAGS).forEach(key => {
+    (DEBUG_FLAGS as any)[key] = false;
+  });
+}
 
 export const debugLogger = {
   /**

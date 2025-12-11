@@ -7,6 +7,7 @@
 
 import { useEffect } from 'react';
 
+import { debugLogger } from '../lib/debugLogger';
 const KONAMI_CODE = [
   'ArrowUp',
   'ArrowUp',
@@ -25,7 +26,7 @@ const KONAMI_CODE = [
  * 
  * @example
  * useKonamiCode(() => {
- *   console.log('Easter egg activated!');
+ *   debugLogger.debug('Easter egg activated!');
  * });
  */
 export function useKonamiCode(callback: () => void) {

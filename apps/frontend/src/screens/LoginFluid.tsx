@@ -15,6 +15,7 @@ import '../styles/fluidCrypto.css';
 import { deriveAllKeysFromDice } from '../lib/kdfSimple';
 import { generateCompleteKeySet, generateUserId } from '../lib/keyGeneration';
 import { calculateSeriesChecksum, splitIntoSeries } from '../lib/diceKey';
+import { debugLogger } from '../lib/debugLogger';
 import '../styles/fluidCrypto.css';
 
 // Helper function for encrypting dice rolls
@@ -170,7 +171,7 @@ export default function LoginFluid() {
         const checksumPassword = checksums.join('') + generatedUserId;
         const encryptedRolls = await encryptDiceRolls(rolls, checksumPassword);
         localStorage.setItem(`diceRolls_${generatedUserId}`, encryptedRolls);
-        console.log('[LoginFluid] Dice rolls stored for quick login');
+        debugLogger.debug('[LoginFluid] Dice rolls stored for quick login');
       } catch (storageError) {
         console.error('[LoginFluid] Failed to store dice rolls:', storageError);
         // Continue anyway - this is not critical for login

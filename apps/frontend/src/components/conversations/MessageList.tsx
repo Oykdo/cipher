@@ -7,6 +7,7 @@ import { BurnCountdown } from '../BurnCountdown';
 import { TimeLockCountdown } from '../TimeLockCountdown';
 import { BurnMessage } from '../BurnMessage';
 
+import { debugLogger } from '../lib/debugLogger';
 interface MessageListProps {
   messages: MessageV2[];
   sessionUserId: string;
@@ -81,7 +82,7 @@ export function MessageList({
           const isBurning = burningMessages.has(message.id);
 
           // Debug log temporarily
-          console.log('MessageDebug:', {
+          debugLogger.debug('MessageDebug:', {
             id: message.id,
             isOwn,
             locked,
@@ -101,7 +102,7 @@ export function MessageList({
               : new Date(message.createdAt).getTime();
             const originalDelay = Math.ceil((message.scheduledBurnAt! - createdAtMs) / 1000);
             
-            console.log('Burn calculation debug:', {
+            debugLogger.debug('Burn calculation debug:', {
               createdAt: message.createdAt,
               createdAtType: typeof message.createdAt,
               createdAtMs,
@@ -115,7 +116,7 @@ export function MessageList({
               return null; // Don't render if delay is invalid
             }
             
-            console.log('Rendering BurnMessage with delay:', originalDelay);
+            debugLogger.debug('Rendering BurnMessage with delay:', originalDelay);
             
             return (
               <BurnMessage

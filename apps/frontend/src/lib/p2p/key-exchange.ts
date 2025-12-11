@@ -119,7 +119,7 @@ export class P2PKeyExchange {
       };
 
       this.sendMessage!(peerId, message).catch(reject);
-      console.log(`🔑 [KeyExchange] Requesting key bundle from ${peerId}`);
+      // SECURITY: Sensitive log removed
     });
   }
 
@@ -127,7 +127,7 @@ export class P2PKeyExchange {
    * Handle incoming key exchange message
    */
   async handleMessage(peerId: string, message: KeyExchangeMessage): Promise<void> {
-    console.log(`🔑 [KeyExchange] Received ${message.type} from ${peerId}`);
+    // SECURITY: crypto log removed
 
     switch (message.type) {
       case 'key_request':
@@ -171,7 +171,7 @@ export class P2PKeyExchange {
     };
 
     await this.sendMessage(peerId, response);
-    console.log(`🔑 [KeyExchange] Sent key bundle to ${peerId}`);
+    // SECURITY: Sensitive log removed
   }
 
   /**
@@ -196,7 +196,7 @@ export class P2PKeyExchange {
     // Notify about received key bundle
     this.onKeyBundleReceived?.(peerId, payload.keyBundle);
     pending.resolve(payload.keyBundle);
-    console.log(`🔑 [KeyExchange] Received key bundle from ${peerId}`);
+    // SECURITY: Sensitive log removed
   }
 
   /**
@@ -206,7 +206,7 @@ export class P2PKeyExchange {
     peerId: string,
     payload: { type: 'verify'; fingerprint: string; verified: boolean }
   ): void {
-    console.log(`🔑 [KeyExchange] Key verification from ${peerId}: ${payload.verified ? 'VERIFIED' : 'FAILED'}`);
+    // SECURITY: Sensitive log removed
   }
 
   /**

@@ -32,6 +32,7 @@ import { decryptReceivedMessage } from '../e2ee/messagingIntegration';
 import { getMyFingerprint, isE2EEInitialized } from '../e2ee/e2eeService';
 import { useAuthStore } from '../../store/auth';
 
+import { debugLogger } from '../lib/debugLogger';
 /**
  * Export all user data to encrypted backup file
  * 
@@ -482,7 +483,7 @@ async function importContacts(contacts: Array<{
       }
     }
     
-    console.log(`[Backup] Imported ${imported}/${contacts.length} contacts with fingerprints`);
+    debugLogger.debug(`[Backup] Imported ${imported}/${contacts.length} contacts with fingerprints`);
   } catch (error) {
     console.error('[Backup] Failed to import contacts:', error);
     throw error;

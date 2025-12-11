@@ -18,6 +18,7 @@
 import _sodium from 'libsodium-wrappers';
 import { getExistingKeyVault } from '../keyVault';
 
+import { debugLogger } from '../lib/debugLogger';
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -165,7 +166,7 @@ export async function storeHandshakeState(
   const serialized = serializeHandshakeState(state);
   await vault.storeData(key, serialized);
   
-  console.log(`🔐 [X3DH Store] Saved handshake state for ${state.peerUsername} (session: ${state.sessionId})`);
+  // SECURITY: crypto log removed
 }
 
 /**
@@ -228,7 +229,7 @@ export async function completeHandshake(
     sharedSecret,
   });
   
-  console.log(`✅ [X3DH Store] Handshake completed with ${peerUsername}`);
+  debugLogger.info('✅ [X3DH Store] Handshake completed with ${peerUsername}');
 }
 
 /**
@@ -242,7 +243,7 @@ export async function failHandshake(
     state: 'FAILED',
   });
   
-  console.log(`❌ [X3DH Store] Handshake failed with ${peerUsername}`);
+  debugLogger.debug(`❌ [X3DH Store] Handshake failed with ${peerUsername}`);
 }
 
 /**
@@ -260,7 +261,7 @@ export async function deleteHandshakeState(
   const key = getStorageKey(username, peerUsername);
   await vault.removeData(key);
   
-  console.log(`🗑️ [X3DH Store] Deleted handshake state for ${peerUsername}`);
+  debugLogger.debug(`🗑️ [X3DH Store] Deleted handshake state for ${peerUsername}`);
 }
 
 /**

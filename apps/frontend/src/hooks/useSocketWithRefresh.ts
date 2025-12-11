@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/auth';
 
+import { debugLogger } from '../lib/debugLogger';
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
 
 interface UseSocketWithRefreshReturn {
@@ -48,13 +49,13 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
 
     // Déconnecter l'ancien socket si existant
     if (socketRef.current) {
-      console.log('[useSocket] Disconnecting old socket');
+      debugLogger.debug('[useSocket] Disconnecting old socket');
       socketRef.current.disconnect();
       socketRef.current = null;
     }
 
     try {
-      console.log('[useSocket] Connecting with new token');
+      // SECURITY: Sensitive log removed
       
       const socket = io(SOCKET_URL, {
         auth: {
@@ -69,7 +70,7 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
 
       // Event: Connection successful
       socket.on('connect', () => {
-        console.log('[useSocket] Connected:', socket.id);
+        debugLogger.debug('[useSocket] Connected:', socket.id);
         setConnected(true);
         setError(null);
       });
@@ -89,18 +90,18 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
 
       // Event: Disconnection
       socket.on('disconnect', (reason) => {
-        console.log('[useSocket] Disconnected:', reason);
+        debugLogger.debug('[useSocket] Disconnected:', reason);
         setConnected(false);
         
         // Si déconnexion par le serveur (token expiré), attendre le refresh
         if (reason === 'io server disconnect') {
-          console.log('[useSocket] Server disconnected, waiting for token refresh');
+          // SECURITY: Sensitive log removed
         }
       });
 
       // Event: Reconnection attempt
       socket.on('reconnect_attempt', (attempt) => {
-        console.log(`[useSocket] Reconnection attempt ${attempt}`);
+        debugLogger.debug(`[useSocket] Reconnection attempt ${attempt}`);
       });
 
       // Event: Reconnection failed
@@ -121,7 +122,7 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
    */
   const disconnect = () => {
     if (socketRef.current) {
-      console.log('[useSocket] Disconnecting socket');
+      debugLogger.debug('[useSocket] Disconnecting socket');
       socketRef.current.disconnect();
       socketRef.current = null;
       setConnected(false);
@@ -132,7 +133,7 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
    * Force une reconnexion
    */
   const reconnect = () => {
-    console.log('[useSocket] Manual reconnect triggered');
+    debugLogger.debug('[useSocket] Manual reconnect triggered');
     disconnect();
     connect();
   };
@@ -140,12 +141,12 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
   // Effect: Connect/reconnect when token changes
   useEffect(() => {
     if (!token) {
-      console.log('[useSocket] No token, disconnecting');
+      // SECURITY: Sensitive log removed
       disconnect();
       return;
     }
 
-    console.log('[useSocket] Token changed, reconnecting');
+    // SECURITY: Sensitive log removed
     connect();
 
     // Cleanup on unmount

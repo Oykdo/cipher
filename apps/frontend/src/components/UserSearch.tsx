@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { apiv2 } from '../services/api-v2';
+import { debugLogger } from '../lib/debugLogger';
 import '../styles/fluidCrypto.css';
 
 export interface UserSearchResult {
@@ -57,12 +58,12 @@ export default function UserSearch({ onSelectUser, onCancel, loading: externalLo
       setSearching(true);
       setError('');
 
-      console.log('[UserSearch] Searching for:', query);
+      debugLogger.debug('[UserSearch] Searching for:', query);
 
       // Use the apiv2 service instead of direct fetch
       const data = await apiv2.searchUsers(query);
 
-      console.log('[UserSearch] Results:', data);
+      debugLogger.debug('[UserSearch] Results:', data);
       setResults(data.users || []);
 
       if (data.users.length === 0) {

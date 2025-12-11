@@ -188,7 +188,7 @@ export function hasAnyLocalAccount(): boolean {
  * BUT keeps the users in the list (known_accounts)
  */
 export function clearQuickConnectCache(): void {
-  console.log('🗑️ [QuickConnect] Clearing QuickConnect cache...');
+  debugLogger.debug('🗑️ [QuickConnect] Clearing QuickConnect cache...');
 
   // Get all accounts first
   const accounts = getLocalAccounts();
@@ -196,17 +196,17 @@ export function clearQuickConnectCache(): void {
   // Clear password hashes for all accounts
   accounts.forEach(account => {
     localStorage.removeItem(`pwd_${account.username}`);
-    console.log(`  ✅ Cleared pwd_${account.username}`);
+    debugLogger.debug(`  ✅ Cleared pwd_${account.username}`);
   });
 
   // Clear auth session
   localStorage.removeItem('cipher-pulse-auth');
-  console.log('  ✅ Cleared cipher-pulse-auth');
+  debugLogger.debug('  ✅ Cleared cipher-pulse-auth');
 
   // Clear secure auth session
   localStorage.removeItem('cipher-pulse-auth-secure');
-  console.log('  ✅ Cleared cipher-pulse-auth-secure');
+  debugLogger.debug('  ✅ Cleared cipher-pulse-auth-secure');
 
-  console.log('✅ [QuickConnect] Cache cleared successfully');
-  console.log('ℹ️  Users will need to use full login (username + master key)');
+  debugLogger.info('✅ [QuickConnect] Cache cleared successfully');
+  // SECURITY: Sensitive log removed');
 }

@@ -21,6 +21,7 @@ import {
   type EncryptedData,
 } from './index';
 import { getExistingKeyVault } from '../keyVault';
+import { debugLogger } from '../lib/debugLogger';
 import {
   ratchetEncrypt,
   ratchetDecrypt,
@@ -288,13 +289,11 @@ export async function initiateSession(
   // Log key fingerprints for debugging (first 8 bytes as hex)
   const myKeyFingerprint = bytesToBase64(myPrivateKey.slice(0, 8));
   const peerKeyFingerprint = bytesToBase64(peerPublicKey.slice(0, 8));
-  console.log(`🔐 [E2EE] Initiating NEW session: ${username} → ${peerUsername}`);
-  console.log(`🔐 [E2EE] My key prefix: ${myKeyFingerprint}, Peer key prefix: ${peerKeyFingerprint}`);
+  // SECURITY: crypto log removed
+  // SECURITY: Key fingerprints removed - never log key material or derived secrets
 
   // Perform X25519 key exchange
   const sharedSecret = await deriveSharedSecret(myPrivateKey, peerPublicKey);
-  const sharedSecretFingerprint = bytesToBase64(sharedSecret.slice(0, 8));
-  console.log(`🔐 [E2EE] Shared secret derived, prefix: ${sharedSecretFingerprint}`);
 
   // Derive encryption key from shared secret
   const sessionInfo = new TextEncoder().encode(`session:${username}:${peerUsername}`);
@@ -329,7 +328,7 @@ export async function initiateSession(
   activeSessions.set(session.sessionId, session);
   await storeSession(username, session);
 
-  console.log(`✅ [E2EE] Session established with ${peerUsername}`);
+  debugLogger.info('✅ [E2EE] Session established with ${peerUsername}');
 
   return session;
 }
@@ -354,7 +353,7 @@ export async function createDoubleRatchetSession(
   myPrivateKey: Uint8Array,
   peerPublicKey: Uint8Array
 ): Promise<E2EESession> {
-  console.log(`🔐 [E2EE] Creating Double Ratchet session after X3DH handshake: ${username} ↔ ${peerUsername}`);
+  // SECURITY: crypto log removed
   
   // Delete any existing session (old NaCl Box sessions)
   await deleteSession(username, peerUsername);
@@ -384,7 +383,7 @@ export async function createDoubleRatchetSession(
   activeSessions.set(session.sessionId, session);
   await storeSession(username, session);
   
-  console.log(`✅ [E2EE] Double Ratchet session established with ${peerUsername} (X3DH handshake completed)`);
+  debugLogger.info('✅ [E2EE] Double Ratchet session established with ${peerUsername} (X3DH handshake completed)');
   return session;
 }
 
@@ -402,14 +401,14 @@ export async function getOrCreateSession(
   // Check memory cache
   let session = activeSessions.get(sessionId);
   if (session) {
-    console.log(`🔐 [E2EE] Using CACHED session (memory) for ${peerUsername}, messageCounter: ${session.messageCounter}`);
+    // SECURITY: crypto log removed
     return session;
   }
   
   // Check KeyVault
   session = await retrieveSession(username, peerUsername);
   if (session) {
-    console.log(`🔐 [E2EE] Using PERSISTED session (KeyVault) for ${peerUsername}, messageCounter: ${session.messageCounter}`);
+    // SECURITY: crypto log removed
     
     // CRITICAL: Check if session has valid DHs_pub (required for new format)
     const hasValidDHsPub = session.ratchetState?.DHs_pub && 
@@ -437,7 +436,7 @@ export async function getOrCreateSession(
   }
   
   // Create new session
-  console.log(`🔐 [E2EE] Creating NEW session for ${peerUsername}`);
+  // SECURITY: crypto log removed
   return initiateSession(username, peerUsername, myPrivateKey, peerPublicKey);
 }
 
@@ -507,7 +506,7 @@ export async function encryptSessionMessage(
     
     // Use NaCl Box if preferred or as fallback
     if (encryptionMode === 'nacl-box' && session.myPrivateKey && session.peerPublicKey) {
-      console.log(`🔒 [E2EE] Using NaCl Box for ${session.peerUsername} (user preference)`);
+      // SECURITY: crypto log removed
       const encrypted = await encryptWithNaClBox(message, session.myPrivateKey, session.peerPublicKey);
       
       if (username) {
@@ -521,7 +520,7 @@ export async function encryptSessionMessage(
     if (session.useDoubleRatchet && session.ratchetState) {
       try {
         const encrypted = ratchetEncrypt(session.ratchetState, message);
-        console.log(`🔒 [E2EE] Encrypted message #${session.messageCounter} for ${session.peerUsername} (Double Ratchet)`);
+        // SECURITY: crypto log removed
         
         // Reset failure counter on success
         session.consecutiveFailures = 0;
@@ -548,7 +547,7 @@ export async function encryptSessionMessage(
 
     // Final fallback to symmetric encryption (legacy)
     const encrypted = await encryptSymmetric(message, session.encryptionKey);
-    console.log(`🔒 [E2EE] Encrypted message #${session.messageCounter} for ${session.peerUsername} (Legacy)`);
+    // SECURITY: crypto log removed
     return encrypted;
   } finally {
     // Always release the lock
@@ -580,7 +579,7 @@ export async function decryptSessionMessage(
         throw new Error('Cannot decrypt NaCl Box message: missing identity keys in session');
       }
       const message = await decryptWithNaClBox(encrypted as NaClBoxMessage, session.myPrivateKey, session.peerPublicKey);
-      console.log(`🔓 [E2EE] Decrypted message from ${session.peerUsername} (NaCl Box)`);
+      debugLogger.debug(`🔓 [E2EE] Decrypted message from ${session.peerUsername} (NaCl Box);`);
       return message;
     }
 
@@ -593,7 +592,7 @@ export async function decryptSessionMessage(
       
       try {
         const message = ratchetDecrypt(session.ratchetState, encrypted as DoubleRatchetMessage);
-        console.log(`🔓 [E2EE] Decrypted message from ${session.peerUsername} (Double Ratchet)`);
+        debugLogger.debug(`🔓 [E2EE] Decrypted message from ${session.peerUsername} (Double Ratchet);`);
         
         // Reset failure counter on success
         session.consecutiveFailures = 0;
@@ -624,7 +623,7 @@ export async function decryptSessionMessage(
 
     // Fallback to legacy symmetric decryption
     const message = await decryptSymmetric(encrypted as EncryptedData, session.encryptionKey);
-    console.log(`🔓 [E2EE] Decrypted message from ${session.peerUsername} (Legacy)`);
+    debugLogger.debug(`🔓 [E2EE] Decrypted message from ${session.peerUsername} (Legacy);`);
     return message;
   } finally {
     // Always release the lock
@@ -650,7 +649,7 @@ export async function resetSessionToNaClBox(
     session.consecutiveFailures = MAX_RATCHET_FAILURES; // Force NaCl Box
     
     await storeSession(username, session);
-    console.log(`🔄 [E2EE] Session with ${peerUsername} reset to NaCl Box mode`);
+    debugLogger.debug(`🔄 [E2EE] Session with ${peerUsername} reset to NaCl Box mode`);
   }
 }
 
@@ -701,7 +700,7 @@ export async function deleteSession(username: string, peerUsername: string): Pro
     await vault.removeData(`e2ee:session:${username}:${peerUsername}`);
   }
 
-  console.log(`🗑️ [E2EE] Deleted session with ${peerUsername}`);
+  debugLogger.debug(`🗑️ [E2EE] Deleted session with ${peerUsername}`);
 }
 
 /**
@@ -709,7 +708,7 @@ export async function deleteSession(username: string, peerUsername: string): Pro
  */
 export async function clearAllSessions(): Promise<void> {
   activeSessions.clear();
-  console.log('🗑️ [E2EE] Cleared all active sessions');
+  debugLogger.debug('🗑️ [E2EE] Cleared all active sessions');
 }
 
 /**

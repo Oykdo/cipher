@@ -70,7 +70,7 @@ export async function ensurePeerKey(peerUsername: string): Promise<boolean> {
     
     if (existingFingerprint && existingFingerprint === keyBundle.fingerprint) {
       // Key hasn't changed, we're good
-      console.log(`✅ [E2EE] Peer key for ${peerUsername} verified (fingerprint match)`);
+      // SECURITY: Sensitive log removed`);
       return true;
     }
     
@@ -97,7 +97,7 @@ export async function ensurePeerKey(peerUsername: string): Promise<boolean> {
       keyBundle.fingerprint
     );
 
-    console.log(`✅ [E2EE] Fetched and stored public key for ${peerUsername}`);
+    // SECURITY: Sensitive log removed
     return true;
   } catch (error) {
     console.error(`[E2EE] Failed to fetch key for ${peerUsername}:`, error);
@@ -217,7 +217,7 @@ export async function decryptReceivedMessage(
 
     // Determine encryption type from the encrypted payload
     const encryptionType = parsed.encrypted.version || 'unknown';
-    console.log(`[E2EE] Decrypting ${encryptionType} message from ${senderUsername}`);
+    debugLogger.debug(`[E2EE] Decrypting ${encryptionType} message from ${senderUsername}`);
 
     try {
       // Decrypt with E2EE (handles both Double Ratchet and NaCl Box)
@@ -261,7 +261,7 @@ export async function exchangeKeysWithPeer(
   }
 
   await addPeerPublicKey(peerUsername, peerPublicKeyBase64, peerFingerprint);
-  console.log(`✅ [E2EE] Keys exchanged with ${peerUsername}`);
+  debugLogger.info('✅ [E2EE] Keys exchanged with ${peerUsername}');
 }
 
 // ============================================================================

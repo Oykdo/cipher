@@ -140,7 +140,7 @@ export class StoreForwardQueue {
       store.add(message);
     });
 
-    console.log(`📦 [StoreForward] Queued message ${message.id} for peer ${peerId}`);
+    debugLogger.debug(`📦 [StoreForward] Queued message ${message.id} for peer ${peerId}`);
     return message.id;
   }
 
@@ -243,7 +243,7 @@ export class StoreForwardQueue {
       store.delete(messageId);
     });
 
-    console.log(`🗑️ [StoreForward] Removed message ${messageId}`);
+    debugLogger.debug(`🗑️ [StoreForward] Removed message ${messageId}`);
   }
 
   /**
@@ -253,7 +253,7 @@ export class StoreForwardQueue {
     const messages = await this.getPendingForPeer(peerId);
     let sentCount = 0;
 
-    console.log(`📤 [StoreForward] Processing ${messages.length} queued messages for peer ${peerId}`);
+    debugLogger.debug(`📤 [StoreForward] Processing ${messages.length} queued messages for peer ${peerId}`);
 
     for (const message of messages) {
       try {
@@ -266,7 +266,7 @@ export class StoreForwardQueue {
             await this.updateStatus(message.id, 'sent');
             this.onMessageSentCallback?.(message.id);
             sentCount++;
-            console.log(`✅ [StoreForward] Sent queued message ${message.id}`);
+            debugLogger.info('✅ [StoreForward] Sent queued message ${message.id}');
           } else {
             await this.updateStatus(message.id, 'failed', true);
           }
@@ -291,7 +291,7 @@ export class StoreForwardQueue {
       await this.cleanupExpired();
     }, this.config.retryIntervalMs);
 
-    console.log('🔄 [StoreForward] Started retry processor');
+    debugLogger.debug('🔄 [StoreForward] Started retry processor');
   }
 
   /**
@@ -301,7 +301,7 @@ export class StoreForwardQueue {
     if (this.retryTimer) {
       clearInterval(this.retryTimer);
       this.retryTimer = null;
-      console.log('⏹️ [StoreForward] Stopped retry processor');
+      debugLogger.debug('⏹️ [StoreForward] Stopped retry processor');
     }
   }
 
@@ -316,7 +316,7 @@ export class StoreForwardQueue {
       // Check if should fallback to server
       const age = now - message.createdAt;
       if (age > this.config.fallbackToServerAfterMs && this.onFallbackCallback) {
-        console.log(`☁️ [StoreForward] Falling back to server for message ${message.id}`);
+        debugLogger.debug(`☁️ [StoreForward] Falling back to server for message ${message.id}`);
 
         try {
           const success = await this.onFallbackCallback(message);
@@ -365,7 +365,7 @@ export class StoreForwardQueue {
       request.onsuccess = () => {
         const cursor = request.result;
         if (cursor) {
-          console.log(`🗑️ [StoreForward] Cleaning up expired message ${cursor.value.id}`);
+          debugLogger.debug(`🗑️ [StoreForward] Cleaning up expired message ${cursor.value.id}`);
           cursor.delete();
           cursor.continue();
         }
@@ -445,7 +445,7 @@ export class StoreForwardQueue {
       store.clear();
     });
 
-    console.log('🗑️ [StoreForward] Cleared all messages');
+    debugLogger.debug('🗑️ [StoreForward] Cleared all messages');
   }
 }
 

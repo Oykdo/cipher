@@ -79,11 +79,11 @@ const MESSAGE_QUEUE_TIMEOUT_MS = 30000;
  */
 export async function initializeE2EE(username: string): Promise<void> {
   if (isE2EEInitialized() && currentUsername === username) {
-    console.log(`🔐 [E2EE Service] Already initialized for ${username}`);
+    // SECURITY: crypto log removed
     return;
   }
 
-  console.log(`🔐 [E2EE Service] Initializing for user: ${username}`);
+  // SECURITY: crypto log removed
 
   // Initialize libsodium
   await initializeCrypto();
@@ -94,14 +94,14 @@ export async function initializeE2EE(username: string): Promise<void> {
   if (!vault) {
     throw new Error('KeyVault not initialized - cannot initialize E2EE. Please re-login.');
   }
-  console.log(`🔐 [E2EE Service] KeyVault is initialized`);
+  // SECURITY: crypto log removed
 
   // Get or create identity keys
   currentIdentityKeys = await getOrCreateIdentityKeys(username);
   currentUsername = username;
 
-  console.log(`✅ [E2EE Service] Initialized for ${username}`);
-  console.log(`🔑 [E2EE Service] Fingerprint: ${currentIdentityKeys.identityKeyPair.fingerprint}`);
+  debugLogger.info('✅ [E2EE Service] Initialized for ${username}');
+  // SECURITY: crypto log removed
 
   // Publish key bundle to server (async, don't block initialization)
   publishKeyBundleToServer().catch(err => {
@@ -188,20 +188,11 @@ export async function publishKeyBundleToServer(): Promise<void> {
     }
 
     // Debug logging
-    console.log('📦 [E2EE Service] Publishing key bundle:', {
-      identityKeyLength: bundleToPublish.identityKey.length,
-      fingerprintLength: bundleToPublish.fingerprint.length,
-      signedPreKey: {
-        keyId: bundleToPublish.signedPreKey.keyId,
-        publicKeyLength: bundleToPublish.signedPreKey.publicKey.length,
-        signatureLength: bundleToPublish.signedPreKey.signature.length,
-      },
-      oneTimePreKeysCount: bundleToPublish.oneTimePreKeys.length,
-    });
+    // SECURITY: Sensitive log removed
 
     await apiv2.publishKeyBundle(bundleToPublish);
 
-    console.log(`✅ [E2EE Service] Key bundle published to server for ${currentUsername}`);
+    // SECURITY: Sensitive log removed
   } catch (error: any) {
     // Don't throw - key bundle publish failure shouldn't break the app
     console.warn('⚠️ [E2EE Service] Failed to publish key bundle (E2EE may still work locally)');
@@ -216,7 +207,7 @@ export async function publishKeyBundleToServer(): Promise<void> {
  * Should be called on logout
  */
 export async function shutdownE2EE(): Promise<void> {
-  console.log('🔐 [E2EE Service] Shutting down...');
+  // SECURITY: crypto log removed
 
   // Clear sessions
   await clearAllSessions();
@@ -225,7 +216,7 @@ export async function shutdownE2EE(): Promise<void> {
   currentUsername = null;
   currentIdentityKeys = null;
 
-  console.log('✅ [E2EE Service] Shutdown complete');
+  debugLogger.info('✅ [E2EE Service] Shutdown complete');
 }
 
 // ============================================================================
@@ -328,7 +319,7 @@ export function queueMessageForHandshake(
   queue.push(queuedMessage);
   messageQueues.set(peerUsername, queue);
   
-  console.log(`📥 [E2EE Service] Queued message ${id} for ${peerUsername} (${queue.length} in queue)`);
+  debugLogger.debug(`📥 [E2EE Service] Queued message ${id} for ${peerUsername} (${queue.length} in queue);`);
   
   // Set timeout to fail the message if handshake takes too long
   setTimeout(() => {
@@ -354,7 +345,7 @@ export async function processQueuedMessages(peerUsername: string): Promise<void>
     return;
   }
   
-  console.log(`📤 [E2EE Service] Processing ${queue.length} queued messages for ${peerUsername}`);
+  debugLogger.debug(`📤 [E2EE Service] Processing ${queue.length} queued messages for ${peerUsername}`);
   
   // Clear the queue
   messageQueues.delete(peerUsername);
@@ -364,7 +355,7 @@ export async function processQueuedMessages(peerUsername: string): Promise<void>
     try {
       const encrypted = await encryptMessageForPeer(peerUsername, queuedMsg.message);
       queuedMsg.onSent(encrypted);
-      console.log(`✅ [E2EE Service] Sent queued message ${queuedMsg.id}`);
+      debugLogger.info('✅ [E2EE Service] Sent queued message ${queuedMsg.id}');
     } catch (error: any) {
       queuedMsg.onFailed(error);
       console.error(`❌ [E2EE Service] Failed to send queued message ${queuedMsg.id}:`, error);
@@ -499,14 +490,14 @@ export async function ensureDoubleRatchetSession(
   
   // Check if DR session already exists
   if (await hasActiveDoubleRatchetSession(peerUsername)) {
-    console.log(`✅ [E2EE Service] DR session already active with ${peerUsername}`);
+    debugLogger.info('✅ [E2EE Service] DR session already active with ${peerUsername}');
     return true;
   }
   
   // Check if handshake is in progress
   const handshakeStatus = getHandshakeStatus(peerUsername);
   if (handshakeStatus && (handshakeStatus.state === 'INIT_SENT' || handshakeStatus.state === 'INIT_RECEIVED')) {
-    console.log(`🔄 [E2EE Service] Handshake in progress with ${peerUsername}`);
+    debugLogger.debug(`🔄 [E2EE Service] Handshake in progress with ${peerUsername}`);
     return false; // Caller should wait or use NaCl Box
   }
   
@@ -519,7 +510,7 @@ export async function ensureDoubleRatchetSession(
     await ensureX3DHInitialized();
     await initiateX3DHSession(peerUsername);
     // Handshake initiated but not yet complete
-    console.log(`🤝 [E2EE Service] Handshake initiated with ${peerUsername}, waiting for completion...`);
+    debugLogger.debug(`🤝 [E2EE Service] Handshake initiated with ${peerUsername}, waiting for completion...`);
     return false; // DR not ready yet
   } catch (error: any) {
     console.warn(`⚠️ [E2EE Service] Could not initiate handshake with ${peerUsername}: ${error.message}`);
@@ -565,7 +556,7 @@ export async function resetPeerSession(peerUsername: string): Promise<void> {
     throw new Error('E2EE not initialized');
   }
 
-  console.log(`🔄 [E2EE Service] Resetting session with ${peerUsername}...`);
+  debugLogger.debug(`🔄 [E2EE Service] Resetting session with ${peerUsername}...`);
 
   // Delete existing session
   await deleteSession(currentUsername, peerUsername);
@@ -582,9 +573,9 @@ export async function resetPeerSession(peerUsername: string): Promise<void> {
       peerKey.publicKey,
       true // useDoubleRatchet
     );
-    console.log(`✅ [E2EE Service] Session reset complete with ${peerUsername}`);
+    debugLogger.info('✅ [E2EE Service] Session reset complete with ${peerUsername}');
   } else {
-    console.log(`⚠️ [E2EE Service] No peer key found, session will be created on next message`);
+    // SECURITY: Sensitive log removed
   }
 }
 
@@ -593,7 +584,7 @@ export async function resetPeerSession(peerUsername: string): Promise<void> {
  * Use this when sessions are desynchronized
  */
 export async function resetAllSessions(): Promise<void> {
-  console.log('🔄 [E2EE Service] Resetting all E2EE sessions...');
+  debugLogger.debug('🔄 [E2EE Service] Resetting all E2EE sessions...');
   
   // Clear all sessions from memory and storage
   await clearAllSessions();
@@ -602,7 +593,7 @@ export async function resetAllSessions(): Promise<void> {
   // removes them from the internal session list. The KeyVault entries
   // for specific peers are managed by deleteSession calls.
   
-  console.log('✅ [E2EE Service] All sessions reset');
+  debugLogger.info('✅ [E2EE Service] All sessions reset');
 }
 
 /**
@@ -620,9 +611,9 @@ export async function forceNaClBoxMode(peerUsername: string): Promise<void> {
     throw new Error('E2EE not initialized');
   }
 
-  console.log(`🔄 [E2EE Service] Forcing NaCl Box mode for ${peerUsername}...`);
+  debugLogger.debug(`🔄 [E2EE Service] Forcing NaCl Box mode for ${peerUsername}...`);
   await resetSessionToNaClBox(currentUsername, peerUsername);
-  console.log(`✅ [E2EE Service] ${peerUsername} now uses NaCl Box encryption`);
+  debugLogger.info('✅ [E2EE Service] ${peerUsername} now uses NaCl Box encryption');
 }
 
 // ============================================================================
@@ -671,7 +662,7 @@ export function setHandshakeMessageSender(
   sender: (peerUsername: string, message: string) => Promise<void>
 ): void {
   sendHandshakeMessageFn = sender;
-  console.log('🔐 [E2EE Service] Handshake message sender configured');
+  // SECURITY: crypto log removed
 }
 
 /**
@@ -706,7 +697,7 @@ async function ensureX3DHInitialized(): Promise<void> {
     );
     
     x3dhInitialized = true;
-    console.log(`🔐 [E2EE Service] X3DH initialized with ${publicBundle.oneTimePreKeys.length} OPKs (Ed25519 signed)`);
+    // SECURITY: crypto log removed
     
     // Publish X3DH key bundle to server (includes signingKey)
     await publishX3DHKeyBundle(publicBundle);
@@ -740,7 +731,7 @@ async function publishX3DHKeyBundle(bundle: PublicKeyBundle): Promise<void> {
     };
     
     await apiv2.publishKeyBundle(serverBundle);
-    console.log('✅ [E2EE Service] X3DH key bundle published (with Ed25519 signing key)');
+    // SECURITY: Sensitive log removed');
   } catch (error) {
     console.warn('⚠️ [E2EE Service] Failed to publish X3DH bundle:', error);
   }
@@ -763,7 +754,7 @@ export async function handleIncomingHandshakeMessage(
     return false;
   }
   
-  console.log(`📨 [E2EE Service] Processing handshake message from ${peerUsername}`);
+  debugLogger.debug(`📨 [E2EE Service] Processing handshake message from ${peerUsername}`);
   
   const result = await processHandshakeMessage(
     currentIdentityKeys.identityKeyPair.privateKey,
@@ -774,7 +765,7 @@ export async function handleIncomingHandshakeMessage(
   
   if (result) {
     // Handshake completed - this means we are Bob (received INIT, sent ACK)
-    console.log(`✅ [E2EE Service] X3DH handshake completed with ${peerUsername} (as responder)`);
+    debugLogger.info('✅ [E2EE Service] X3DH handshake completed with ${peerUsername} (as responder)');
     
     // Create Double Ratchet session for Bob
     const { createDoubleRatchetSession } = await import('./sessionManager');
@@ -792,7 +783,7 @@ export async function handleIncomingHandshakeMessage(
       peerPublicKey
     );
     
-    console.log(`✅ [E2EE Service] DR session created as responder for ${peerUsername}`);
+    debugLogger.info('✅ [E2EE Service] DR session created as responder for ${peerUsername}');
     
     // Process any queued messages now that handshake is complete
     await processQueuedMessages(peerUsername);
@@ -825,7 +816,7 @@ export async function initiateX3DHSession(peerUsername: string): Promise<void> {
   // Check if handshake already in progress
   const status = getHandshakeStatus(peerUsername);
   if (status && status.state !== 'IDLE' && status.state !== 'FAILED') {
-    console.log(`🔄 [E2EE Service] X3DH handshake already in progress with ${peerUsername}`);
+    debugLogger.debug(`🔄 [E2EE Service] X3DH handshake already in progress with ${peerUsername}`);
     return;
   }
   
@@ -866,7 +857,7 @@ export async function initiateX3DHSession(peerUsername: string): Promise<void> {
       timestamp: Date.now(),
     };
     
-    console.log(`🤝 [E2EE Service] Initiating X3DH handshake with ${peerUsername}`);
+    debugLogger.debug(`🤝 [E2EE Service] Initiating X3DH handshake with ${peerUsername}`);
     
     // Start the handshake and wait for completion
     const { sharedSecret, ratchetState } = await initiateX3DHHandshake(
@@ -891,7 +882,7 @@ export async function initiateX3DHSession(peerUsername: string): Promise<void> {
       peerBundle.identityKey
     );
     
-    console.log(`✅ [E2EE Service] X3DH handshake completed and DR session created with ${peerUsername}`);
+    debugLogger.info('✅ [E2EE Service] X3DH handshake completed and DR session created with ${peerUsername}');
     
     // Process any queued messages now that handshake is complete
     await processQueuedMessages(peerUsername);

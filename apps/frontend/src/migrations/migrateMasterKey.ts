@@ -9,6 +9,7 @@
 
 import { storeMasterKey, importRawKey } from '../lib/keyStore';
 
+import { debugLogger } from '../lib/debugLogger';
 export interface MigrationResult {
   status: 'success' | 'not_needed' | 'failed';
   message: string;
@@ -178,7 +179,7 @@ export function isMigrationCompleted(): boolean {
  */
 export async function logMigrationStatus(): Promise<void> {
   const completed = isMigrationCompleted();
-  console.log(`[Migration] Status: ${completed ? '✅ Completed' : '⚠️ Pending'}`);
+  debugLogger.debug(`[Migration] Status: ${completed ? '✅ Completed' : '⚠️ Pending'}`);
   
   if (!completed) {
     console.warn('[Migration] ⚠️ Plaintext masterKey detected in localStorage - migration recommended');

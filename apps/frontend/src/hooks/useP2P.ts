@@ -19,6 +19,7 @@ import { P2PManager } from '../lib/p2p/p2p-manager';
 import { P2PMessage } from '../lib/p2p/webrtc';
 import { useAuthStore } from '../store/auth';
 
+import { debugLogger } from '../lib/debugLogger';
 export interface UseP2POptions {
   signalingUrl?: string;
   signalingUrls?: string[]; // Multiple servers for failover
@@ -44,7 +45,7 @@ export function useP2P(options: UseP2POptions = {}) {
 
     const initializeP2P = async () => {
       try {
-        console.log('🚀 [useP2P] Initializing P2P manager (unified E2EE)');
+        debugLogger.debug('🚀 [useP2P] Initializing P2P manager (unified E2EE);');
 
         // ARCHITECTURE FIX: No longer need masterKey - E2EE is handled via peerUsername
         const p2pManager = new P2PManager({
@@ -70,7 +71,7 @@ export function useP2P(options: UseP2POptions = {}) {
 
         try {
           await p2pManager.initialize();
-          console.log('✅ [useP2P] P2P manager initialized');
+          debugLogger.info('✅ [useP2P] P2P manager initialized');
         } catch (initError) {
           // Initialize anyway - P2P works in degraded mode without signaling
           console.warn('⚠️ [useP2P] P2P manager initialized in degraded mode:', initError);
@@ -88,7 +89,7 @@ export function useP2P(options: UseP2POptions = {}) {
 
     // Cleanup on unmount
     return () => {
-      console.log('🔌 [useP2P] Cleaning up P2P manager');
+      debugLogger.websocket('[useP2P]...');
       manager?.destroy();
       initializingRef.current = false;
     };

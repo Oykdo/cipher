@@ -79,7 +79,7 @@ export class LANDiscovery {
   initialize(peerId: string, username?: string): void {
     this.myPeerId = peerId;
     this.myUsername = username || '';
-    console.log(`📡 [LAN] Initialized for peer: ${peerId.slice(0, 8)}...`);
+    // SECURITY: Sensitive log removed
   }
 
   /**
@@ -87,7 +87,7 @@ export class LANDiscovery {
    */
   async start(): Promise<void> {
     if (!this.config.enabled) {
-      console.log('⚠️ [LAN] LAN discovery is disabled');
+      debugLogger.debug('⚠️ [LAN] LAN discovery is disabled');
       return;
     }
 
@@ -113,7 +113,7 @@ export class LANDiscovery {
     this.broadcastPresence();
 
     this.emit({ type: 'lan:ready', timestamp: Date.now() });
-    console.log('🚀 [LAN] Started discovery');
+    debugLogger.debug('🚀 [LAN] Started discovery');
   }
 
   /**
@@ -133,7 +133,7 @@ export class LANDiscovery {
     this.disconnectFromLocalRelay();
     this.isRunning = false;
     
-    console.log('⏹️ [LAN] Stopped discovery');
+    debugLogger.debug('⏹️ [LAN] Stopped discovery');
   }
 
   /**
@@ -244,7 +244,7 @@ export class LANDiscovery {
         this.localRelay = new WebSocket(this.config.localRelayUrl!);
 
         this.localRelay.onopen = () => {
-          console.log('✅ [LAN] Connected to local relay');
+          debugLogger.info('✅ [LAN] Connected to local relay');
           // Announce ourselves
           this.broadcastPresence();
           resolve();
@@ -255,7 +255,7 @@ export class LANDiscovery {
         };
 
         this.localRelay.onclose = () => {
-          console.log('🔌 [LAN] Disconnected from local relay');
+          debugLogger.websocket('[LAN]...');
           this.localRelay = null;
           
           // Try to reconnect after delay
@@ -305,7 +305,7 @@ export class LANDiscovery {
         case 'signal':
           if (message.to === this.myPeerId) {
             // Handle incoming signal for WebRTC
-            console.log(`📨 [LAN] Received signal from ${message.from}`);
+            debugLogger.debug(`📨 [LAN] Received signal from ${message.from}`);
           }
           break;
         case 'peers':
@@ -351,7 +351,7 @@ export class LANDiscovery {
         peer,
         timestamp: Date.now(),
       });
-      console.log(`👤 [LAN] Discovered peer: ${peer.id.slice(0, 8)}... (${peer.username || 'anonymous'})`);
+      // SECURITY: Sensitive log removed`);
     }
   }
 
@@ -387,7 +387,7 @@ export class LANDiscovery {
           timestamp: now,
         });
         
-        console.log(`👋 [LAN] Lost peer: ${peerId.slice(0, 8)}...`);
+        // SECURITY: Sensitive log removed
       }
     }
   }

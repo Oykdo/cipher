@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
+import { debugLogger } from '../lib/debugLogger';
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
 
 interface UseSocketOptions {
@@ -56,13 +57,13 @@ export function useSocket({ token, autoConnect = true }: UseSocketOptions): UseS
       });
 
       socket.on('connect', () => {
-        console.log('[Socket] Connected:', socket.id);
+        debugLogger.debug('[Socket] Connected:', socket.id);
         setConnected(true);
         setError(null);
       });
 
       socket.on('disconnect', (reason) => {
-        console.log('[Socket] Disconnected:', reason);
+        debugLogger.debug('[Socket] Disconnected:', reason);
         setConnected(false);
       });
 
@@ -106,7 +107,7 @@ export function useSocket({ token, autoConnect = true }: UseSocketOptions): UseS
       socketRef.current = null;
       setConnected(false);
 
-      console.log('[Socket] Cleaned up and disconnected');
+      debugLogger.debug('[Socket] Cleaned up and disconnected');
     }
   };
 
@@ -150,12 +151,12 @@ export function useConversationRoom(
 
     // Join room
     socket.emit('join_conversation', { conversationId });
-    console.log('[Socket] Joined conversation:', conversationId);
+    debugLogger.debug('[Socket] Joined conversation:', conversationId);
 
     return () => {
       // Leave room on unmount
       socket.emit('leave_conversation', { conversationId });
-      console.log('[Socket] Left conversation:', conversationId);
+      debugLogger.debug('[Socket] Left conversation:', conversationId);
     };
   }, [socket, conversationId]);
 }

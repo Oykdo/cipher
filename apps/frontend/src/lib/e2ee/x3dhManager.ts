@@ -32,6 +32,7 @@ import {
 } from './x3dh';
 import { initializeAlice, initializeBob, type RatchetState } from './doubleRatchet';
 import { getExistingKeyVault } from '../keyVault';
+import { debugLogger } from '../lib/debugLogger';
 // NOTE: These imports will be used when we fully integrate x3dhSessionStore
 // import { createDoubleRatchetSession } from './sessionManager';
 // import { storeHandshakeState, getHandshakeState, completeHandshake, failHandshake, createInitiatorHandshakeState, type X3DHHandshakeState } from './x3dhSessionStore';
@@ -105,11 +106,11 @@ export async function initializeX3DHManager(
       // Update signing key pair (may have changed if user re-logged)
       localKeyBundle.signingKeyPair = signingKeyPair;
       
-      console.log(`🔐 [X3DH] Loaded existing key bundle with ${localKeyBundle.oneTimePreKeys.length} OPKs`);
+      // SECURITY: Sensitive log removed
       
       // Check if SPK needs rotation
       if (Date.now() - localKeyBundle.lastRotation > SIGNED_PREKEY_ROTATION_MS) {
-        console.log(`🔄 [X3DH] Rotating signed pre-key...`);
+        // SECURITY: Sensitive log removed
         await rotateSignedPreKey();
       }
     } catch (e) {
@@ -135,7 +136,7 @@ export async function initializeX3DHManager(
     if (vault) {
       await vault.storeData('x3dh_local_bundle', serializeLocalKeyBundle(localKeyBundle));
     }
-    console.log(`🔐 [X3DH] Generated new key bundle with ${oneTimePreKeys.length} OPKs (Ed25519 signed)`);
+    // SECURITY: Sensitive log removed`);
   }
   
   // Create public bundle for publishing (includes Ed25519 signing key)
@@ -168,7 +169,7 @@ async function rotateSignedPreKey(): Promise<void> {
     await vault.storeData('x3dh_local_bundle', serializeLocalKeyBundle(localKeyBundle));
   }
   
-  console.log(`🔐 [X3DH] Rotated SPK to #${newId} (Ed25519 signed)`);
+  // SECURITY: crypto log removed
 }
 
 // OPK replenishment configuration
@@ -209,7 +210,7 @@ async function consumeOneTimePreKey(id: number): Promise<OneTimePreKey | undefin
     await vault.storeData('x3dh_local_bundle', serializeLocalKeyBundle(localKeyBundle));
   }
   
-  console.log(`🔐 [X3DH] Consumed OPK #${id}, generated replacement #${newOPK.id}`);
+  // SECURITY: crypto log removed
   
   // Check if we need to replenish OPKs
   await checkAndReplenishOPKs();
@@ -226,7 +227,7 @@ async function checkAndReplenishOPKs(): Promise<void> {
   const currentCount = localKeyBundle.oneTimePreKeys.length;
   
   if (currentCount < OPK_LOW_THRESHOLD) {
-    console.log(`⚠️ [X3DH] OPK count low (${currentCount}), replenishing...`);
+    debugLogger.debug(`⚠️ [X3DH] OPK count low (${currentCount});, replenishing...`);
     await replenishOPKs(OPK_REPLENISH_BATCH);
   }
 }
@@ -252,7 +253,7 @@ export async function replenishOPKs(count: number = OPK_REPLENISH_BATCH): Promis
     await vault.storeData('x3dh_local_bundle', serializeLocalKeyBundle(localKeyBundle));
   }
   
-  console.log(`🔐 [X3DH] Generated ${count} new OPKs (total: ${localKeyBundle.oneTimePreKeys.length})`);
+  // SECURITY: crypto log removed
   
   // Publish to server if callback is set
   if (publishOPKsCallback) {
@@ -262,7 +263,7 @@ export async function replenishOPKs(count: number = OPK_REPLENISH_BATCH): Promis
         publicKey: _sodium.to_base64(opk.publicKey),
       }));
       await publishOPKsCallback(opksForServer);
-      console.log(`✅ [X3DH] Published ${count} new OPKs to server`);
+      debugLogger.info('✅ [X3DH] Published ${count} new OPKs to server');
     } catch (error) {
       console.error('❌ [X3DH] Failed to publish OPKs to server:', error);
     }
@@ -297,7 +298,7 @@ export async function initiateX3DHHandshake(
       reject(new Error('Invalid signed pre-key signature (Ed25519 verification failed)'));
       return;
     }
-    console.log(`✅ [X3DH] Peer SPK signature verified (Ed25519)`);
+    debugLogger.info('✅ [X3DH] Peer SPK signature verified (Ed25519)');
     
     // Create handshake session
     let session = createHandshakeSession(peerUsername);
@@ -332,7 +333,7 @@ export async function initiateX3DHHandshake(
         ephemeralKeyPair.publicKey,
         session.usedOneTimePreKeyId
       );
-      console.log(`🔐 [X3DH] Created HANDSHAKE_INIT with sessionId: ${session.sessionId}`);
+      // SECURITY: crypto log removed
       
       // Transition state
       session = transitionHandshakeState(session, 'SEND_INIT');
@@ -368,7 +369,7 @@ export async function initiateX3DHHandshake(
           });
       }
       
-      console.log(`📤 [X3DH] Sent HANDSHAKE_INIT to ${peerUsername}`);
+      debugLogger.debug(`📤 [X3DH] Sent HANDSHAKE_INIT to ${peerUsername}`);
     }).catch(reject);
   });
 }
@@ -382,7 +383,7 @@ function handleHandshakeTimeout(peerUsername: string): void {
   
   if (isHandshakeTimedOut(pending.session)) {
     if (shouldRetry(pending.session)) {
-      console.log(`🔄 [X3DH] Retrying handshake with ${peerUsername} (attempt ${pending.session.retryCount + 1})`);
+      debugLogger.debug(`🔄 [X3DH] Retrying handshake with ${peerUsername} (attempt ${pending.session.retryCount + 1});`);
       pending.session = transitionHandshakeState(pending.session, 'TIMEOUT');
       // Retry logic would go here
     } else {
@@ -446,7 +447,7 @@ export async function handleHandshakeInit(
   // Create ACK message with same sessionId as INIT
   const ackMessage = createHandshakeAck(initMessage.sessionId, ephemeralKeyPair.publicKey, initMessage.nonce);
   
-  console.log(`📥 [X3DH] Received HANDSHAKE_INIT from ${peerUsername} (sessionId: ${initMessage.sessionId}), sending ACK`);
+  debugLogger.debug(`📥 [X3DH] Received HANDSHAKE_INIT from ${peerUsername} (sessionId: ${initMessage.sessionId});, sending ACK`);
   
   // Send ACK
   if (sendHandshakeMessage) {
@@ -496,7 +497,7 @@ export async function handleHandshakeAck(
     peerUsername
   );
   
-  console.log(`📥 [X3DH] Received HANDSHAKE_ACK from ${peerUsername} (sessionId: ${ackMessage.sessionId}), session ACTIVE`);
+  debugLogger.debug(`📥 [X3DH] Received HANDSHAKE_ACK from ${peerUsername} (sessionId: ${ackMessage.sessionId});, session ACTIVE`);
   
   // Complete the handshake
   pending.onComplete(sharedSecret, ratchetState);

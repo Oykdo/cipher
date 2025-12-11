@@ -59,7 +59,7 @@ export class DHTManager {
     // Load routing table from storage
     await this.loadRoutingTable();
     
-    console.log(`🌐 [DHT] Initialized with peer ID: ${peerId.slice(0, 8)}...`);
+    // SECURITY: Sensitive log removed
   }
 
   /**
@@ -67,7 +67,7 @@ export class DHTManager {
    */
   async start(): Promise<void> {
     if (!this.config.participateInDHT) {
-      console.log('⚠️ [DHT] Participation disabled (opt-in required)');
+      debugLogger.debug('⚠️ [DHT] Participation disabled (opt-in required);');
       return;
     }
 
@@ -83,7 +83,7 @@ export class DHTManager {
     }, this.config.refreshInterval);
 
     this.emit({ type: 'dht:ready', timestamp: Date.now() });
-    console.log('🚀 [DHT] Started');
+    debugLogger.debug('🚀 [DHT] Started');
   }
 
   /**
@@ -95,7 +95,7 @@ export class DHTManager {
       this.refreshTimer = null;
     }
     this.isRunning = false;
-    console.log('⏹️ [DHT] Stopped');
+    debugLogger.debug('⏹️ [DHT] Stopped');
   }
 
   /**
@@ -158,7 +158,7 @@ export class DHTManager {
     // Announce to closest peers in routing table
     const closestPeers = this.getClosestPeers(this.myPeerId, this.config.kBucketSize);
     
-    console.log(`📢 [DHT] Announcing to ${closestPeers.length} closest peers`);
+    debugLogger.debug(`📢 [DHT] Announcing to ${closestPeers.length} closest peers`);
   }
 
   /**
@@ -200,7 +200,7 @@ export class DHTManager {
       timestamp: Date.now(),
     });
 
-    console.log(`👤 [DHT] Added peer: ${peerInfo.id.slice(0, 8)}... (distance: ${distance})`);
+    // SECURITY: Sensitive log removed`);
   }
 
   /**
@@ -330,7 +330,7 @@ export class DHTManager {
         for (const entry of request.result as RoutingTableEntry[]) {
           this.routingTable.set(entry.peerId, entry);
         }
-        console.log(`📂 [DHT] Loaded ${this.routingTable.size} peers from storage`);
+        debugLogger.debug(`📂 [DHT] Loaded ${this.routingTable.size} peers from storage`);
         resolve();
       };
 
@@ -380,16 +380,16 @@ export class DHTManager {
    */
   private async connectToBootstrapNodes(): Promise<void> {
     if (this.config.bootstrapNodes.length === 0) {
-      console.log('⚠️ [DHT] No bootstrap nodes configured');
+      debugLogger.debug('⚠️ [DHT] No bootstrap nodes configured');
       return;
     }
 
-    console.log(`🔗 [DHT] Connecting to ${this.config.bootstrapNodes.length} bootstrap nodes`);
+    debugLogger.debug(`🔗 [DHT] Connecting to ${this.config.bootstrapNodes.length} bootstrap nodes`);
     
     // In a full implementation, this would establish connections
     // For now, we'll just log and prepare for peer exchange
     for (const node of this.config.bootstrapNodes) {
-      console.log(`  → ${node}`);
+      debugLogger.debug(`  → ${node}`);
     }
   }
 
@@ -406,7 +406,7 @@ export class DHTManager {
 
     // In a full implementation, this would query each peer
     // For now, return null as we'd need actual network connections
-    console.log(`🔍 [DHT] Querying ${closestPeers.length} peers for ${targetPeerId.slice(0, 8)}...`);
+    // SECURITY: Sensitive log removed
     
     return null;
   }
@@ -422,7 +422,7 @@ export class DHTManager {
     for (const [peerId, entry] of this.routingTable) {
       if (now - entry.lastSeen > staleThreshold && entry.failedAttempts > 3) {
         this.routingTable.delete(peerId);
-        console.log(`🗑️ [DHT] Removed stale peer: ${peerId.slice(0, 8)}...`);
+        // SECURITY: Sensitive log removed
       }
     }
 

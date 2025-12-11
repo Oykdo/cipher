@@ -23,6 +23,7 @@ import '../styles/fluidCrypto.css';
 import CosmicLoader from '../components/CosmicLoader';
 
 
+import { debugLogger } from '../lib/debugLogger';
 // Helper for delay
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -309,7 +310,7 @@ export default function LoginNew() {
             const masterKeyHex = await vault.getData(`masterKey:${username}`);
             if (masterKeyHex) {
               await setSessionMasterKey(masterKeyHex);
-              console.log('[LoginNew] MasterKey loaded from KeyVault for SRP login');
+              // SECURITY: MasterKey loaded (not logging for security)
             } else {
               console.warn('[LoginNew] No masterKey in KeyVault for SRP login');
             }
@@ -320,7 +321,7 @@ export default function LoginNew() {
           // Initialize E2EE for message encryption
           try {
             await initializeE2EE(verifyData.user.username);
-            console.log('[LoginNew] E2EE initialized for SRP login');
+            debugLogger.debug('[LoginNew] E2EE initialized for SRP login');
           } catch (e2eeError) {
             console.warn('[LoginNew] E2EE initialization failed:', e2eeError);
           }
@@ -580,7 +581,7 @@ export default function LoginNew() {
           await setSessionMasterKey(masterKeyHex);
           try {
             await setTemporaryMasterKey(masterKeyHex);
-            console.log('[LoginNew] MasterKey stored locally for DiceKey login');
+            // SECURITY: MasterKey stored (not logging for security)
           } catch (mkError) {
             console.error('[LoginNew] Failed to store masterKey in legacy storage:', mkError);
           }
@@ -680,7 +681,7 @@ export default function LoginNew() {
           const masterKeyHex = await decryptData(encryptedMasterKey, fileHash);
           if (masterKeyHex) {
             await setSessionMasterKey(masterKeyHex);
-            console.log('[LoginNew] ✅ MasterKey decrypted from avatarAuth for file login');
+            // SECURITY: MasterKey decrypted (not logging for security)
           } else {
             console.warn('[LoginNew] Failed to decrypt masterKey from avatarAuth');
           }
@@ -694,7 +695,7 @@ export default function LoginNew() {
       // Initialize E2EE for message encryption
       try {
         await initializeE2EE(data.user.username);
-        console.log('[LoginNew] E2EE initialized for file login');
+        debugLogger.debug('[LoginNew] E2EE initialized for file login');
       } catch (e2eeError) {
         console.warn('[LoginNew] E2EE initialization failed:', e2eeError);
       }
@@ -745,7 +746,7 @@ export default function LoginNew() {
       // Fallback: try to get username from state if not in sessionStorage
       if (!username && diceKeyUsername) {
         username = diceKeyUsername;
-        console.log('[LoginNew] Using username from state:', username);
+        debugLogger.debug('[LoginNew] Using username from state:', username);
       }
 
       // Fallback: try to get username from pendingSignup
@@ -753,7 +754,7 @@ export default function LoginNew() {
         try {
           const signupData = JSON.parse(pendingSignup);
           username = signupData.username;
-          console.log('[LoginNew] Using username from pendingSignup:', username);
+          debugLogger.debug('[LoginNew] Using username from pendingSignup:', username);
         } catch (e) {
           console.error('[LoginNew] Failed to parse pendingSignup:', e);
         }
@@ -800,7 +801,7 @@ export default function LoginNew() {
           if (!srpResponse.ok) {
             console.error('[LoginNew] SRP Setup failed:', await srpResponse.text());
           } else {
-            console.log('[LoginNew] ✅ SRP configured successfully');
+            debugLogger.debug('[LoginNew] ✅ SRP configured successfully');
           }
         } catch (srpError) {
           console.error('[LoginNew] SRP Setup error:', srpError);
@@ -829,7 +830,7 @@ export default function LoginNew() {
 
           // ✅ Store MasterKey Encrypted with Checksums for future DiceKey Login
           if (signupData.checksums && signupData.userId && masterKeyHex) {
-            console.log('[LoginNew] Attempting to save checksum auth...');
+            debugLogger.debug('[LoginNew] Attempting to save checksum auth...');
             try {
               const checksumPassword = signupData.checksums.join('') + signupData.userId;
               // Encrypt masterKey with checksums as password (no logging for security)
@@ -856,13 +857,13 @@ export default function LoginNew() {
 
           // ✅ Store MasterKey Encrypted with AvatarHash for future File Login
           if (signupData.avatarHash && masterKeyHex) {
-            console.log('[LoginNew] Storing masterKey encrypted with avatarHash for file login...');
+            // SECURITY: Storing encrypted masterKey (not logging details)
             try {
               const encryptedWithAvatar = await encryptData(masterKeyHex, signupData.avatarHash);
               if (encryptedWithAvatar) {
                 localStorage.setItem(`avatarAuth_${signupData.avatarHash}`, encryptedWithAvatar);
                 localStorage.setItem(`avatarAuth_${signupData.avatarHash}_username`, username);
-                console.log('[LoginNew] ✅ MasterKey stored for file login');
+                // SECURITY: MasterKey stored (not logging for security)
               }
             } catch (err) {
               console.error('[LoginNew] Failed to store avatarAuth:', err);
@@ -905,7 +906,7 @@ export default function LoginNew() {
         // Initialize E2EE immediately after account creation
         try {
           await initializeE2EE(username);
-          console.log('[LoginNew] E2EE initialized for new account');
+          debugLogger.debug('[LoginNew] E2EE initialized for new account');
         } catch (e2eeError) {
           console.warn('[LoginNew] E2EE initialization failed:', e2eeError);
         }

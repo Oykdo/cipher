@@ -89,7 +89,7 @@ export class P2PPresenceManager {
     // Send initial heartbeat
     this.broadcastPresence();
 
-    console.log('💓 [Presence] Started P2P presence manager');
+    debugLogger.debug('💓 [Presence] Started P2P presence manager');
   }
 
   /**
@@ -104,7 +104,7 @@ export class P2PPresenceManager {
       clearInterval(this.checkTimer);
       this.checkTimer = null;
     }
-    console.log('⏹️ [Presence] Stopped P2P presence manager');
+    debugLogger.debug('⏹️ [Presence] Stopped P2P presence manager');
   }
 
   /**
@@ -133,7 +133,7 @@ export class P2PPresenceManager {
    */
   addConnectedPeer(peerId: string): void {
     this.connectedPeers.add(peerId);
-    console.log(`👤 [Presence] Added connected peer: ${peerId}`);
+    debugLogger.debug(`👤 [Presence] Added connected peer: ${peerId}`);
   }
 
   /**
@@ -150,7 +150,7 @@ export class P2PPresenceManager {
       this.onPresenceChange?.(peerId, presence);
     }
     
-    console.log(`👤 [Presence] Removed connected peer: ${peerId}`);
+    debugLogger.debug(`👤 [Presence] Removed connected peer: ${peerId}`);
   }
 
   /**
@@ -173,7 +173,7 @@ export class P2PPresenceManager {
 
     // Notify if status changed
     if (!previous || previous.status !== presence.status) {
-      console.log(`💓 [Presence] Peer ${peerId} is now ${presence.status}`);
+      debugLogger.debug(`💓 [Presence] Peer ${peerId} is now ${presence.status}`);
       this.onPresenceChange?.(peerId, presence);
     }
   }

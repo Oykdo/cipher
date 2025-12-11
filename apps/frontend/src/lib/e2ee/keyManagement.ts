@@ -20,6 +20,7 @@ import {
 } from './index';
 import { getExistingKeyVault } from '../keyVault';
 
+import { debugLogger } from '../lib/debugLogger';
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -52,15 +53,15 @@ export interface StoredIdentityKeys {
  * Generate complete identity key bundle for a new user
  */
 export async function generateUserIdentityKeys(): Promise<UserIdentityKeys> {
-  console.log('🔑 [E2EE] Generating user identity keys...');
+  // SECURITY: crypto log removed
   
   // Generate long-term identity key pair (X25519)
   const identityKeyPair = await generateIdentityKeyPair();
-  console.log('✅ [E2EE] Identity key pair generated');
+  // SECURITY: Sensitive log removed
   
   // Generate signing key pair (Ed25519)
   const signingKeyPair = await generateSigningKeyPair();
-  console.log('✅ [E2EE] Signing key pair generated');
+  // SECURITY: Sensitive log removed
   
   // Generate signed prekey
   const preKeyPair = await generateKeyExchangeKeyPair();
@@ -74,11 +75,11 @@ export async function generateUserIdentityKeys(): Promise<UserIdentityKeys> {
     publicKey: preKeyPublicBase64,
     signature,
   };
-  console.log('✅ [E2EE] Signed prekey generated');
+  debugLogger.info('✅ [E2EE] Signed prekey generated');
   
   // Generate one-time prekeys
   const preKeys = await generateOneTimePreKeys(100);
-  console.log(`✅ [E2EE] Generated ${preKeys.length} one-time prekeys`);
+  debugLogger.info('✅ [E2EE] Generated ${preKeys.length} one-time prekeys');
   
   return {
     identityKeyPair,
@@ -122,7 +123,7 @@ export async function storeIdentityKeys(
   };
   
   await vault.storeData(`e2ee:identity:${username}`, JSON.stringify(stored));
-  console.log(`✅ [E2EE] Identity keys stored for user: ${username}`);
+  debugLogger.info('✅ [E2EE] Identity keys stored for user: ${username}');
 }
 
 /**
@@ -176,11 +177,11 @@ export async function getOrCreateIdentityKeys(
 
   if (!keys) {
     // Generate new keys if none exist
-    console.log(`🔑 [E2EE] No existing keys found for ${username}, generating new keys...`);
+    // SECURITY: crypto log removed
     keys = await generateUserIdentityKeys();
     await storeIdentityKeys(username, keys);
   } else {
-    console.log(`✅ [E2EE] Retrieved existing keys for ${username}`);
+    debugLogger.info('✅ [E2EE] Retrieved existing keys for ${username}');
   }
 
   return keys;
@@ -229,7 +230,7 @@ export async function storePeerPublicKey(
   };
 
   await vault.storeData(`e2ee:peer:${username}:${peerUsername}`, JSON.stringify(data));
-  console.log(`✅ [E2EE] Stored public key for peer: ${peerUsername}`);
+  // SECURITY: Sensitive log removed
 }
 
 /**
@@ -279,7 +280,7 @@ export async function markPeerKeyVerified(
   data.verifiedAt = Date.now();
 
   await vault.storeData(`e2ee:peer:${username}:${peerUsername}`, JSON.stringify(data));
-  console.log(`✅ [E2EE] Marked peer key as verified: ${peerUsername}`);
+  // SECURITY: Sensitive log removed
 }
 
 // ============================================================================
@@ -349,6 +350,6 @@ export async function importIdentityKeys(
   }
 
   await vault.storeData(`e2ee:identity:${username}`, keysJson);
-  console.log(`✅ [E2EE] Imported identity keys for user: ${username}`);
+  debugLogger.info('✅ [E2EE] Imported identity keys for user: ${username}');
 }
 

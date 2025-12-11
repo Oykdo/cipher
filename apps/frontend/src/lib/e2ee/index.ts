@@ -20,6 +20,7 @@
 
 import sodium from 'libsodium-wrappers';
 
+import { debugLogger } from '../lib/debugLogger';
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -65,7 +66,7 @@ export async function initializeCrypto(): Promise<void> {
   
   await sodium.ready;
   sodiumReady = true;
-  console.log('✅ [E2EE] Libsodium initialized');
+  debugLogger.info('✅ [E2EE] Libsodium initialized');
 }
 
 /**

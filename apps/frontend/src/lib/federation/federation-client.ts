@@ -41,7 +41,7 @@ export class FederationClient {
   initialize(domain: string, serverId: string): void {
     this.config.myDomain = domain;
     this.config.myServerId = serverId;
-    console.log(`🌐 [Federation] Initialized for domain: ${domain}`);
+    debugLogger.p2p('[Federation]...');
   }
 
   /**
@@ -71,7 +71,7 @@ export class FederationClient {
     // Initial discovery
     this.discoverServers();
     
-    console.log('🔍 [Federation] Started server discovery');
+    debugLogger.debug('🔍 [Federation] Started server discovery');
   }
 
   /**
@@ -82,7 +82,7 @@ export class FederationClient {
       clearInterval(this.discoveryTimer);
       this.discoveryTimer = null;
     }
-    console.log('⏹️ [Federation] Stopped server discovery');
+    debugLogger.debug('⏹️ [Federation] Stopped server discovery');
   }
 
   /**
@@ -219,7 +219,7 @@ export class FederationClient {
       timestamp: Date.now(),
     });
 
-    console.log(`✅ [Federation] Added trusted server: ${server.domain}`);
+    debugLogger.info('✅ [Federation] Added trusted server: ${server.domain}');
   }
 
   /**

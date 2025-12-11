@@ -23,6 +23,7 @@ import { getKeyVault } from '../lib/keyVault';
 import { API_BASE_URL } from '../config';
 import { createSafeHTML } from '../lib/sanitize';
 import { initializeE2EE } from '../lib/e2ee/e2eeService';
+import { debugLogger } from '../lib/debugLogger';
 import '../styles/fluidCrypto.css';
 
 type Step = 'choose' | 'username' | 'standard-length' | 'standard-display' | 'standard-verify' | 'standard-welcome' | 'standard-password' | 'dicekey' | 'generating' | 'display';
@@ -268,7 +269,7 @@ export default function SignupFluid() {
       // Initialize E2EE immediately after account creation
       try {
         await initializeE2EE(username);
-        console.log('[SignupFluid] E2EE initialized for new account');
+        debugLogger.debug('[SignupFluid] E2EE initialized for new account');
       } catch (e2eeError) {
         console.warn('[SignupFluid] E2EE initialization failed:', e2eeError);
       }

@@ -8,6 +8,7 @@ import { deriveAllKeysFromDice } from "../lib/kdf";
 import { generateCompleteKeySet, serializeKeySet, generateUserId, encodeKey } from "../lib/keyGeneration";
 import { API_BASE_URL } from "../config";
 
+import { debugLogger } from '../lib/debugLogger';
 function SignupNew() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -62,7 +63,7 @@ function SignupNew() {
     setError("");
 
     try {
-      console.log("🎲 Starting key generation from 300 dice rolls...");
+      // SECURITY: Sensitive log removed
       
       // Step 1: Derive all seeds from dice rolls (with Argon2id + HKDF)
       const derivedKeys = await deriveAllKeysFromDice(rolls);
@@ -88,7 +89,7 @@ function SignupNew() {
         masterKey: derivedKeys.masterKey,
       });
       
-      console.log(`✅ Keys generated successfully! User ID: ${userId}`);
+      debugLogger.info('✅ Keys generated successfully! User ID: ${userId}');
       
       setStep("display");
     } catch (err: any) {
