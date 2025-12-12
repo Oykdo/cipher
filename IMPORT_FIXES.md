@@ -1,6 +1,6 @@
 # 🔧 Import Fixes Applied - e2ee-v2
 
-## ✅ Fixes Appliqués
+## ✅ Fixes Appliqués (4 Total)
 
 ### 1. Fix Database Import (Backend)
 **Commit** : `98d334b`
@@ -26,7 +26,7 @@ const db = getDatabase();
 ---
 
 ### 2. Fix argon2-browser Import (Frontend)
-**Commits** : `9073aa1`, `dc4a04a`
+**Commits** : `9073aa1`, `dc4a04a`, `c85eb52`
 
 **Erreur #1** :
 ```
@@ -65,20 +65,47 @@ const ARGON2_PARAMS = {
 };
 ```
 
+**Erreur #3** :
+```
+TypeError: argon2.hash is not a function
+```
+
+**Solution #3** :
+```typescript
+// ❌ Avant (static import)
+import * as argon2 from 'argon2-browser';
+
+// ✅ Après (dynamic import)
+let argon2: any = null;
+
+async function ensureArgon2Loaded() {
+  if (argon2) return;
+  argon2 = await import('argon2-browser');
+  if (typeof argon2.hash !== 'function') {
+    throw new Error('argon2.hash is not a function');
+  }
+}
+
+// Utiliser avant chaque appel
+await ensureArgon2Loaded();
+const result = await argon2.hash({...});
+```
+
 **Fichier** : `apps/frontend/src/lib/e2ee/keyManager.ts`
 
-**Raison** : argon2-browser charge ses enums de manière asynchrone, utiliser constante numérique directement
+**Raison** : argon2-browser charge son WASM de manière asynchrone, nécessite dynamic import
 
 ---
 
 ## 📊 Commits e2ee-v2
 
 ```bash
-git log --oneline -6
+git log --oneline -7
 ```
 
 Résultat :
 ```
+c85eb52 fix: use dynamic import for argon2-browser to handle async WASM loading
 dc4a04a fix: use numeric constant for Argon2id type instead of enum
 9073aa1 fix: correct argon2-browser import to use namespace import
 b59ee05 docs: add quick fix guide and update testing instructions
