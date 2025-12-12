@@ -27,6 +27,7 @@ import { e2eeRoutes } from './routes/e2ee.js';
 import { acknowledgeRoutes } from './routes/acknowledge.js';
 import { avatarRoutes } from './routes/avatar.js';
 import { conversationRequestRoutes } from './routes/conversationRequests.js';
+import publicKeysRoutes from './routes/publicKeys.js';
 import { enforceHttps, DEFAULT_HTTPS_CONFIG } from "./utils/httpsEnforcement.js";
 import { cspNonceMiddleware, DEFAULT_CSP_CONFIG } from "./middleware/cspNonce.js";
 import { csrfProtection, addSecurityHeaders, csrfTokenRoute } from "./middleware/csrfProtection.js";
@@ -195,8 +196,9 @@ await app.register(acknowledgeRoutes);
 await app.register(avatarRoutes);
 await app.register(e2eeRoutes);
 await app.register(conversationRequestRoutes);
+await app.register(publicKeysRoutes);
 
-app.log.info('✅ Modular routes registered');
+app.log.info('✅ Modular routes registered (including e2ee-v2 public keys)');
 
 // ============================================================================
 // BACKUP ROUTES (Refactored)

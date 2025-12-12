@@ -81,6 +81,7 @@ export interface MessageV2 {
   isBurned?: boolean;
   burnedAt?: number;
   scheduledBurnAt?: number;
+  burnDelay?: number; // Burn delay in seconds (for BAR messages not yet acknowledged)
   // P2P metadata (client-side only)
   isP2P?: boolean;
   isPending?: boolean;
@@ -239,7 +240,7 @@ export const apiv2 = {
   sendMessage: async (
     conversationId: string,
     body: string,
-    options?: { scheduledBurnAt?: number; unlockBlockHeight?: number }
+    options?: { scheduledBurnAt?: number; unlockBlockHeight?: number; burnDelay?: number }
   ): Promise<MessageV2> => {
     return authFetchV2WithRefresh("/messages", {
       method: "POST",
@@ -520,4 +521,69 @@ export async function getRecoveryKeys(accessToken: string): Promise<{
   }
 
   return response.json();
+}
+
+// ============================================================================
+// PUBLIC KEY MANAGEMENT (e2ee-v2)
+// ============================================================================
+
+export interface PublicKeyResponseV2 {
+  userId: string;
+  username: string;
+  publicKey: string;       // Base64 encoded Curve25519 public key
+  signPublicKey: string;   // Base64 encoded Ed25519 public key
+}
+
+/**
+ * Get public keys for multiple users
+ * 
+ * @param userIds Array of user IDs
+ * @returns Array of public keys
+ */
+export async function getPublicKeys(userIds: string[]): Promise<{ keys: PublicKeyResponseV2[] }> {
+  const response = await authFetchV2WithRefresh(`${API_BASE_URL}/api/v2/users/public-keys`, {
+    method: 'POST',
+    body: JSON.stringify({ userIds }),
+  });
+
+  return response;
+}
+
+/**
+ * Upload/update current user's public keys
+ * Called once after key generation
+ * 
+ * @param publicKey Base64 encoded Curve25519 public key
+ * @param signPublicKey Base64 encoded Ed25519 public key
+ */
+export async function uploadPublicKeys(publicKey: string, signPublicKey: string): Promise<void> {
+  await authFetchV2WithRefresh(`${API_BASE_URL}/api/v2/users/me/public-keys`, {
+    method: 'PUT',
+    body: JSON.stringify({ publicKey, signPublicKey }),
+  });
+}
+
+export interface ConversationMemberV2 {
+  userId: string;
+  username: string;
+  publicKey?: string;       // Optional: may not be available yet
+  signPublicKey?: string;   // Optional: may not be available yet
+}
+
+/**
+ * Get all members of a conversation
+ * Includes public keys if available
+ * 
+ * @param conversationId Conversation ID
+ * @returns Array of conversation members
+ */
+export async function getConversationMembers(conversationId: string): Promise<ConversationMemberV2[]> {
+  const response = await authFetchV2WithRefresh(
+    `${API_BASE_URL}/api/v2/conversations/${conversationId}/members`,
+    {
+      method: 'GET',
+    }
+  );
+
+  return response.members;
 }

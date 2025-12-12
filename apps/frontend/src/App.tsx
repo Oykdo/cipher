@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/auth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { proactiveTokenRefresh } from './services/api-interceptor';
+import { useKeyInitialization } from './hooks/useKeyInitialization';
 
 const Landing = lazy(() => import('./screens/Landing'));
 const Login = lazy(() => import('./screens/Login'));
@@ -45,6 +46,18 @@ function App() {
   const session = useAuthStore((state) => state.session);
   // Consider authenticated if both user and token exist
   const isAuthenticated = !!session?.user?.id && !!session?.accessToken;
+
+  // Initialize e2ee-v2 keys automatically for logged-in users
+  const keyInit = useKeyInitialization();
+
+  // Log key initialization status
+  useEffect(() => {
+    if (keyInit.initialized && keyInit.keysExist) {
+      console.log('🔐 [App] e2ee-v2 keys ready');
+    } else if (keyInit.error) {
+      console.error('❌ [App] Key initialization error:', keyInit.error);
+    }
+  }, [keyInit.initialized, keyInit.keysExist, keyInit.error]);
 
   // Proactive token refresh - refresh 5 minutes before expiration
   useEffect(() => {

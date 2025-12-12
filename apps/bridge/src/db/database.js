@@ -453,12 +453,25 @@ class DatabaseService {
         `, [conversationId]);
     }
 
-    async burnMessage(messageId, burnedAt = new Date()) {
+    async burnMessage(messageId, burnedAt = Date.now()) {
+        // Convert timestamp (milliseconds) to PostgreSQL timestamp
+        // PostgreSQL expects Date object or to_timestamp with seconds
+        const timestamp = burnedAt instanceof Date ? burnedAt : new Date(burnedAt);
+        
         await run(this.pool, `
             UPDATE messages 
             SET is_burned = true, burned_at = $1, body = '[Message détruit]', scheduled_burn_at = NULL
             WHERE id = $2
-        `, [burnedAt, messageId]);
+        `, [timestamp, messageId]);
+    }
+
+    async deleteMessage(messageId) {
+        await run(this.pool, `DELETE FROM messages WHERE id = $1`, [messageId]);
+    }
+
+    async deleteAttachment(attachmentId) {
+        const row = await get(this.pool, `DELETE FROM attachments WHERE id = $1 RETURNING *`, [attachmentId]);
+        return row;
     }
 
     async scheduleBurn(messageId, when) {
@@ -473,11 +486,15 @@ class DatabaseService {
     }
 
     async getPendingBurns() {
+        // Return scheduled burns with positive timestamps (absolute time)
+        // Negative values are delays (calculated on acknowledge)
         const rows = await all(this.pool, `
             SELECT id as "messageId", conversation_id as "conversationId", scheduled_burn_at as "scheduledBurnAt"
             FROM messages
-            WHERE is_burned = false AND scheduled_burn_at IS NOT NULL AND scheduled_burn_at > $1
-        `, [new Date()]);
+            WHERE is_burned = false 
+              AND scheduled_burn_at IS NOT NULL 
+              AND scheduled_burn_at > 0
+        `);
         return rows;
     }
 
@@ -936,6 +953,85 @@ class DatabaseService {
             SET state = 'EXPIRED', updated_at = NOW()
             WHERE expires_at IS NOT NULL AND expires_at < NOW() AND state = 'PENDING'
         `);
+    }
+
+    // ========================================================================
+    // PUBLIC KEY MANAGEMENT (e2ee-v2)
+    // ========================================================================
+
+    /**
+     * Get public keys for multiple users
+     * @param {string[]} userIds - Array of user IDs
+     * @returns {Promise<Array>} Array of {user_id, username, public_key, sign_public_key}
+     */
+    async getPublicKeysByUserIds(userIds) {
+        if (!userIds || userIds.length === 0) {
+            return [];
+        }
+
+        // Create placeholders for parameterized query
+        const placeholders = userIds.map((_, i) => `$${i + 1}`).join(', ');
+        
+        const rows = await all(
+            this.pool,
+            `SELECT id as user_id, username, public_key, sign_public_key 
+             FROM users 
+             WHERE id IN (${placeholders})`,
+            userIds
+        );
+
+        return rows;
+    }
+
+    /**
+     * Update user's public keys
+     * @param {string} userId - User ID
+     * @param {string} publicKey - Base64 encoded Curve25519 public key
+     * @param {string} signPublicKey - Base64 encoded Ed25519 public key
+     */
+    async updateUserPublicKeys(userId, publicKey, signPublicKey) {
+        await run(
+            this.pool,
+            `UPDATE users 
+             SET public_key = $1, sign_public_key = $2, updated_at = NOW() 
+             WHERE id = $3`,
+            [publicKey, signPublicKey, userId]
+        );
+    }
+
+    /**
+     * Check if user is a member of a conversation
+     * @param {string} conversationId - Conversation ID
+     * @param {string} userId - User ID
+     * @returns {Promise<boolean>}
+     */
+    async isConversationMember(conversationId, userId) {
+        const result = await get(
+            this.pool,
+            `SELECT 1 FROM conversation_participants 
+             WHERE conversation_id = $1 AND user_id = $2`,
+            [conversationId, userId]
+        );
+
+        return result !== undefined;
+    }
+
+    /**
+     * Get all members of a conversation with their public keys
+     * @param {string} conversationId - Conversation ID
+     * @returns {Promise<Array>} Array of {user_id, username, public_key, sign_public_key}
+     */
+    async getConversationMembersWithKeys(conversationId) {
+        const rows = await all(
+            this.pool,
+            `SELECT u.id as user_id, u.username, u.public_key, u.sign_public_key
+             FROM conversation_participants cp
+             JOIN users u ON cp.user_id = u.id
+             WHERE cp.conversation_id = $1`,
+            [conversationId]
+        );
+
+        return rows;
     }
 }
 
