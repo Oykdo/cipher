@@ -8,7 +8,9 @@
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { db } from '../db/database.js';
+import { getDatabase } from '../db/database.js';
+
+const db = getDatabase();
 
 // ============================================================================
 // TYPES
