@@ -75,7 +75,9 @@ export function MessageList({
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
       <AnimatePresence>
-        {messages.map((message) => {
+        {messages
+          .filter(message => !message.isBurned) // ✅ FIX: Don't display burned messages
+          .map((message) => {
           const isOwn = message.senderId === sessionUserId;
           const locked = isMessageLocked(message);
           const burned = message.isBurned;

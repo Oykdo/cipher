@@ -380,19 +380,39 @@ export default function Conversations() {
             // Cache the result (even for own messages placeholder)
             cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
           } else if (peerUsername) {
-            // Messages from peer - decrypt using the E2EE session
-            // Use the detailed version to get encryption type
-            const result = await decryptReceivedMessage(
-              peerUsername,
-              msg.body,
-              undefined,
-              true // returnDetails
-            );
-            decryptedBody = result.text;
-            // Store encryption type for UI display
-            (msg as any).encryptionType = result.encryptionType;
-            // Cache successful decryption
-            cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
+            // Messages from peer - try E2EE first, fallback to legacy
+            try {
+              const result = await decryptReceivedMessage(
+                peerUsername,
+                msg.body,
+                undefined,
+                true // returnDetails
+              );
+              
+              // ✅ FIX: Check if E2EE decryption succeeded
+              if (result.text && !result.text.startsWith('[')) {
+                // Successfully decrypted with E2EE
+                decryptedBody = result.text;
+                (msg as any).encryptionType = result.encryptionType;
+                cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
+              } else {
+                // E2EE failed (old message), fallback to legacy
+                debugLogger.debug(`[DECRYPT] E2EE failed for message ${msg.id}, trying legacy`);
+                decryptedBody = await decryptIncomingMessage(conversationId, msg);
+                cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
+              }
+            } catch (e2eeError) {
+              // E2EE decryption threw error, fallback to legacy
+              debugLogger.debug(`[DECRYPT] E2EE error for message ${msg.id}, trying legacy:`, e2eeError);
+              try {
+                decryptedBody = await decryptIncomingMessage(conversationId, msg);
+                cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
+              } catch (legacyError) {
+                // Both failed
+                console.error(`[DECRYPT] Both E2EE and legacy failed for ${msg.id}`);
+                throw legacyError;
+              }
+            }
           } else {
             // No peer username, use legacy decryption directly
             decryptedBody = await decryptIncomingMessage(conversationId, msg);
