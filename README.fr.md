@@ -3,7 +3,7 @@
 <div align="center">
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![License](https://img.shields.io/badge/license-ISC-green.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)
 
@@ -405,7 +405,7 @@ Si vous trouvez Cipher Pulse utile, soutenez son développement :
 
 ## 📄 Licence
 
-Ce projet est sous licence **ISC** - voir le fichier [LICENSE](./LICENSE) pour plus de détails.
+Ce projet est sous licence **MIT** - voir le fichier [LICENSE](./LICENSE) pour plus de détails.
 
 ---
 
