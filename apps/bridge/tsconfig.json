@@ -17,7 +17,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "allowJs": true,
-    "types": ["node", "better-sqlite3"],
+    "types": ["node"],
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src/**/*"],
