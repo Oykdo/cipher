@@ -17,6 +17,7 @@ import {
   getPeerFingerprint,
   ensureE2EEInitializedForSession,
 } from './e2eeService';
+import { debugLogger } from '../debugLogger';
 
 async function requireE2EE(): Promise<void> {
   if (isE2EEInitialized()) return;
