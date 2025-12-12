@@ -6,13 +6,17 @@
 # Terminal 1 - Backend
 cd apps/bridge
 npm run dev
+# Attendez "Server listening at http://0.0.0.0:3001"
 
 # Terminal 2 - Frontend  
 cd apps/frontend
 npm run dev
+# Attendez "Local: http://localhost:5173/"
 ```
 
 Ouvrez : **http://localhost:5173**
+
+**Note** : Le backend écoute sur port **3001**, le frontend sur port **5173**.
 
 ---
 
