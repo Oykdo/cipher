@@ -15,7 +15,22 @@
 
 import _sodium from 'libsodium-wrappers';
 
-// No external dependency for key derivation - using Web Crypto API (native)
+// Argon2 with WASM support (vite-plugin-wasm)
+let argon2: any = null;
+
+async function ensureArgon2Loaded() {
+  if (argon2) return;
+  
+  try {
+    // Dynamic import with WASM support from vite-plugin-wasm
+    const module = await import('argon2-browser');
+    argon2 = module;
+    console.log('[KeyManager] ✅ argon2-browser loaded successfully with WASM');
+  } catch (error) {
+    console.error('[KeyManager] ❌ Failed to load argon2-browser:', error);
+    throw new Error('Failed to load argon2-browser. WASM may not be supported.');
+  }
+}
 
 // ============================================================================
 // TYPES
@@ -57,13 +72,15 @@ const STORAGE_KEY_PREFIX = 'cipher-pulse-keys:';
 const MASTER_KEY_STORAGE = 'cipher-pulse-master-key';
 const KEY_VERSION = 'key-v1';
 
-// PBKDF2 parameters for master key derivation (Web Crypto API)
-// Using PBKDF2 instead of Argon2 to avoid WASM loading issues
-// Security: OWASP recommends 100k+ iterations for PBKDF2-SHA256
-const PBKDF2_PARAMS = {
-  iterations: 100000, // OWASP recommendation
-  hashAlgorithm: 'SHA-256',
-  keyLength: 32, // 256 bits
+// Argon2id parameters for master key derivation (optimal security)
+// Memory-hard KDF resistant to GPU/ASIC attacks
+// Winner of Password Hashing Competition 2015
+const ARGON2_PARAMS = {
+  type: 2, // Argon2id (0=Argon2d, 1=Argon2i, 2=Argon2id)
+  hashLen: 32, // 256 bits
+  time: 3, // iterations (time cost)
+  mem: 65536, // 64 MB (memory cost) - memory-hard security
+  parallelism: 4, // parallelism degree
 };
 
 // ============================================================================
@@ -71,38 +88,25 @@ const PBKDF2_PARAMS = {
 // ============================================================================
 
 /**
- * Derive master key from user password using PBKDF2
- * Uses Web Crypto API (native, no external dependencies)
+ * Derive master key from user password using Argon2id
+ * Memory-hard KDF providing optimal security against GPU/ASIC attacks
  * 
- * SECURITY: Never store password - derive key on-the-fly
- * PBKDF2 with 100k iterations provides equivalent security to Argon2
- * for this use case (encrypting keys stored locally)
+ * SECURITY: 
+ * - Never store password - derive key on-the-fly
+ * - Argon2id = memory-hard (64MB) + time-hard (3 iterations)
+ * - 100x more resistant to GPU brute-force than PBKDF2
+ * - Winner of Password Hashing Competition 2015
  */
 async function deriveMasterKey(password: string, salt: Uint8Array): Promise<Uint8Array> {
-  const encoder = new TextEncoder();
+  await ensureArgon2Loaded();
   
-  // Import password as key material
-  const passwordKey = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  );
+  const result = await argon2.hash({
+    pass: password,
+    salt: salt,
+    ...ARGON2_PARAMS,
+  });
   
-  // Derive key using PBKDF2
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: PBKDF2_PARAMS.iterations,
-      hash: PBKDF2_PARAMS.hashAlgorithm,
-    },
-    passwordKey,
-    PBKDF2_PARAMS.keyLength * 8 // bits
-  );
-  
-  return new Uint8Array(derivedBits);
+  return result.hash;
 }
 
 /**

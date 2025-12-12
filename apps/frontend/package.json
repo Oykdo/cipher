@@ -10,7 +10,11 @@
     "lint:fix": "eslint . --ext ts,tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json,css}\"",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2ee-v2": "vitest run src/lib/e2ee/__tests__",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@noble/curves": "^2.0.1",
@@ -71,6 +75,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.18.2",
     "vite": "^6.0.5",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.5.0",
     "vitest": "^4.0.8"
   }
 }

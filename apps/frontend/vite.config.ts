@@ -3,15 +3,20 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import wasm from 'vite-plugin-wasm';
+import topLevelAwait from 'vite-plugin-top-level-await';
 
 export default defineConfig({
   plugins: [
+    wasm(), // WASM support for argon2-browser
+    topLevelAwait(), // Top-level await support
     react(),
     tailwindcss(),
     nodePolyfills({
-      include: ['buffer'],
+      include: ['buffer', 'util', 'stream', 'process', 'events'],
       globals: {
         Buffer: true,
+        process: true,
       },
     }),
   ],
@@ -41,9 +46,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    target: 'esnext', // Support for modern features including WASM
   },
   optimizeDeps: {
     exclude: ['argon2-browser'],
+    esbuildOptions: {
+      target: 'esnext',
+    },
   },
   worker: {
     format: 'es',
