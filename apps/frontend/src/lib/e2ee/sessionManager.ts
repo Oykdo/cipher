@@ -286,11 +286,7 @@ export async function initiateSession(
   peerPublicKey: Uint8Array,
   useDoubleRatchet: boolean = true
 ): Promise<E2EESession> {
-  // Log key fingerprints for debugging (first 8 bytes as hex)
-  const myKeyFingerprint = bytesToBase64(myPrivateKey.slice(0, 8));
-  const peerKeyFingerprint = bytesToBase64(peerPublicKey.slice(0, 8));
-  // SECURITY: crypto log removed
-  // SECURITY: Key fingerprints removed - never log key material or derived secrets
+  // SECURITY: Never log key material or derived secrets
 
   // Perform X25519 key exchange
   const sharedSecret = await deriveSharedSecret(myPrivateKey, peerPublicKey);

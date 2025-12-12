@@ -31,16 +31,18 @@ class BurnScheduler {
   /**
    * Schedule a message to be burned at a specific time
    */
-  schedule(messageId: string, conversationId: string, scheduledBurnAt: number) {
+  schedule(messageId: string, conversationId: string, scheduledBurnAt: number | Date) {
     if (!this.fastify) {
       throw new Error('BurnScheduler not initialized');
     }
+
+    const scheduledAtMs = scheduledBurnAt instanceof Date ? scheduledBurnAt.getTime() : scheduledBurnAt;
 
     // Cancel existing schedule if any
     this.cancel(messageId);
 
     const now = Date.now();
-    const delay = Math.max(0, scheduledBurnAt - now);
+    const delay = Math.max(0, scheduledAtMs - now);
 
     if (delay === 0) {
       // Burn immediately
@@ -56,14 +58,14 @@ class BurnScheduler {
     this.scheduledBurns.set(messageId, {
       messageId,
       conversationId,
-      scheduledBurnAt,
+      scheduledBurnAt: scheduledAtMs,
       timeoutId,
     });
 
     this.fastify.log.info({
       messageId,
       conversationId,
-      scheduledBurnAt: new Date(scheduledBurnAt).toISOString(),
+      scheduledBurnAt: new Date(scheduledAtMs).toISOString(),
       delayMs: delay,
     }, '🔥 Message burn scheduled');
   }
@@ -92,7 +94,8 @@ class BurnScheduler {
     try {
       const burnedAt = Date.now();
 
-      // Mark message as burned in database
+      // Mark message as burned in database (instead of permanent deletion)
+      // This preserves the record for audit purposes while preventing display
       await db.burnMessage(messageId, burnedAt);
 
       // Remove from scheduled burns

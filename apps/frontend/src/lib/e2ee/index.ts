@@ -241,11 +241,7 @@ export async function encryptSymmetric(
   await ensureSodiumReady();
 
   const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
-  const plaintextBytes = typeof plaintext === 'string'
-    ? sodium.from_string(plaintext)
-    : plaintext;
-
-  const ciphertext = sodium.crypto_secretbox_easy(plaintextBytes, nonce, key);
+  const ciphertext = sodium.crypto_secretbox_easy(plaintext, nonce, key);
 
   return {
     ciphertext: sodium.to_base64(ciphertext),
@@ -294,8 +290,7 @@ export async function encryptSealed(
 ): Promise<string> {
   await ensureSodiumReady();
 
-  const plaintextBytes = sodium.from_string(plaintext);
-  const ciphertext = sodium.crypto_box_seal(plaintextBytes, recipientPublicKey);
+  const ciphertext = sodium.crypto_box_seal(plaintext, recipientPublicKey);
 
   return sodium.to_base64(ciphertext);
 }
@@ -344,8 +339,7 @@ export async function signData(
 ): Promise<string> {
   await ensureSodiumReady();
 
-  const dataBytes = typeof data === 'string' ? sodium.from_string(data) : data;
-  const signature = sodium.crypto_sign_detached(dataBytes, privateKey);
+  const signature = sodium.crypto_sign_detached(data, privateKey);
 
   return sodium.to_base64(signature);
 }
@@ -365,10 +359,13 @@ export async function verifySignature(
   await ensureSodiumReady();
 
   try {
-    const dataBytes = typeof data === 'string' ? sodium.from_string(data) : data;
     const signatureBytes = sodium.from_base64(signature);
 
-    return sodium.crypto_sign_verify_detached(signatureBytes, dataBytes, publicKey);
+    return sodium.crypto_sign_verify_detached(
+      signatureBytes,
+      data,
+      publicKey
+    );
   } catch {
     return false;
   }
@@ -393,10 +390,8 @@ export async function encryptAuthenticated(
   await ensureSodiumReady();
 
   const nonce = sodium.randombytes_buf(sodium.crypto_box_NONCEBYTES);
-  const plaintextBytes = sodium.from_string(plaintext);
-
   const ciphertext = sodium.crypto_box_easy(
-    plaintextBytes,
+    plaintext,
     nonce,
     recipientPublicKey,
     senderPrivateKey

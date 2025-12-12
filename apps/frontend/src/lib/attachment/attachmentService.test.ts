@@ -285,8 +285,8 @@ describe('AttachmentService', () => {
 
   describe('Chunking and large files', () => {
     it('should handle files larger than chunk size', async () => {
-      // Create a 1 MB file
-      const largeContent = new Uint8Array(1024 * 1024);
+      // Create a file just larger than CHUNK_SIZE to exercise chunking without slowing tests
+      const largeContent = new Uint8Array(256 * 1024 + 4096);
       for (let i = 0; i < largeContent.length; i++) {
         largeContent[i] = i % 256;
       }
@@ -315,7 +315,7 @@ describe('AttachmentService', () => {
     it('should call progress callback during encryption', async () => {
       const progressCallback = vi.fn();
 
-      const largeContent = new Uint8Array(1024 * 1024);
+      const largeContent = new Uint8Array(256 * 1024 + 4096);
       const largeFile = new File([largeContent], 'large.bin', { type: 'application/octet-stream' });
 
       await encryptAttachment(
@@ -332,7 +332,7 @@ describe('AttachmentService', () => {
     });
 
     it('should call progress callback during decryption', async () => {
-      const largeContent = new Uint8Array(1024 * 1024);
+      const largeContent = new Uint8Array(256 * 1024 + 4096);
       const largeFile = new File([largeContent], 'large.bin', { type: 'application/octet-stream' });
 
       const encrypted = await encryptAttachment(

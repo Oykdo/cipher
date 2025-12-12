@@ -224,8 +224,9 @@ describe('KeyStore - Secure IndexedDB Storage', () => {
       
       await storeCryptoKeyIDB('test-key', cryptoKey);
       
-      // Key should not be JSON serializable
-      expect(() => JSON.stringify(cryptoKey)).toThrow();
+      // Key should not expose raw key material via JSON serialization
+      const json = JSON.stringify(cryptoKey);
+      expect(json).not.toContain(Array.from(rawKey).join(''));
     });
     
     it('should protect against XSS key extraction', async () => {

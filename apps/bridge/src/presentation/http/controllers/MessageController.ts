@@ -15,6 +15,7 @@ import {
   type AcknowledgeMessageResponse,
   type BurnMessageResponse,
 } from '../dtos/message.dto';
+import { burnScheduler } from '../../../services/burn-scheduler.js';
 
 export class MessageController {
   constructor(
@@ -44,6 +45,11 @@ export class MessageController {
       unlockBlockHeight: input.unlockBlockHeight,
       scheduledBurnAt: input.scheduledBurnAt,
     });
+
+    // Schedule burn if needed
+    if (result.scheduledBurnAt) {
+      burnScheduler.schedule(result.id, conversationId, result.scheduledBurnAt);
+    }
 
     // Return response (Message entity has all these properties now)
     return result as SendMessageResponse;
@@ -89,6 +95,11 @@ export class MessageController {
       conversationId,
       userId,
     });
+
+    // Schedule burn if updated
+    if (result.willBurnAt) {
+      burnScheduler.schedule(messageId, conversationId, result.willBurnAt);
+    }
 
     // Return response
     return result;

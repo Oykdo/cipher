@@ -13,6 +13,8 @@
  * - Fallback to known peers if bootstrap fails
  */
 
+import { debugLogger } from '../../debugLogger';
+
 export interface BootstrapNode {
   url: string;
   peerId?: string;
@@ -126,7 +128,7 @@ export class BootstrapManager {
       }
     }
 
-    debugLogger.info('✅ [Bootstrap] Connected: ${connected}, Failed: ${failed}');
+    debugLogger.info(`✅ [Bootstrap] Connected: ${connected}, Failed: ${failed}`);
     return { connected, failed };
   }
 
@@ -155,7 +157,7 @@ export class BootstrapManager {
         // Try to get peer list
         await this.fetchPeersFromNode(node);
         
-        debugLogger.info('✅ [Bootstrap] Connected to ${node.url} (${node.latency}ms)');
+        debugLogger.info(`✅ [Bootstrap] Connected to ${node.url} (${node.latency}ms)`);
         return true;
       }
 

@@ -15,6 +15,8 @@ import {
   base64ToBytes,
   secureWipe,
 } from '../../shared/crypto';
+import { API_BASE_URL } from '../../config';
+import { fetchWithRefresh } from '../../services/api-interceptor';
 
 // ============================================================================
 // TYPES
@@ -38,6 +40,7 @@ export interface EncryptedAttachment {
     fileMimeType: string;
     thumbnail?: string;
     encryptedChunks: string[]; // Base64-encoded encrypted chunks
+    remoteAttachmentId?: string; // Server-side ciphertext reference (when chunks are uploaded out-of-band)
     fileKey: string; // Encrypted or plain fileKey depending on securityMode
     iv: string; // Base64 IV for file encryption
     securityMode: SecurityMode;
@@ -68,6 +71,46 @@ export interface ProgressCallback {
 const CHUNK_SIZE = 256 * 1024; // 256 KB chunks for large files
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB max
 const THUMBNAIL_MAX_SIZE = 200; // Max thumbnail dimension in pixels
+
+async function downloadEncryptedAttachmentBytes(remoteAttachmentId: string): Promise<Uint8Array> {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/v2/attachments/${remoteAttachmentId}`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.message || errorData.error || `Request failed: ${response.status}`);
+  }
+
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+async function readFileBytes(file: File): Promise<Uint8Array> {
+  const f: any = file as any;
+  if (typeof f.arrayBuffer === 'function') {
+    return new Uint8Array(await f.arrayBuffer());
+  }
+
+  if (typeof FileReader !== 'undefined') {
+    const buf = await new Promise<ArrayBuffer>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error || new Error('Failed to read file'));
+      reader.onload = () => {
+        const result = reader.result;
+        if (result instanceof ArrayBuffer) {
+          resolve(result);
+        } else {
+          reject(new Error('Unexpected FileReader result type'));
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    return new Uint8Array(buf);
+  }
+
+  throw new Error('file.arrayBuffer is not available in this environment');
+}
 
 // ============================================================================
 // FILE ENCRYPTION
@@ -326,7 +369,7 @@ export async function encryptAttachment(
   }
 
   // Read file data
-  const fileData = new Uint8Array(await file.arrayBuffer());
+  const fileData = await readFileBytes(file);
   
   // Generate thumbnail for images
   const thumbnail = await generateThumbnail(file);
@@ -427,16 +470,29 @@ export async function decryptAttachment(
       fileKey = base64ToBytes(payload.fileKey);
     }
 
-    // Decode chunks from Base64
-    const chunks = payload.encryptedChunks.map((chunkStr, index) => {
-      if (onProgress) {
-        onProgress(index + 1, payload.totalChunks);
-      }
-      return base64ToBytes(chunkStr);
-    });
+    let encryptedFileData: Uint8Array;
 
-    // Reassemble encrypted file data
-    const encryptedFileData = reassembleChunks(chunks);
+    const hasInlineChunks = Array.isArray(payload.encryptedChunks) && payload.encryptedChunks.length > 0;
+    if (!hasInlineChunks) {
+      if (!payload.remoteAttachmentId) {
+        throw new Error('Attachment payload is missing encryptedChunks and remoteAttachmentId');
+      }
+      encryptedFileData = await downloadEncryptedAttachmentBytes(payload.remoteAttachmentId);
+      if (onProgress) {
+        onProgress(payload.totalChunks || 1, payload.totalChunks || 1);
+      }
+    } else {
+      // Decode chunks from Base64
+      const chunks = payload.encryptedChunks.map((chunkStr, index) => {
+        if (onProgress) {
+          onProgress(index + 1, payload.totalChunks);
+        }
+        return base64ToBytes(chunkStr);
+      });
+
+      // Reassemble encrypted file data
+      encryptedFileData = reassembleChunks(chunks);
+    }
 
     // Split ciphertext and tag
     const ciphertext = encryptedFileData.slice(0, -16);

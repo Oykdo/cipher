@@ -123,6 +123,8 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
   const disconnect = () => {
     if (socketRef.current) {
       debugLogger.debug('[useSocket] Disconnecting socket');
+      // Remove all listeners before disconnecting to avoid warnings
+      socketRef.current.removeAllListeners();
       socketRef.current.disconnect();
       socketRef.current = null;
       setConnected(false);

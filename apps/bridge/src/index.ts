@@ -65,7 +65,12 @@ await app.register(fastifyStatic, {
 });
 
 // SECURITY FIX VULN-008: Stricter CORS configuration
-const ALLOWED_DEV_ORIGINS = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:4001'];
+const ALLOWED_DEV_ORIGINS = [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5178',
+    'http://localhost:4001',
+];
 
 await app.register(cors, {
     origin: (origin, cb) => {

@@ -78,7 +78,7 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
         
         // Return keys
         return {
-          keys: publicKeys.map(key => ({
+          keys: publicKeys.map((key: any) => ({
             userId: key.user_id,
             username: key.username,
             publicKey: key.public_key,
@@ -162,7 +162,7 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
         const members = await getDB().getConversationMembersWithKeys(conversationId);
         
         return {
-          members: members.map(member => ({
+          members: members.map((member: any) => ({
             userId: member.user_id,
             username: member.username,
             publicKey: member.public_key || undefined,

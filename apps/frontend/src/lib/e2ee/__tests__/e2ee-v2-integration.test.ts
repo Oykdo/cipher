@@ -274,7 +274,7 @@ describe('e2ee-v2 Integration - Complete Workflow', () => {
     expect(parsed.ciphertext).not.toContain('1234');
     
     // Ciphertext should be base64 gibberish
-    expect(parsed.ciphertext).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    expect(parsed.ciphertext).toMatch(/^[A-Za-z0-9+/_-]+=*$/);
 
     console.log('✅ Server CANNOT decrypt message (zero-knowledge verified)');
     console.log('📦 Server sees:', {

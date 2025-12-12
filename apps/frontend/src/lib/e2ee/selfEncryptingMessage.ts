@@ -83,22 +83,34 @@ export async function encryptSelfEncryptingMessage(
 ): Promise<EncryptedMessageV2> {
   await _sodium.ready;
 
+  if (!participants.length) {
+    throw new Error('No participants provided');
+  }
+
+  const sodiumAny = _sodium as any;
+
+  const hasAesGcm =
+    typeof sodiumAny.crypto_aead_aes256gcm_is_available === 'function' &&
+    typeof sodiumAny.crypto_aead_aes256gcm_encrypt === 'function' &&
+    typeof sodiumAny.crypto_aead_aes256gcm_decrypt === 'function' &&
+    sodiumAny.crypto_aead_aes256gcm_is_available();
+
   // 1. Generate one-time symmetric key
   const messageKey = _sodium.randombytes_buf(KEY_LENGTH);
   const iv = _sodium.randombytes_buf(IV_LENGTH);
 
   // 2. Encrypt message with AES-256-GCM
-  const plaintextBytes = new TextEncoder().encode(plaintext);
+  const additionalData = new Uint8Array(0);
   
   // Use libsodium's crypto_aead_aes256gcm if available (hardware accelerated)
   let ciphertext: Uint8Array;
   let authTag: Uint8Array;
   
-  if (_sodium.crypto_aead_aes256gcm_is_available()) {
+  if (hasAesGcm) {
     // Hardware-accelerated AES-GCM
-    const encrypted = _sodium.crypto_aead_aes256gcm_encrypt(
-      plaintextBytes,
-      null,           // No additional data
+    const encrypted = sodiumAny.crypto_aead_aes256gcm_encrypt(
+      plaintext,
+      additionalData, // No additional data
       null,           // No secret nonce
       iv,
       messageKey
@@ -109,8 +121,8 @@ export async function encryptSelfEncryptingMessage(
   } else {
     // Fallback to ChaCha20-Poly1305 (always available)
     const encrypted = _sodium.crypto_aead_chacha20poly1305_ietf_encrypt(
-      plaintextBytes,
-      null,
+      plaintext,
+      additionalData,
       null,
       iv,
       messageKey
@@ -167,6 +179,14 @@ export async function decryptSelfEncryptingMessage(
 ): Promise<string> {
   await _sodium.ready;
 
+  const sodiumAny = _sodium as any;
+
+  const hasAesGcm =
+    typeof sodiumAny.crypto_aead_aes256gcm_is_available === 'function' &&
+    typeof sodiumAny.crypto_aead_aes256gcm_encrypt === 'function' &&
+    typeof sodiumAny.crypto_aead_aes256gcm_decrypt === 'function' &&
+    sodiumAny.crypto_aead_aes256gcm_is_available();
+
   // 1. Validate version
   if (encryptedMessage.version !== 'e2ee-v2') {
     throw new Error(`Unsupported message version: ${encryptedMessage.version}`);
@@ -199,15 +219,16 @@ export async function decryptSelfEncryptingMessage(
   const fullCiphertext = new Uint8Array(ciphertext.length + authTag.length);
   fullCiphertext.set(ciphertext);
   fullCiphertext.set(authTag, ciphertext.length);
+  const additionalData = new Uint8Array(0);
 
   let decrypted: Uint8Array;
   
-  if (_sodium.crypto_aead_aes256gcm_is_available()) {
+  if (hasAesGcm) {
     // Hardware-accelerated AES-GCM
-    decrypted = _sodium.crypto_aead_aes256gcm_decrypt(
+    decrypted = sodiumAny.crypto_aead_aes256gcm_decrypt(
       null,           // No secret nonce
       fullCiphertext,
-      null,           // No additional data
+      additionalData, // No additional data
       iv,
       messageKey
     );
@@ -216,7 +237,7 @@ export async function decryptSelfEncryptingMessage(
     decrypted = _sodium.crypto_aead_chacha20poly1305_ietf_decrypt(
       null,
       fullCiphertext,
-      null,
+      additionalData,
       iv,
       messageKey
     );
@@ -226,7 +247,7 @@ export async function decryptSelfEncryptingMessage(
   _sodium.memzero(messageKey);
 
   // 6. Convert to string
-  return new TextDecoder().decode(decrypted);
+  return _sodium.to_string(decrypted);
 }
 
 // ============================================================================
@@ -237,16 +258,21 @@ export async function decryptSelfEncryptingMessage(
  * Check if a message is in e2ee-v2 format
  */
 export function isSelfEncryptingMessage(data: any): data is EncryptedMessageV2 {
-  return (
-    typeof data === 'object' &&
-    data !== null &&
-    data.version === 'e2ee-v2' &&
-    typeof data.iv === 'string' &&
-    typeof data.ciphertext === 'string' &&
-    typeof data.authTag === 'string' &&
-    typeof data.keys === 'object' &&
-    data.keys !== null
-  );
+  if (typeof data !== 'object' || data === null) return false;
+  if (data.version !== 'e2ee-v2') return false;
+  if (data.type !== 'standard' && data.type !== 'bar' && data.type !== 'timelock' && data.type !== 'attachment') return false;
+  if (typeof data.iv !== 'string' || data.iv.length === 0) return false;
+  if (typeof data.ciphertext !== 'string' || data.ciphertext.length === 0) return false;
+  if (typeof data.authTag !== 'string' || data.authTag.length === 0) return false;
+  if (typeof data.keys !== 'object' || data.keys === null) return false;
+
+  const entries = Object.entries(data.keys as Record<string, unknown>);
+  for (const [userId, wrappedKey] of entries) {
+    if (typeof userId !== 'string' || userId.length === 0) return false;
+    if (typeof wrappedKey !== 'string' || wrappedKey.length === 0) return false;
+  }
+
+  return true;
 }
 
 /**

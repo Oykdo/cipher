@@ -28,6 +28,8 @@ import {
   DEFAULT_DHT_CONFIG,
 } from './types';
 
+import { debugLogger } from '../../debugLogger';
+
 const DB_NAME = 'cipher-pulse-dht';
 const ROUTING_STORE = 'routing-table';
 const PEERS_STORE = 'known-peers';

@@ -203,8 +203,8 @@ export class P2PKeyExchange {
    * Handle key verification message
    */
   private handleKeyVerify(
-    peerId: string,
-    payload: { type: 'verify'; fingerprint: string; verified: boolean }
+    _peerId: string,
+    _payload: { type: 'verify'; fingerprint: string; verified: boolean }
   ): void {
     // SECURITY: Sensitive log removed
   }

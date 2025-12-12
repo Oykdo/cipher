@@ -144,7 +144,11 @@ function KDF_CK(ck: Uint8Array): [Uint8Array, Uint8Array] {
 /**
  * Encrypt a message with authenticated encryption
  */
-function ENCRYPT(key: Uint8Array, plaintext: Uint8Array, associatedData: Uint8Array): { ciphertext: Uint8Array; nonce: Uint8Array } {
+function ENCRYPT(
+  key: Uint8Array,
+  plaintext: string | Uint8Array,
+  associatedData: string | Uint8Array
+): { ciphertext: Uint8Array; nonce: Uint8Array } {
   const nonce = _sodium.randombytes_buf(_sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
   const ciphertext = _sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
     plaintext,
@@ -159,7 +163,12 @@ function ENCRYPT(key: Uint8Array, plaintext: Uint8Array, associatedData: Uint8Ar
 /**
  * Decrypt a message with authenticated encryption
  */
-function DECRYPT(key: Uint8Array, ciphertext: Uint8Array, nonce: Uint8Array, associatedData: Uint8Array): Uint8Array {
+function DECRYPT(
+  key: Uint8Array,
+  ciphertext: Uint8Array,
+  nonce: Uint8Array,
+  associatedData: string | Uint8Array
+): Uint8Array {
   return _sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
     null,
     ciphertext,
@@ -260,7 +269,7 @@ export function initializeBob(
 ): RatchetState {
   // Compute public key from private key
   // This works because identity keys use crypto_box format (X25519)
-  const myPublicKey = _sodium.crypto_scalarmult_base(myPrivateKey);
+  const myPublicKey = getDHPublicKey(myPrivateKey);
   
   // SECURITY: Never log cryptographic material
   // Initializing Double Ratchet as Bob (responder)
@@ -309,11 +318,10 @@ export function ratchetEncrypt(
   };
 
   // Prepare associated data (header)
-  const ad = _sodium.from_string(JSON.stringify(header));
+  const ad = JSON.stringify(header);
 
   // Encrypt
-  const plaintextBytes = _sodium.from_string(plaintext);
-  const { ciphertext, nonce } = ENCRYPT(messageKey, plaintextBytes, ad);
+  const { ciphertext, nonce } = ENCRYPT(messageKey, plaintext, ad);
 
   // Increment message number
   state.Ns++;
@@ -343,7 +351,7 @@ export function ratchetDecrypt(
   debugLogger.debug(`🔓 [DR] Current state: Nr=${state.Nr}, skippedKeys.size=${state.skippedKeys.size}`);
 
   // Prepare associated data
-  const ad = _sodium.from_string(JSON.stringify(header));
+  const ad = JSON.stringify(header);
 
   // Try skipped message keys first
   const plaintextFromSkipped = trySkippedMessageKeys(state, header, ciphertext, nonce, ad);
@@ -507,7 +515,7 @@ function trySkippedMessageKeys(
   header: MessageHeader,
   ciphertext: string,
   nonce: string,
-  ad: Uint8Array
+  ad: string | Uint8Array
 ): string | null {
   const headerPubKey = _sodium.from_base64(header.publicKey);
   const keyId = makeKeyId(headerPubKey, header.messageNumber);

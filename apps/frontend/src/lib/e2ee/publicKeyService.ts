@@ -141,6 +141,10 @@ async function fetchPublicKeysFromAPI(userIds: string[]): Promise<PublicKeyInfo[
     const results: PublicKeyInfo[] = [];
     
     for (const key of response.keys) {
+      if (!key.publicKey || !key.signPublicKey) {
+        continue;
+      }
+      
       const keyInfo: PublicKeyInfo = {
         userId: key.userId,
         username: key.username,
@@ -240,10 +244,28 @@ export async function getConversationParticipantKeys(
     
     // Get public keys for all members
     const userIds = members.map(m => m.userId);
-    return getPublicKeys(userIds, options);
-  } catch (error) {
-    console.error('[PublicKeyService] Failed to get conversation participant keys:', error);
-    throw new Error(`Failed to get participant keys: ${error}`);
+    const keys = await getPublicKeys(userIds, options);
+
+    const byId = new Set(keys.map(k => k.userId));
+    const missing = userIds.filter(id => !byId.has(id));
+    if (missing.length > 0) {
+      const missingUsernames = members
+        .filter(m => missing.includes(m.userId))
+        .map(m => m.username)
+        .filter(Boolean);
+
+      const label = missingUsernames.length > 0 ? missingUsernames.join(', ') : missing.join(', ');
+      throw new Error(`Missing e2ee-v2 public keys for: ${label}`);
+    }
+
+    return keys;
+  } catch (error: any) {
+    const msg = typeof error?.message === 'string' ? error.message : String(error);
+    // Missing keys is a normal state (user hasn't published v2 keys yet) - avoid noisy console errors
+    if (!msg.includes('Missing e2ee-v2 public keys')) {
+      console.error('[PublicKeyService] Failed to get conversation participant keys:', error);
+    }
+    throw new Error(`Failed to get participant keys: ${msg}`);
   }
 }
 

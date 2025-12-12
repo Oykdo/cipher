@@ -99,8 +99,9 @@ export async function deriveMasterKey(
   // Generate salt if not provided (deterministic if seed is deterministic)
   const actualSalt = salt || await generateDeterministicSalt(seed);
   
-  // Import argon2-browser (lazy load for performance)
-  const argon2 = await import('argon2-browser');
+  // Import bundled argon2 to avoid WASM fetch/import issues (Vite + Vitest/jsdom)
+  const argon2Module: any = await import('argon2-browser/dist/argon2-bundled.min.js');
+  const argon2 = argon2Module?.default ?? argon2Module;
   
   // Derive key with Argon2id
   const result = await argon2.hash({
@@ -110,7 +111,7 @@ export async function deriveMasterKey(
     mem: ARGON2_CONFIG.memory,
     parallelism: ARGON2_CONFIG.parallelism,
     hashLen: ARGON2_CONFIG.hashLength,
-    type: argon2.ArgonType.Argon2id,
+    type: argon2.ArgonType?.Argon2id ?? 2,
   });
   
   // result.hash is already a Uint8Array

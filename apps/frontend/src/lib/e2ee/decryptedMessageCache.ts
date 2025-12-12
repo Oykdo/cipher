@@ -61,6 +61,8 @@ export function cacheDecryptedMessage(
 
   const key = `${CACHE_KEY_PREFIX}${messageId}`;
   storage.setItem(key, JSON.stringify(cached));
+  
+  console.log(`[CACHE] Stored message ${messageId} in cache (length: ${plaintext.length})`);
 
   // Update index
   const index = getCacheIndex();
@@ -79,13 +81,16 @@ export function getCachedDecryptedMessage(messageId: string): string | null {
   const cached = storage.getItem(key);
 
   if (!cached) {
+    console.log(`[CACHE] Message ${messageId} NOT found in cache`);
     return null;
   }
 
   try {
     const data: CachedMessage = JSON.parse(cached);
+    console.log(`[CACHE] Retrieved message ${messageId} from cache (length: ${data.plaintext.length})`);
     return data.plaintext;
-  } catch {
+  } catch (err) {
+    console.error(`[CACHE] Failed to parse cached message ${messageId}:`, err);
     return null;
   }
 }
@@ -96,6 +101,19 @@ export function getCachedDecryptedMessage(messageId: string): string | null {
 export function isMessageCached(messageId: string): boolean {
   const key = `${CACHE_KEY_PREFIX}${messageId}`;
   return storage.getItem(key) !== null;
+}
+
+/**
+ * Clear cache for a specific message (e.g., when burned)
+ */
+export function clearMessageCache(messageId: string): void {
+  const key = `${CACHE_KEY_PREFIX}${messageId}`;
+  storage.removeItem(key);
+
+  // Remove from index
+  const index = getCacheIndex();
+  const newIndex = index.filter(id => id !== messageId);
+  updateCacheIndex(newIndex);
 }
 
 /**

@@ -17,7 +17,8 @@ const migrations = [
     '002_add_discoverable.sql',
     '002_add_user_dicekey_fields.sql',
     'add_conversation_requests.sql',
-    '003_update_audit_logs_jsonb.sql'
+    '003_update_audit_logs_jsonb.sql',
+    '004_add_sender_plaintext.sql'
 ];
 
 async function runMigrations() {

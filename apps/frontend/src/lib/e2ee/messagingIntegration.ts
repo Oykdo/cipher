@@ -16,6 +16,7 @@ import {
   addPeerPublicKey,
   getPeerFingerprint,
   ensureE2EEInitializedForSession,
+  getCurrentUsername,
 } from './e2eeService';
 import { debugLogger } from '../debugLogger';
 
@@ -141,10 +142,23 @@ export async function encryptMessageForSending(
   // Encrypt with E2EE
   const encrypted = await encryptMessageForPeer(recipientUsername, plaintext);
 
+  // Encrypt a copy for the sender (so they can decrypt it later)
+  const currentUsername = getCurrentUsername();
+  let senderCopy: any = undefined;
+  
+  if (currentUsername) {
+    try {
+      senderCopy = await encryptMessageForPeer(currentUsername, plaintext);
+    } catch (e) {
+      console.warn('[E2EE] Failed to create sender copy:', e);
+    }
+  }
+
   // Wrap in envelope to indicate E2EE
   const envelope = {
     version: 'e2ee-v1',
     encrypted,
+    senderCopy,
   };
 
   return JSON.stringify(envelope);
@@ -201,7 +215,7 @@ export async function decryptReceivedMessage(
   }
 
   // Check if it's an E2EE envelope
-  if (parsed.version === 'e2ee-v1' && parsed.encrypted) {
+  if (parsed.version === 'e2ee-v1' && (parsed.encrypted || parsed.senderCopy)) {
     try {
       await requireE2EE();
     } catch (error) {
@@ -209,7 +223,23 @@ export async function decryptReceivedMessage(
       return makeResult('[E2EE not initialized - please re-login]');
     }
 
+    // Determine if we are the sender
+    const currentUsername = getCurrentUsername();
+    const isOwnMessage = currentUsername && senderUsername === currentUsername;
+    
+    // Choose which ciphertext to decrypt
+    // If we are the sender, try to use senderCopy
+    let ciphertextToDecrypt = parsed.encrypted;
+    if (isOwnMessage && parsed.senderCopy) {
+      ciphertextToDecrypt = parsed.senderCopy;
+      debugLogger.debug('[E2EE] Decrypting own message using senderCopy');
+    } else if (isOwnMessage && !parsed.senderCopy) {
+      // We are sender but no copy - cannot decrypt (legacy message)
+      return makeResult('🔒 Message envoyé (chiffré de bout en bout)\n\nCe message a été chiffré avec la clé publique de votre destinataire. Seul le destinataire peut le déchiffrer.\n\nPour relire vos propres messages, gardez cette session ouverte ou utilisez la fonctionnalité de sauvegarde.');
+    }
+
     // Ensure we have sender's public key (fetch if needed)
+    // Note: If isOwnMessage, senderUsername IS currentUsername, so we need our own public key (which we have)
     const hasPeerKey = await ensurePeerKey(senderUsername);
     if (!hasPeerKey) {
       console.error(`[E2EE] Cannot decrypt: no public key for sender ${senderUsername}`);
@@ -217,12 +247,12 @@ export async function decryptReceivedMessage(
     }
 
     // Determine encryption type from the encrypted payload
-    const encryptionType = parsed.encrypted.version || 'unknown';
+    const encryptionType = ciphertextToDecrypt.version || 'unknown';
     debugLogger.debug(`[E2EE] Decrypting ${encryptionType} message from ${senderUsername}`);
 
     try {
       // Decrypt with E2EE (handles both Double Ratchet and NaCl Box)
-      const decrypted = await decryptMessageFromPeer(senderUsername, parsed.encrypted);
+      const decrypted = await decryptMessageFromPeer(senderUsername, ciphertextToDecrypt);
       return makeResult(decrypted, encryptionType);
     } catch (error) {
       // Double Ratchet messages can't be recovered - they need the exact session state

@@ -100,6 +100,19 @@ export async function initializeE2EE(username: string): Promise<void> {
   currentIdentityKeys = await getOrCreateIdentityKeys(username);
   currentUsername = username;
 
+  // Ensure we can encrypt a sender copy to ourselves (store our own public key in the peer cache)
+  // This avoids noisy warnings like: "No public key found for peer: <self>"
+  try {
+    await storePeerPublicKey(
+      username,
+      username,
+      currentIdentityKeys.identityKeyPair.publicKey,
+      currentIdentityKeys.identityKeyPair.fingerprint
+    );
+  } catch {
+    // Best-effort only
+  }
+
   debugLogger.info('✅ [E2EE Service] Initialized for ${username}');
   // SECURITY: crypto log removed
 

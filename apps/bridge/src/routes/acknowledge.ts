@@ -66,19 +66,43 @@ export async function acknowledgeRoutes(fastify: FastifyInstance) {
         return { error: 'Vous ne pouvez pas accuser réception de votre propre message' };
       }
 
-      // Schedule burn with the configured delay
-      burnScheduler.schedule(messageId, conversationId, message.scheduled_burn_at);
+      // Calculate actual burn time
+      let actualBurnTime: number;
+      const scheduledBurnValue = typeof message.scheduled_burn_at === 'object'
+        ? new Date(message.scheduled_burn_at).getTime()
+        : message.scheduled_burn_at;
+
+      if (scheduledBurnValue < 0) {
+        // Negative value = delay in seconds after reading
+        const delaySeconds = Math.abs(scheduledBurnValue);
+        actualBurnTime = Date.now() + (delaySeconds * 1000);
+        
+        // Update the message with the actual burn time
+        await db.scheduleBurn(messageId, actualBurnTime);
+        
+        fastify.log.info({
+          messageId,
+          delaySeconds,
+          actualBurnTime: new Date(actualBurnTime).toISOString(),
+        }, 'Calculated burn time from delay');
+      } else {
+        // Positive value = absolute timestamp
+        actualBurnTime = scheduledBurnValue;
+      }
+
+      // Schedule burn with the calculated time
+      burnScheduler.schedule(messageId, conversationId, actualBurnTime);
 
       fastify.log.info({
         messageId,
         conversationId,
         userId,
-        scheduledBurnAt: new Date(message.scheduled_burn_at).toISOString(),
+        scheduledBurnAt: new Date(actualBurnTime).toISOString(),
       }, 'Message acknowledged - burn countdown started');
 
       return {
         success: true,
-        scheduledBurnAt: message.scheduled_burn_at,
+        scheduledBurnAt: actualBurnTime,
       };
     }
   );

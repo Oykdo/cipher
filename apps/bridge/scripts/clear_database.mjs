@@ -8,6 +8,13 @@ async function clearDatabase() {
     const db = getDatabase();
 
     try {
+        if (!process.argv.includes('--confirm')) {
+            console.error('🛑 Refusing to clear database. Re-run with: node scripts/clear_database.mjs --confirm');
+            process.exit(1);
+        }
+
+        process.env.ALLOW_DESTRUCTIVE_DB_OPS = '1';
+
         console.log('🔄 Clearing database...');
         await db.clearAll();
         console.log('✅ Database cleared successfully!');

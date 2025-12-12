@@ -118,6 +118,7 @@ interface NewMessagePayload {
     createdAt: number;
     unlockBlockHeight?: number;
     scheduledBurnAt?: number;
+    burnDelay?: number;
     isLocked?: boolean;
   };
 }

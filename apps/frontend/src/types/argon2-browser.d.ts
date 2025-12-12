@@ -27,3 +27,36 @@ declare module 'argon2-browser' {
 
   export function hash(options: Argon2Options): Promise<Argon2Result>;
 }
+
+declare module 'argon2-browser/dist/argon2-bundled.min.js' {
+  export enum ArgonType {
+    Argon2d = 0,
+    Argon2i = 1,
+    Argon2id = 2,
+  }
+
+  export interface Argon2Options {
+    pass: Uint8Array | string;
+    salt: Uint8Array | string;
+    time: number;
+    mem: number;
+    parallelism: number;
+    hashLen: number;
+    type: ArgonType;
+  }
+
+  export interface Argon2Result {
+    hash: Uint8Array;
+    hashHex: string;
+    encoded: string;
+  }
+
+  export function hash(options: Argon2Options): Promise<Argon2Result>;
+
+  const argon2: {
+    hash: typeof hash;
+    ArgonType: typeof ArgonType;
+  };
+
+  export default argon2;
+}

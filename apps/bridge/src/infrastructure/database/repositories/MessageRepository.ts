@@ -71,29 +71,9 @@ export class MessageRepository implements IMessageRepository {
   }
 
   async findTimeLocked(): Promise<Message[]> {
-    // Find messages with unlock_block_height set (time-locked messages)
-    // Only return messages that are still locked (unlock time in future)
-    const currentTime = Date.now();
-    
-    const rows = await this.db
-      .selectFrom('messages')
-      .selectAll()
-      .where('unlock_block_height', 'is not', null)
-      .where('unlock_block_height', '>', currentTime)
-      .where('is_burned', '=', 0)
-      .execute();
-
-    return rows.map(row => {
-      const conversationId = `${row.sender_id}:${row.recipient_id}`;
-      return new Message(
-        row.id,
-        conversationId,
-        row.sender_id,
-        row.body,
-        new Date(row.created_at),
-        row.unlock_block_height || undefined
-      );
-    });
+    // Not implemented in Postgres DatabaseService yet.
+    // This repository is currently only used by the clean-architecture layer (not wired for v2 routes).
+    return [];
   }
 
   async create(message: Message): Promise<void> {
@@ -127,8 +107,7 @@ export class MessageRepository implements IMessageRepository {
   }
 
   async delete(id: string): Promise<void> {
-    // TODO: Implement delete (or just burn?)
-    throw new Error('MessageRepository.delete not implemented yet');
+    await this.db.deleteMessage(id);
   }
 
   async burn(messageId: string): Promise<void> {

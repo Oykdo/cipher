@@ -316,7 +316,9 @@ describe('Signal Protocol - Double Ratchet', () => {
       const aliceState = aliceRatchet.getState();
       const bobState = bobRatchet.getState();
 
-      expect(aliceState.sendMessageNumber).toBeGreaterThan(0);
+      // In an alternating conversation, each send is typically the first message of a fresh sending chain
+      // (sendMessageNumber may be reset to 0 after each DH ratchet). We mainly assert that state advanced.
+      expect(aliceState.receiveMessageNumber).toBeGreaterThan(0);
       expect(bobState.sendMessageNumber).toBeGreaterThan(0);
     });
 

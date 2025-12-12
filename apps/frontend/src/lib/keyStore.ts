@@ -302,6 +302,9 @@ export async function deriveKeyFromPassword(
  * @returns Non-extractable CryptoKey for AES-GCM
  */
 export async function importRawKey(rawKey: Uint8Array): Promise<CryptoKey> {
+  if (rawKey.byteLength !== 32) {
+    throw new Error('Invalid raw key length: expected 32 bytes for AES-256');
+  }
   return await crypto.subtle.importKey(
     'raw',
     new Uint8Array(rawKey),

@@ -33,14 +33,17 @@ export default function Welcome() {
   const [verificationError, setVerificationError] = useState('');
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
-  if (!state || !state.userId || !state.checksums) {
-    console.error('Missing state, redirecting to landing');
-    // Si pas de state, rediriger vers landing
-    navigate('/');
-    return null;
-  }
+  const missingState = !state || !state.userId || !state.checksums;
+  const userId = state?.userId ?? '';
+  const username = state?.username ?? '';
+  const checksums = state?.checksums ?? [];
 
-  const { userId, username, checksums } = state;
+  useEffect(() => {
+    if (missingState) {
+      console.error('Missing state, redirecting to landing');
+      navigate('/');
+    }
+  }, [missingState, navigate]);
 
   // Generate 5 random checksums to verify on mount
   useEffect(() => {
@@ -56,6 +59,10 @@ export default function Welcome() {
       setRandomChecksums(indices.map(i => ({ index: i, value: checksums[i] })));
     }
   }, [checksums]);
+
+  if (missingState) {
+    return null;
+  }
 
   const copyUserId = () => {
     navigator.clipboard.writeText(userId);

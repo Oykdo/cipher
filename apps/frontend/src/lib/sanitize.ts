@@ -160,6 +160,7 @@ export function sanitizeSearchQuery(query: string, maxLength: number = 100): str
   }
   
   // Remove control characters
+  // eslint-disable-next-line no-control-regex -- intentionally strips ASCII control chars
   return cleaned.replace(/[\x00-\x1F\x7F]/g, '');
 }
 

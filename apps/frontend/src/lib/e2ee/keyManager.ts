@@ -22,10 +22,9 @@ async function ensureArgon2Loaded() {
   if (argon2) return;
   
   try {
-    // Dynamic import with WASM support from vite-plugin-wasm
-    const module = await import('argon2-browser');
-    argon2 = module;
-    console.log('[KeyManager] ✅ argon2-browser loaded successfully with WASM');
+    // Use the bundled build to avoid runtime WASM fetch/import issues (Vite + Vitest/jsdom).
+    const module: any = await import('argon2-browser/dist/argon2-bundled.min.js');
+    argon2 = module?.default ?? module;
   } catch (error) {
     console.error('[KeyManager] ❌ Failed to load argon2-browser:', error);
     throw new Error('Failed to load argon2-browser. WASM may not be supported.');

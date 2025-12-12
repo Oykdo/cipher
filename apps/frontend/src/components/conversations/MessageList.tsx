@@ -8,8 +8,6 @@ import { TimeLockCountdown } from '../TimeLockCountdown';
 import { BurnMessage } from '../BurnMessage';
 import { AttachmentMessage } from './AttachmentMessage';
 import type { EncryptedAttachment } from '../../lib/attachment';
-
-import { debugLogger } from "../../lib/debugLogger";
 interface MessageListProps {
   messages: MessageV2[];
   sessionUserId: string;
@@ -81,8 +79,8 @@ export function MessageList({
           const isOwn = message.senderId === sessionUserId;
           const locked = isMessageLocked(message);
           const burned = message.isBurned;
-          // A message is a burn message if it has scheduledBurnAt (even if already burned for animation)
-          const isBurnMessage = message.scheduledBurnAt && !locked;
+          // A message is a burn message if it has scheduledBurnAt OR burnDelay
+          const isBurnMessage = (message.scheduledBurnAt || message.burnDelay) && !locked;
           const isBurning = burningMessages.has(message.id);
           
           // Check if message is an attachment
@@ -96,18 +94,6 @@ export function MessageList({
             // Not an attachment, continue as text message
           }
 
-          // Debug log temporarily
-          debugLogger.debug('MessageDebug:', {
-            id: message.id,
-            isOwn,
-            locked,
-            burned,
-            isBurnMessage,
-            isBurning,
-            scheduledBurnAt: message.scheduledBurnAt,
-            body: message.body,
-          });
-
           // Handle attachment messages
           if (attachmentData && !burned) {
             return (
@@ -116,9 +102,11 @@ export function MessageList({
                 className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
               >
                 <AttachmentMessage
+                  messageId={message.id}
+                  conversationId={message.conversationId}
+                  burnDelay={message.burnDelay}
                   attachment={attachmentData}
                   isOwn={isOwn}
-                  onBurnComplete={onBurnComplete}
                   formatTime={formatTime}
                 />
               </div>
@@ -128,27 +116,38 @@ export function MessageList({
           // Use BurnMessage component for burn after reading messages (recipient only)
           // Continue rendering even if burned to show animation
           if (isBurnMessage && !isOwn && !burned && !isBurning) {
-            // Calculate the original burn delay from creation time
-            const createdAtMs = typeof message.createdAt === 'number' 
-              ? message.createdAt 
-              : new Date(message.createdAt).getTime();
-            const originalDelay = Math.ceil((message.scheduledBurnAt! - createdAtMs) / 1000);
+            // Get burn delay
+            let originalDelay: number;
             
-            debugLogger.debug('Burn calculation debug:', {
-              createdAt: message.createdAt,
-              createdAtType: typeof message.createdAt,
-              createdAtMs,
-              scheduledBurnAt: message.scheduledBurnAt,
-              originalDelay,
-              diff: message.scheduledBurnAt! - createdAtMs
-            });
-            
-            if (isNaN(originalDelay) || originalDelay <= 0) {
-              console.warn('Invalid burn delay calculated:', originalDelay);
-              return null; // Don't render if delay is invalid
+            if (message.burnDelay) {
+              // New BAR format: burnDelay in seconds (not yet acknowledged)
+              originalDelay = message.burnDelay;
+              // debugLogger.debug('Using burnDelay from message:', originalDelay);
+            } else if (message.scheduledBurnAt) {
+              // Old format or already acknowledged: calculate from scheduledBurnAt
+              const createdAtMs = typeof message.createdAt === 'number' 
+                ? message.createdAt 
+                : new Date(message.createdAt).getTime();
+              originalDelay = Math.ceil((message.scheduledBurnAt - createdAtMs) / 1000);
+              
+              /*
+              debugLogger.debug('Calculated delay from scheduledBurnAt:', {
+                createdAtMs,
+                scheduledBurnAt: message.scheduledBurnAt,
+                originalDelay,
+              });
+              */
+            } else {
+              console.warn('BAR message without burnDelay or scheduledBurnAt');
+              return null;
             }
             
-            debugLogger.debug('Rendering BurnMessage with delay:', originalDelay);
+            if (isNaN(originalDelay) || originalDelay <= 0) {
+              console.warn('Invalid burn delay:', originalDelay);
+              return null;
+            }
+            
+            // debugLogger.debug('Rendering BurnMessage with delay:', originalDelay);
             
             return (
               <BurnMessage
@@ -241,7 +240,7 @@ export function MessageList({
                     )}
 
                     {/* Burn After Reading - Simple indicator for sent messages (no timer) */}
-                    {message.scheduledBurnAt && isOwn && (
+                    {(message.scheduledBurnAt || message.burnDelay) && isOwn && (
                       <motion.div
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -254,7 +253,10 @@ export function MessageList({
                           </span>
                         </div>
                         <div className="mt-1 text-[10px] text-orange-400/70">
-                          {t('messages.burn_waiting_read')}
+                          {message.burnDelay 
+                            ? t('messages.burn_waiting_read')
+                            : t('messages.burn_countdown_active')
+                          }
                         </div>
                       </motion.div>
                     )}

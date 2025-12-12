@@ -4,8 +4,7 @@ import type { AuthSession } from '../store/auth';
 import type { MessageV2 } from '../services/api-v2';
 import { useConversationMessages } from './useConversationMessages';
 import { encryptForConversation, decryptFromConversation } from '../lib/encryption';
-import { getExistingKeyVault } from '../lib/keyVault';
-import { getMasterKeyHex } from '../lib/secureKeyAccess';
+import { resolveMasterKeyForSession } from '../lib/masterKeyResolver';
 
 vi.mock('../lib/encryption', () => ({
   encryptForConversation: vi.fn(async (plaintext: string, masterKey: string, conversationId: string) => ({
@@ -23,18 +22,13 @@ vi.mock('../lib/encryption', () => ({
   }),
 }));
 
-vi.mock('../lib/keyVault', () => ({
-  getExistingKeyVault: vi.fn(),
-}));
-
-vi.mock('../lib/secureKeyAccess', () => ({
-  getMasterKeyHex: vi.fn(),
+vi.mock('../lib/masterKeyResolver', () => ({
+  resolveMasterKeyForSession: vi.fn(),
 }));
 
 const mockDecrypt = decryptFromConversation as unknown as ReturnType<typeof vi.fn>;
 const mockEncrypt = encryptForConversation as unknown as ReturnType<typeof vi.fn>;
-const mockGetExistingKeyVault = getExistingKeyVault as unknown as ReturnType<typeof vi.fn>;
-const mockGetLegacyMasterKeyHex = getMasterKeyHex as unknown as ReturnType<typeof vi.fn>;
+const mockResolveMasterKey = resolveMasterKeyForSession as unknown as ReturnType<typeof vi.fn>;
 
 function createSession(overrides: Partial<AuthSession> = {}): AuthSession {
   return {
@@ -64,9 +58,7 @@ describe('useConversationMessages', () => {
   });
 
   it('uses KeyVault masterKey when available', async () => {
-    const vault = { getData: vi.fn().mockResolvedValue('kv-master-key') };
-    mockGetExistingKeyVault.mockReturnValue(vault);
-    mockGetLegacyMasterKeyHex.mockResolvedValue(null);
+    mockResolveMasterKey.mockResolvedValue('kv-master-key');
 
     const session = createSession();
     const { result } = renderHook(() => useConversationMessages(session));
@@ -80,13 +72,11 @@ describe('useConversationMessages', () => {
 
     const decrypted = await result.current.decryptMessages('conv1', messages);
 
-    expect(vault.getData).toHaveBeenCalledWith('masterKey:alice');
     expect(decrypted[0].body).toBe('hello');
   });
 
   it('falls back to legacy secureKeyAccess when KeyVault is empty', async () => {
-    mockGetExistingKeyVault.mockReturnValue(null);
-    mockGetLegacyMasterKeyHex.mockResolvedValue('legacy-key');
+    mockResolveMasterKey.mockResolvedValue('legacy-key');
 
     const session = createSession();
     const { result } = renderHook(() => useConversationMessages(session));
@@ -100,13 +90,11 @@ describe('useConversationMessages', () => {
 
     const decrypted = await result.current.decryptMessages('conv1', messages);
 
-    expect(mockGetLegacyMasterKeyHex).toHaveBeenCalled();
     expect(decrypted[0].body).toBe('hello');
   });
 
   it('returns explicit error body when masterKey cannot be resolved', async () => {
-    mockGetExistingKeyVault.mockReturnValue(null);
-    mockGetLegacyMasterKeyHex.mockResolvedValue(null);
+    mockResolveMasterKey.mockResolvedValue(null);
 
     const session = createSession();
     const { result } = renderHook(() => useConversationMessages(session));
@@ -124,9 +112,7 @@ describe('useConversationMessages', () => {
   });
 
   it('encryptMessage uses resolved masterKey', async () => {
-    const vault = { getData: vi.fn().mockResolvedValue('kv-master-key') };
-    mockGetExistingKeyVault.mockReturnValue(vault);
-    mockGetLegacyMasterKeyHex.mockResolvedValue(null);
+    mockResolveMasterKey.mockResolvedValue('kv-master-key');
 
     const session = createSession();
     const { result } = renderHook(() => useConversationMessages(session));
@@ -139,8 +125,7 @@ describe('useConversationMessages', () => {
 
   it('decryptIncomingMessage handles locked messages without touching body', async () => {
     const session = createSession();
-    mockGetExistingKeyVault.mockReturnValue(null);
-    mockGetLegacyMasterKeyHex.mockResolvedValue(null);
+    mockResolveMasterKey.mockResolvedValue(null);
 
     const { result } = renderHook(() => useConversationMessages(session));
 
@@ -153,9 +138,7 @@ describe('useConversationMessages', () => {
   });
 
   it('decryptIncomingMessage returns error marker on invalid JSON', async () => {
-    const vault = { getData: vi.fn().mockResolvedValue('kv-master-key') };
-    mockGetExistingKeyVault.mockReturnValue(vault);
-    mockGetLegacyMasterKeyHex.mockResolvedValue(null);
+    mockResolveMasterKey.mockResolvedValue('kv-master-key');
 
     const session = createSession();
     const { result } = renderHook(() => useConversationMessages(session));

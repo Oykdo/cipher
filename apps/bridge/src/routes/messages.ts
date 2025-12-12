@@ -11,6 +11,7 @@ interface MessageRecord {
   conversationId: string;
   senderId: string;
   body: string;
+  sender_plaintext?: string;
   createdAt: number;
   unlockBlockHeight?: number;
   isLocked?: boolean;
@@ -58,33 +59,66 @@ export async function messageRoutes(fastify: FastifyInstance) {
         firstMessageId: dbMessages[0]?.id,
       }, '[MESSAGES] Messages fetched from DB');
 
-      // Server-side time-lock validation
+      // Server-side time-lock validation and filtering
       const messages = await Promise.all(
-        dbMessages.map(async (msg) => {
-          const unlockHeight = msg.unlock_block_height;
+        dbMessages
+          .filter(msg => {
+            // Filter out burned messages (PostgreSQL boolean or SQLite integer)
+            const isBurned = msg.is_burned === true || msg.is_burned === 1;
+            return !isBurned;
+          })
+          .map(async (msg) => {
+            const unlockHeight = msg.unlock_block_height;
 
-          // ✅ FIX: Ne vérifier isLocked QUE si unlockHeight est défini ET supérieur à 0
-          // Messages standards ont unlockHeight = null, donc isLocked = false
-          const isLocked = (unlockHeight && unlockHeight > 0)
-            ? !(await blockchain.canUnlock(unlockHeight))
-            : false;
+            // ✅ FIX: Ne vérifier isLocked QUE si unlockHeight est défini ET supérieur à 0
+            // Messages standards ont unlockHeight = null, donc isLocked = false
+            const isLocked = (unlockHeight && unlockHeight > 0)
+              ? !(await blockchain.canUnlock(unlockHeight))
+              : false;
 
-          // ✅ IMPORTANT: Toujours retourner msg.body (chiffré) sauf si vraiment verrouillé
-          // Ne pas retourner '[Message verrouillé]' si isLocked est false
-          return {
-            id: msg.id,
-            conversationId: msg.conversation_id,
-            senderId: msg.sender_id,
-            body: isLocked ? '[Message verrouillé]' : msg.body,
-            createdAt: msg.created_at,
-            unlockBlockHeight: unlockHeight || undefined,
-            isLocked,
-            // Burn After Reading fields
-            isBurned: msg.is_burned || false,
-            burnedAt: msg.burned_at ? new Date(msg.burned_at).getTime() : undefined,
-            scheduledBurnAt: msg.scheduled_burn_at ? new Date(msg.scheduled_burn_at).getTime() : undefined,
-          };
-        })
+            const senderPlaintext =
+              msg.sender_id === userId && !isLocked
+                ? (msg.sender_plaintext ?? undefined)
+                : undefined;
+
+            // ✅ IMPORTANT: Toujours retourner msg.body (chiffré) sauf si vraiment verrouillé
+            // Ne pas retourner '[Message verrouillé]' si isLocked est false
+            // Handle scheduled burn time
+            let scheduledBurnAt: number | undefined;
+            let burnDelay: number | undefined;
+            
+            if (msg.scheduled_burn_at) {
+              const burnValue = typeof msg.scheduled_burn_at === 'object'
+                ? new Date(msg.scheduled_burn_at).getTime()
+                : msg.scheduled_burn_at;
+              
+              if (burnValue < 0) {
+                // Negative value = delay in seconds (not yet acknowledged)
+                burnDelay = Math.abs(burnValue);
+                scheduledBurnAt = undefined; // Will be set on acknowledge
+              } else {
+                // Positive value = absolute timestamp
+                scheduledBurnAt = burnValue;
+                burnDelay = undefined;
+              }
+            }
+
+            return {
+              id: msg.id,
+              conversationId: msg.conversation_id,
+              senderId: msg.sender_id,
+              body: isLocked ? '[Message verrouillé]' : msg.body,
+              sender_plaintext: senderPlaintext,
+              createdAt: msg.created_at,
+              unlockBlockHeight: unlockHeight || undefined,
+              isLocked,
+              // Burn After Reading fields
+              isBurned: msg.is_burned || false,
+              burnedAt: msg.burned_at ? new Date(msg.burned_at).getTime() : undefined,
+              scheduledBurnAt,
+              burnDelay, // Added: delay in seconds for BAR messages
+            };
+          })
       );
 
       // SECURITY FIX VUL-005: Don't log message content
@@ -112,11 +146,20 @@ export async function messageRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const userId = (request.user as any).sub as string;
-      const { conversationId, body, unlockBlockHeight, scheduledBurnAt } = request.body as {
+      const {
+        conversationId,
+        body,
+        senderPlaintext,
+        unlockBlockHeight,
+        scheduledBurnAt,
+        burnDelay,
+      } = request.body as {
         conversationId?: string;
         body?: string;
+        senderPlaintext?: string;
         unlockBlockHeight?: number;
         scheduledBurnAt?: number;
+        burnDelay?: number; // Burn delay in seconds (for Burn-After-Reading)
       };
 
       if (!conversationId || !body) {
@@ -128,6 +171,18 @@ export async function messageRoutes(fastify: FastifyInstance) {
       if (body.length > 100000) {
         reply.code(413);
         return { error: 'Message trop long (max 100KB)' };
+      }
+
+      // Sender plaintext is optional, but if provided must be reasonable
+      if (senderPlaintext !== undefined) {
+        if (typeof senderPlaintext !== 'string') {
+          reply.code(400);
+          return { error: 'senderPlaintext doit être une string' };
+        }
+        if (senderPlaintext.length > 100000) {
+          reply.code(413);
+          return { error: 'senderPlaintext trop long (max 100KB)' };
+        }
       }
 
       // SECURITY FIX VUL-004: Use strict Zod schema for validation
@@ -150,7 +205,15 @@ export async function messageRoutes(fastify: FastifyInstance) {
         }
       }
 
-      // Validate scheduled burn
+      // Validate burn delay (for Burn-After-Reading)
+      if (burnDelay !== undefined) {
+        if (typeof burnDelay !== 'number' || burnDelay < 1 || burnDelay > 3600) {
+          reply.code(400);
+          return { error: 'burnDelay doit être entre 1 et 3600 secondes' };
+        }
+      }
+
+      // Validate scheduled burn (deprecated - use burnDelay instead)
       if (scheduledBurnAt !== undefined) {
         if (typeof scheduledBurnAt !== 'number' || scheduledBurnAt < Date.now()) {
           reply.code(400);
@@ -179,17 +242,28 @@ export async function messageRoutes(fastify: FastifyInstance) {
 
       const messageId = randomUUID();
 
+      // Calculate scheduled burn time
+      // If burnDelay is provided (new Burn-After-Reading), store it as negative value
+      // The actual burn time will be calculated when the recipient acknowledges
+      let finalScheduledBurnAt = scheduledBurnAt;
+      if (burnDelay !== undefined) {
+        // Store as negative to indicate "delay after reading" instead of absolute time
+        // This is a hack until we add a proper burn_delay column
+        finalScheduledBurnAt = -burnDelay; // Negative = seconds after reading
+      }
+
       const dbMessage = await db.createMessage({
         id: messageId,
         conversation_id: conversationId,
         sender_id: userId,
         body,
+        sender_plaintext: senderPlaintext,
         unlock_block_height: unlockBlockHeight,
-        scheduled_burn_at: scheduledBurnAt,
+        scheduled_burn_at: finalScheduledBurnAt,
       });
 
-      // Schedule burn if needed
-      if (scheduledBurnAt) {
+      // Schedule burn if needed (only for absolute timestamps, not delays)
+      if (scheduledBurnAt && scheduledBurnAt > 0) {
         const { burnScheduler } = await import('../services/burn-scheduler.js');
         burnScheduler.schedule(messageId, conversationId, scheduledBurnAt);
       }
@@ -209,6 +283,13 @@ export async function messageRoutes(fastify: FastifyInstance) {
         // Burn After Reading fields
         isBurned: false,
         scheduledBurnAt: scheduledBurnAt,
+        burnDelay: burnDelay,
+      };
+
+      // Response for sender only: include sender_plaintext so they can re-read after reconnect
+      const responseMessage = {
+        ...message,
+        sender_plaintext: senderPlaintext,
       };
 
       const payload = {
@@ -230,11 +311,12 @@ export async function messageRoutes(fastify: FastifyInstance) {
           createdAt: message.createdAt,
           unlockBlockHeight: message.unlockBlockHeight,
           scheduledBurnAt: scheduledBurnAt,
+          burnDelay: burnDelay,
           isLocked: isLocked,
         },
       });
 
-      return message;
+      return responseMessage;
     }
   );
 }

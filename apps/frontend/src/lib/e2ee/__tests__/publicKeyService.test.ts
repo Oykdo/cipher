@@ -15,20 +15,17 @@ import {
   getConversationParticipantKeys,
   preloadPublicKeys,
   invalidateCache,
-  refreshCache,
   getCacheStats,
   cleanExpiredCache,
 } from '../publicKeyService';
 import type { PublicKeyInfo } from '../publicKeyService';
 import _sodium from 'libsodium-wrappers';
-import { apiv2 } from '../../../services/api-v2';
+import * as api from '../../../services/api-v2';
 
 // Mock API
 vi.mock('../../../services/api-v2', () => ({
-  apiv2: {
-    getPublicKeys: vi.fn(),
-    getConversationMembers: vi.fn(),
-  },
+  getPublicKeys: vi.fn(),
+  getConversationMembers: vi.fn(),
 }));
 
 // Helper to generate mock key
@@ -61,7 +58,7 @@ describe('PublicKeyService - Fetching', () => {
     const mockKey = await generateMockPublicKey('user1', 'alice');
 
     // Mock API response
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({
+    vi.mocked(api.getPublicKeys).mockResolvedValue({
       keys: [
         {
           userId: mockKey.userId,
@@ -75,7 +72,7 @@ describe('PublicKeyService - Fetching', () => {
     const result = await getPublicKey('user1');
 
     // Verify API was called
-    expect(apiv2.getPublicKeys).toHaveBeenCalledWith(['user1']);
+    expect(api.getPublicKeys).toHaveBeenCalledWith(['user1']);
 
     // Verify result
     expect(result).toBeDefined();
@@ -89,7 +86,7 @@ describe('PublicKeyService - Fetching', () => {
     const mockKey1 = await generateMockPublicKey('user1', 'alice');
     const mockKey2 = await generateMockPublicKey('user2', 'bob');
 
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({
+    vi.mocked(api.getPublicKeys).mockResolvedValue({
       keys: [
         {
           userId: mockKey1.userId,
@@ -108,7 +105,7 @@ describe('PublicKeyService - Fetching', () => {
 
     const results = await getPublicKeys(['user1', 'user2']);
 
-    expect(apiv2.getPublicKeys).toHaveBeenCalledWith(['user1', 'user2']);
+    expect(api.getPublicKeys).toHaveBeenCalledWith(['user1', 'user2']);
     expect(results).toHaveLength(2);
     expect(results[0].userId).toBe('user1');
     expect(results[1].userId).toBe('user2');
@@ -117,12 +114,12 @@ describe('PublicKeyService - Fetching', () => {
   it('should return empty array for empty input', async () => {
     const results = await getPublicKeys([]);
 
-    expect(apiv2.getPublicKeys).not.toHaveBeenCalled();
+    expect(api.getPublicKeys).not.toHaveBeenCalled();
     expect(results).toEqual([]);
   });
 
   it('should return null for non-existent user', async () => {
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({ keys: [] });
+    vi.mocked(api.getPublicKeys).mockResolvedValue({ keys: [] });
 
     const result = await getPublicKey('non-existent-user');
 
@@ -130,7 +127,7 @@ describe('PublicKeyService - Fetching', () => {
   });
 
   it('should handle API errors gracefully', async () => {
-    vi.mocked(apiv2.getPublicKeys).mockRejectedValue(
+    vi.mocked(api.getPublicKeys).mockRejectedValue(
       new Error('Network error')
     );
 
@@ -152,7 +149,7 @@ describe('PublicKeyService - Cache (Memory)', () => {
   it('should cache keys in memory after first fetch', async () => {
     const mockKey = await generateMockPublicKey('user1', 'alice');
 
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({
+    vi.mocked(api.getPublicKeys).mockResolvedValue({
       keys: [
         {
           userId: mockKey.userId,
@@ -165,11 +162,11 @@ describe('PublicKeyService - Cache (Memory)', () => {
 
     // First call - should hit API
     await getPublicKey('user1');
-    expect(apiv2.getPublicKeys).toHaveBeenCalledTimes(1);
+    expect(api.getPublicKeys).toHaveBeenCalledTimes(1);
 
     // Second call - should use cache
     await getPublicKey('user1');
-    expect(apiv2.getPublicKeys).toHaveBeenCalledTimes(1); // Still 1, not called again
+    expect(api.getPublicKeys).toHaveBeenCalledTimes(1); // Still 1, not called again
 
     // Verify cache stats
     const stats = getCacheStats();
@@ -180,7 +177,7 @@ describe('PublicKeyService - Cache (Memory)', () => {
     const mockKey1 = await generateMockPublicKey('user1', 'alice');
     const mockKey2 = await generateMockPublicKey('user2', 'bob');
 
-    vi.mocked(apiv2.getPublicKeys)
+    vi.mocked(api.getPublicKeys)
       .mockResolvedValueOnce({
         keys: [
           {
@@ -209,15 +206,15 @@ describe('PublicKeyService - Cache (Memory)', () => {
     await getPublicKeys(['user1', 'user2']);
 
     // API should be called twice total (once for user1, once for user2)
-    expect(apiv2.getPublicKeys).toHaveBeenCalledTimes(2);
-    expect(apiv2.getPublicKeys).toHaveBeenNthCalledWith(1, ['user1']);
-    expect(apiv2.getPublicKeys).toHaveBeenNthCalledWith(2, ['user2']);
+    expect(api.getPublicKeys).toHaveBeenCalledTimes(2);
+    expect(api.getPublicKeys).toHaveBeenNthCalledWith(1, ['user1']);
+    expect(api.getPublicKeys).toHaveBeenNthCalledWith(2, ['user2']);
   });
 
   it('should force refresh when force option is true', async () => {
     const mockKey = await generateMockPublicKey('user1', 'alice');
 
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({
+    vi.mocked(api.getPublicKeys).mockResolvedValue({
       keys: [
         {
           userId: mockKey.userId,
@@ -230,11 +227,11 @@ describe('PublicKeyService - Cache (Memory)', () => {
 
     // First call
     await getPublicKey('user1');
-    expect(apiv2.getPublicKeys).toHaveBeenCalledTimes(1);
+    expect(api.getPublicKeys).toHaveBeenCalledTimes(1);
 
     // Force refresh
     await getPublicKey('user1', { force: true });
-    expect(apiv2.getPublicKeys).toHaveBeenCalledTimes(2);
+    expect(api.getPublicKeys).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -252,7 +249,7 @@ describe('PublicKeyService - Cache (Persistent)', () => {
   it('should persist cache to localStorage', async () => {
     const mockKey = await generateMockPublicKey('user1', 'alice');
 
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({
+    vi.mocked(api.getPublicKeys).mockResolvedValue({
       keys: [
         {
           userId: mockKey.userId,
@@ -279,7 +276,7 @@ describe('PublicKeyService - Cache (Persistent)', () => {
   it('should load from persistent cache after memory cache is cleared', async () => {
     const mockKey = await generateMockPublicKey('user1', 'alice');
 
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({
+    vi.mocked(api.getPublicKeys).mockResolvedValue({
       keys: [
         {
           userId: mockKey.userId,
@@ -292,17 +289,17 @@ describe('PublicKeyService - Cache (Persistent)', () => {
 
     // First fetch - populates both caches
     await getPublicKey('user1');
-    expect(apiv2.getPublicKeys).toHaveBeenCalledTimes(1);
+    expect(api.getPublicKeys).toHaveBeenCalledTimes(1);
 
     // Simulate page reload - clear memory cache but keep localStorage
-    const publicKeyCache = (await import('../publicKeyService')).default;
-    // Memory cache is private, but invalidateCache with specific user clears it
+    vi.resetModules();
+    const reloaded = await import('../publicKeyService');
     
     // Second fetch - should load from localStorage, not API
-    await getPublicKey('user1');
-    expect(apiv2.getPublicKeys).toHaveBeenCalledTimes(1); // Still 1
+    await reloaded.getPublicKey('user1');
+    expect(api.getPublicKeys).toHaveBeenCalledTimes(1); // Still 1
 
-    const stats = getCacheStats();
+    const stats = reloaded.getCacheStats();
     expect(stats.persistentCount).toBe(1);
   });
 });
@@ -379,7 +376,7 @@ describe('PublicKeyService - Cache Invalidation', () => {
     const mockKey1 = await generateMockPublicKey('user1', 'alice');
     const mockKey2 = await generateMockPublicKey('user2', 'bob');
 
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({
+    vi.mocked(api.getPublicKeys).mockResolvedValue({
       keys: [
         {
           userId: mockKey1.userId,
@@ -410,7 +407,7 @@ describe('PublicKeyService - Cache Invalidation', () => {
   it('should invalidate all cache when no userIds provided', async () => {
     const mockKey = await generateMockPublicKey('user1', 'alice');
 
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({
+    vi.mocked(api.getPublicKeys).mockResolvedValue({
       keys: [
         {
           userId: mockKey.userId,
@@ -451,13 +448,13 @@ describe('PublicKeyService - Conversation Participants', () => {
     const mockKey2 = await generateMockPublicKey('user2', 'bob');
 
     // Mock conversation members API
-    vi.mocked(apiv2.getConversationMembers).mockResolvedValue([
+    vi.mocked(api.getConversationMembers).mockResolvedValue([
       { userId: 'user1', username: 'alice' },
       { userId: 'user2', username: 'bob' },
     ]);
 
     // Mock public keys API
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({
+    vi.mocked(api.getPublicKeys).mockResolvedValue({
       keys: [
         {
           userId: mockKey1.userId,
@@ -476,15 +473,15 @@ describe('PublicKeyService - Conversation Participants', () => {
 
     const keys = await getConversationParticipantKeys('conv-123');
 
-    expect(apiv2.getConversationMembers).toHaveBeenCalledWith('conv-123');
-    expect(apiv2.getPublicKeys).toHaveBeenCalledWith(['user1', 'user2']);
+    expect(api.getConversationMembers).toHaveBeenCalledWith('conv-123');
+    expect(api.getPublicKeys).toHaveBeenCalledWith(['user1', 'user2']);
     expect(keys).toHaveLength(2);
     expect(keys[0].userId).toBe('user1');
     expect(keys[1].userId).toBe('user2');
   });
 
   it('should handle conversation API errors', async () => {
-    vi.mocked(apiv2.getConversationMembers).mockRejectedValue(
+    vi.mocked(api.getConversationMembers).mockRejectedValue(
       new Error('Conversation not found')
     );
 
@@ -509,7 +506,7 @@ describe('PublicKeyService - Preloading', () => {
     const mockKey1 = await generateMockPublicKey('user1', 'alice');
     const mockKey2 = await generateMockPublicKey('user2', 'bob');
 
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({
+    vi.mocked(api.getPublicKeys).mockResolvedValue({
       keys: [
         {
           userId: mockKey1.userId,
@@ -528,14 +525,14 @@ describe('PublicKeyService - Preloading', () => {
 
     await preloadPublicKeys(['user1', 'user2']);
 
-    expect(apiv2.getPublicKeys).toHaveBeenCalledWith(['user1', 'user2']);
+    expect(api.getPublicKeys).toHaveBeenCalledWith(['user1', 'user2']);
 
     const stats = getCacheStats();
     expect(stats.memoryCount).toBe(2);
   });
 
   it('should not throw on preload errors', async () => {
-    vi.mocked(apiv2.getPublicKeys).mockRejectedValue(
+    vi.mocked(api.getPublicKeys).mockRejectedValue(
       new Error('Network error')
     );
 
@@ -561,7 +558,7 @@ describe('PublicKeyService - Cache Stats', () => {
     const mockKey1 = await generateMockPublicKey('user1', 'alice');
     const mockKey2 = await generateMockPublicKey('user2', 'bob');
 
-    vi.mocked(apiv2.getPublicKeys).mockResolvedValue({
+    vi.mocked(api.getPublicKeys).mockResolvedValue({
       keys: [
         {
           userId: mockKey1.userId,

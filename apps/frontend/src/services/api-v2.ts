@@ -7,7 +7,7 @@
 
 import { API_BASE_URL } from "../config";
 import type { SecurityTier } from "../store/auth";
-import { authFetchV2WithRefresh } from "./api-interceptor";
+import { authFetchV2WithRefresh, fetchWithRefresh } from "./api-interceptor";
 
 // ============================================================================
 // TYPES & INTERFACES (correspondant aux DTOs backend)
@@ -75,6 +75,8 @@ export interface MessageV2 {
   conversationId: string;
   senderId: string;
   body: string;
+  // Returned only to the sender; used to re-read own messages after reconnect
+  sender_plaintext?: string;
   createdAt: number;
   unlockBlockHeight?: number;
   isLocked?: boolean;
@@ -240,7 +242,7 @@ export const apiv2 = {
   sendMessage: async (
     conversationId: string,
     body: string,
-    options?: { scheduledBurnAt?: number; unlockBlockHeight?: number; burnDelay?: number }
+    options?: { scheduledBurnAt?: number; unlockBlockHeight?: number; burnDelay?: number; senderPlaintext?: string }
   ): Promise<MessageV2> => {
     return authFetchV2WithRefresh("/messages", {
       method: "POST",
@@ -286,6 +288,72 @@ export const apiv2 = {
       method: "POST",
       body: JSON.stringify({ messageId }),
     });
+  },
+
+  // ========================
+  // ATTACHMENTS (Encrypted client-side)
+  // ========================
+
+  initAttachmentUpload: async (
+    conversationId: string,
+    meta: { filename: string; mime: string; size: number }
+  ): Promise<{ uploadId: string }> => {
+    return authFetchV2WithRefresh('/attachments/init', {
+      method: 'POST',
+      body: JSON.stringify({
+        conversationId,
+        filename: meta.filename,
+        mime: meta.mime,
+        size: meta.size,
+      }),
+    });
+  },
+
+  uploadAttachmentChunk: async (
+    uploadId: string,
+    index: number,
+    total: number,
+    chunk: Uint8Array
+  ): Promise<{ received: number[] }> => {
+    const form = new FormData();
+    form.append('uploadId', uploadId);
+    form.append('index', String(index));
+    form.append('total', String(total));
+    form.append('file', new Blob([chunk.buffer as ArrayBuffer]), `chunk-${index}.bin`);
+
+    const response = await fetchWithRefresh(`${API_BASE_URL}/api/v2/attachments/chunk`, {
+      method: 'POST',
+      body: form,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.message || errorData.error || `Request failed: ${response.status}`);
+    }
+
+    return response.json() as Promise<{ received: number[] }>;
+  },
+
+  commitAttachmentUpload: async (
+    uploadId: string
+  ): Promise<{ id: string; filename: string; mime: string; size: number }> => {
+    return authFetchV2WithRefresh('/attachments/commit', {
+      method: 'POST',
+      body: JSON.stringify({ uploadId }),
+    });
+  },
+
+  downloadAttachment: async (attachmentId: string): Promise<ArrayBuffer> => {
+    const response = await fetchWithRefresh(`${API_BASE_URL}/api/v2/attachments/${attachmentId}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.message || errorData.error || `Request failed: ${response.status}`);
+    }
+
+    return response.arrayBuffer();
   },
 
   // ========================
@@ -541,7 +609,7 @@ export interface PublicKeyResponseV2 {
  * @returns Array of public keys
  */
 export async function getPublicKeys(userIds: string[]): Promise<{ keys: PublicKeyResponseV2[] }> {
-  const response = await authFetchV2WithRefresh('/users/public-keys', {
+  const response = await authFetchV2WithRefresh<{ keys: PublicKeyResponseV2[] }>('/users/public-keys', {
     method: 'POST',
     body: JSON.stringify({ userIds }),
   });
@@ -578,7 +646,7 @@ export interface ConversationMemberV2 {
  * @returns Array of conversation members
  */
 export async function getConversationMembers(conversationId: string): Promise<ConversationMemberV2[]> {
-  const response = await authFetchV2WithRefresh(
+  const response = await authFetchV2WithRefresh<{ members: ConversationMemberV2[] }>(
     `/conversations/${conversationId}/members`,
     {
       method: 'GET',

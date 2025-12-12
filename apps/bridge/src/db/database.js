@@ -1,5 +1,5 @@
 import pg from 'pg';
-import { readFileSync } from 'fs';
+import { readFileSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import argon2 from 'argon2';
@@ -80,7 +80,17 @@ function decryptMnemonic(encryptedJson, masterKeyHex) {
 class DatabaseService {
     constructor(dbPath) {
         // dbPath is ignored for Postgres, using env var
-        const connectionString = process.env.DATABASE_URL;
+        const isTestEnv =
+            process.env.NODE_ENV === 'test' ||
+            process.env.VITEST === 'true' ||
+            process.env.VITEST === '1' ||
+            process.env.USE_TEST_DB === '1' ||
+            process.env.USE_TEST_DB === 'true';
+
+        const connectionString =
+            (isTestEnv ? process.env.DATABASE_URL_TEST : undefined) ||
+                process.env.DATABASE_URL;
+
         if (!connectionString) {
             console.error('❌ DATABASE_URL environment variable is missing!');
         }
@@ -89,6 +99,8 @@ class DatabaseService {
             connectionString,
             ssl: connectionString?.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined
         });
+
+        this._ensureSenderPlaintextColumnPromise = null;
 
         // Initialize schema (check connection)
         this.initialize();
@@ -162,6 +174,39 @@ class DatabaseService {
                 FOREIGN KEY (responder_user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         `);
+
+        // Ensure critical column for sender self-read is present (safe no-op if table missing)
+        await this.ensureSenderPlaintextColumn();
+    }
+
+    async ensureSenderPlaintextColumn() {
+        if (this._ensureSenderPlaintextColumnPromise) {
+            return this._ensureSenderPlaintextColumnPromise;
+        }
+
+        this._ensureSenderPlaintextColumnPromise = run(this.pool, `
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'messages'
+                ) THEN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = 'messages'
+                          AND column_name = 'sender_plaintext'
+                    ) THEN
+                        ALTER TABLE messages ADD COLUMN sender_plaintext TEXT;
+                    END IF;
+                END IF;
+            END $$;
+        `).catch((error) => {
+            // Don't crash startup if migration can't run (e.g. perms). We'll fail later on insert.
+            console.warn('[Database] Failed to ensure sender_plaintext column:', error?.message || error);
+        });
+
+        return this._ensureSenderPlaintextColumnPromise;
     }
 
     async migrate() {
@@ -394,19 +439,22 @@ class DatabaseService {
     // MESSAGE QUERIES
     // ============================================================================
     async createMessage(message) {
+        await this.ensureSenderPlaintextColumn();
+
         // Convert JS timestamp (milliseconds) to PostgreSQL timestamp
         const scheduledBurnAt = message.scheduled_burn_at 
             ? new Date(message.scheduled_burn_at) 
             : null;
         
         await run(this.pool, `
-            INSERT INTO messages (id, conversation_id, sender_id, body, unlock_block_height, scheduled_burn_at)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO messages (id, conversation_id, sender_id, body, sender_plaintext, unlock_block_height, scheduled_burn_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
         `, [
             message.id, 
             message.conversation_id, 
             message.sender_id, 
             message.body, 
+            message.sender_plaintext || null,
             message.unlock_block_height || null,
             scheduledBurnAt
         ]);
@@ -454,13 +502,54 @@ class DatabaseService {
     }
 
     async burnMessage(messageId, burnedAt = Date.now()) {
+        // If this message contains an attachment reference, delete the ciphertext from disk.
+        // (The attachment is already encrypted client-side; deletion here is lifecycle management.)
+        try {
+            const msgRow = await get(this.pool, 'SELECT body FROM messages WHERE id = $1', [messageId]);
+            const body = msgRow?.body;
+
+            if (typeof body === 'string') {
+                let parsed;
+                try {
+                    parsed = JSON.parse(body);
+                }
+                catch {
+                    parsed = null;
+                }
+
+                const remoteAttachmentId = parsed?.type === 'attachment'
+                    ? (parsed?.payload?.remoteAttachmentId || parsed?.payload?.remote_attachment_id)
+                    : null;
+
+                if (remoteAttachmentId && typeof remoteAttachmentId === 'string') {
+                    const deleted = await this.deleteAttachment(remoteAttachmentId);
+                    const filePath = deleted?.path;
+                    if (filePath && typeof filePath === 'string') {
+                        try {
+                            unlinkSync(filePath);
+                        }
+                        catch {
+                            // Ignore missing file
+                        }
+                    }
+                }
+            }
+        }
+        catch {
+            // Never block burning on attachment cleanup.
+        }
+
         // Convert timestamp (milliseconds) to PostgreSQL timestamp
         // PostgreSQL expects Date object or to_timestamp with seconds
         const timestamp = burnedAt instanceof Date ? burnedAt : new Date(burnedAt);
         
         await run(this.pool, `
             UPDATE messages 
-            SET is_burned = true, burned_at = $1, body = '[Message détruit]', scheduled_burn_at = NULL
+            SET is_burned = true,
+                burned_at = $1,
+                body = '[Message détruit]',
+                sender_plaintext = NULL,
+                scheduled_burn_at = NULL
             WHERE id = $2
         `, [timestamp, messageId]);
     }
@@ -475,7 +564,8 @@ class DatabaseService {
     }
 
     async scheduleBurn(messageId, when) {
-        await run(this.pool, `UPDATE messages SET scheduled_burn_at = $1 WHERE id = $2`, [when, messageId]);
+        const scheduledAt = typeof when === 'number' ? new Date(when) : when;
+        await run(this.pool, `UPDATE messages SET scheduled_burn_at = $1 WHERE id = $2`, [scheduledAt, messageId]);
     }
 
     async getScheduledBurnsDue(now = new Date()) {
@@ -493,7 +583,7 @@ class DatabaseService {
             FROM messages
             WHERE is_burned = false 
               AND scheduled_burn_at IS NOT NULL 
-              AND scheduled_burn_at > 0
+              AND scheduled_burn_at > to_timestamp(0)
         `);
         return rows;
     }
@@ -753,6 +843,11 @@ class DatabaseService {
 
     async clearAll() {
         // Dangerous!
+        // Explicit opt-in required to avoid accidental wipes of a real database.
+        if (process.env.ALLOW_DESTRUCTIVE_DB_OPS !== '1' && process.env.ALLOW_DESTRUCTIVE_DB_OPS !== 'true') {
+            throw new Error('Refusing to clear DB: set ALLOW_DESTRUCTIVE_DB_OPS=1 to allow TRUNCATE');
+        }
+
         await run(this.pool, 'TRUNCATE TABLE messages, conversation_members, conversations, users CASCADE');
         console.log('[Database] All data cleared');
     }
@@ -972,11 +1067,15 @@ class DatabaseService {
         // Create placeholders for parameterized query
         const placeholders = userIds.map((_, i) => `$${i + 1}`).join(', ');
         
+        // Use e2ee_key_bundles for keys
         const rows = await all(
             this.pool,
-            `SELECT id as user_id, username, public_key, sign_public_key 
-             FROM users 
-             WHERE id IN (${placeholders})`,
+            `SELECT u.id as user_id, u.username, 
+                    ekb.identity_key as public_key, 
+                    ekb.signing_key as sign_public_key 
+             FROM users u
+             LEFT JOIN e2ee_key_bundles ekb ON u.id = ekb.user_id
+             WHERE u.id IN (${placeholders})`,
             userIds
         );
 
@@ -1008,7 +1107,7 @@ class DatabaseService {
     async isConversationMember(conversationId, userId) {
         const result = await get(
             this.pool,
-            `SELECT 1 FROM conversation_participants 
+            `SELECT 1 FROM conversation_members 
              WHERE conversation_id = $1 AND user_id = $2`,
             [conversationId, userId]
         );
@@ -1022,12 +1121,17 @@ class DatabaseService {
      * @returns {Promise<Array>} Array of {user_id, username, public_key, sign_public_key}
      */
     async getConversationMembersWithKeys(conversationId) {
+        // Use LEFT JOIN to get members even if they don't have keys
+        // Use e2ee_key_bundles table for keys, matching the schema
         const rows = await all(
             this.pool,
-            `SELECT u.id as user_id, u.username, u.public_key, u.sign_public_key
-             FROM conversation_participants cp
-             JOIN users u ON cp.user_id = u.id
-             WHERE cp.conversation_id = $1`,
+            `SELECT u.id as user_id, u.username, 
+                    ekb.identity_key as public_key, 
+                    ekb.signing_key as sign_public_key
+             FROM conversation_members cm
+             JOIN users u ON cm.user_id = u.id
+             LEFT JOIN e2ee_key_bundles ekb ON u.id = ekb.user_id
+             WHERE cm.conversation_id = $1`,
             [conversationId]
         );
 

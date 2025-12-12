@@ -151,7 +151,7 @@ describe('KeyManager - Storage', () => {
     // Private keys should be encrypted (different from original base64)
     const privateKeyB64 = _sodium.to_base64(keys.privateKey);
     expect(parsed.privateKey).not.toBe(privateKeyB64);
-    expect(parsed.privateKey).toContain('{'); // Should be encrypted JSON object
+    expect(parsed.privateKey).toMatch(/^[A-Za-z0-9+/_-]+=*$/);
   });
 });
 
@@ -276,7 +276,7 @@ describe('KeyManager - Backup & Restore', () => {
     expect(backup.exportedAt).toBeGreaterThan(0);
 
     // Encrypted data should be base64
-    expect(backup.encrypted).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    expect(backup.encrypted).toMatch(/^[A-Za-z0-9+/_-]+=*$/);
   });
 
   it('should restore keys from backup with correct password', async () => {

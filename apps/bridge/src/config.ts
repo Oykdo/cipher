@@ -26,7 +26,7 @@ function getSecret(key: string): string | undefined {
 export const config = {
     env: process.env.NODE_ENV || 'development',
     isProd,
-    port: Number(process.env.PORT || 4001),
+    port: Number(process.env.PORT || 4000),
     host: '0.0.0.0',
 
     paths: {

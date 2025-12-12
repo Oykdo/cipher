@@ -3,6 +3,7 @@ import { SignupUseCase } from '../SignupUseCase.js';
 import { getDatabase } from '../../../../db/database.js';
 import { UserRepository } from '../../../../infrastructure/database/repositories/UserRepository.js';
 import * as bip39 from 'bip39';
+import { randomUUID } from 'crypto';
 
 // Test data generator
 const createTestMnemonic = (bits = 128) => bip39.generateMnemonic(bits);
@@ -16,7 +17,9 @@ const mockJwtService = {
   verifyRefreshToken: (token: string) => ({ userId: token.replace('refresh_token_', '') }),
 };
 
-describe('SignupUseCase', () => {
+const describeDb = process.env.DATABASE_URL_TEST ? describe : describe.skip;
+
+describeDb('SignupUseCase', () => {
   let signupUseCase: SignupUseCase;
   let db: ReturnType<typeof getDatabase>;
   let userRepository: UserRepository;
@@ -29,14 +32,15 @@ describe('SignupUseCase', () => {
 
   describe('Standard Signup (BIP-39)', () => {
     it('should create user with valid BIP-39 mnemonic', async () => {
+      const username = `alice_${randomUUID()}`;
       const result = await signupUseCase.execute({
-        username: 'alice',
+        username,
         securityTier: 'standard',
         mnemonicLength: 12,
       });
 
       expect(result).toHaveProperty('user');
-      expect(result.user.username).toBe('alice');
+      expect(result.user.username).toBe(username);
       expect(result.user.securityTier).toBe('standard');
       expect(result.mnemonic).toHaveLength(12);
       expect(result).toHaveProperty('accessToken');
@@ -54,9 +58,10 @@ describe('SignupUseCase', () => {
     });
 
     it('should reject duplicate username', async () => {
+      const username = `alice_${randomUUID()}`;
       // First signup
       await signupUseCase.execute({
-        username: 'alice',
+        username,
         securityTier: 'standard',
         mnemonicLength: 12,
       });
@@ -64,7 +69,7 @@ describe('SignupUseCase', () => {
       // Duplicate signup should fail
       await expect(
         signupUseCase.execute({
-          username: 'alice',
+          username,
           securityTier: 'standard',
           mnemonicLength: 12,
         })
@@ -72,13 +77,14 @@ describe('SignupUseCase', () => {
     });
 
     it('should hash master key with Argon2', async () => {
+      const username = `alice_${randomUUID()}`;
       await signupUseCase.execute({
-        username: 'alice',
+        username,
         securityTier: 'standard',
         mnemonicLength: 12,
       });
 
-      const user = db.getUserByUsername('alice');
+      const user = await db.getUserByUsername(username);
       expect(user).not.toBeNull();
       // Password hash (master_key_hex in DB) should be Argon2 format
       expect(user!.master_key_hex).toMatch(/^\$argon2id\$/);
@@ -107,8 +113,9 @@ describe('SignupUseCase', () => {
 
   describe('Mnemonic Generation', () => {
     it('should generate 12-word BIP-39 mnemonic by default', async () => {
+      const username = `alice_${randomUUID()}`;
       const result = await signupUseCase.execute({
-        username: 'alice',
+        username,
         securityTier: 'standard',
         mnemonicLength: 12,
       });
@@ -118,8 +125,9 @@ describe('SignupUseCase', () => {
     });
 
     it('should generate 24-word BIP-39 mnemonic when specified', async () => {
+      const username = `bob_${randomUUID()}`;
       const result = await signupUseCase.execute({
-        username: 'bob',
+        username,
         securityTier: 'standard',
         mnemonicLength: 24,
       });

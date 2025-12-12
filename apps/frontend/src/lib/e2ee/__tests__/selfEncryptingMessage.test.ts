@@ -19,7 +19,7 @@ import {
   estimateEncryptedSize,
   validateEncryptedMessage,
 } from '../selfEncryptingMessage';
-import type { EncryptedMessageV2, ParticipantKey } from '../selfEncryptingMessage';
+import type { ParticipantKey } from '../selfEncryptingMessage';
 import _sodium from 'libsodium-wrappers';
 
 // Helper to generate participant keys
@@ -429,7 +429,9 @@ describe('SelfEncryptingMessage - Format Validation', () => {
 
     const validation = validateEncryptedMessage(encrypted);
     expect(validation.valid).toBe(false);
-    expect(validation.errors).toContain(expect.stringMatching(/invalid iv length/i));
+    expect(validation.errors).toEqual(
+      expect.arrayContaining([expect.stringMatching(/invalid iv length/i)])
+    );
   });
 
   it('should detect invalid auth tag length', async () => {
@@ -447,7 +449,9 @@ describe('SelfEncryptingMessage - Format Validation', () => {
 
     const validation = validateEncryptedMessage(encrypted);
     expect(validation.valid).toBe(false);
-    expect(validation.errors).toContain(expect.stringMatching(/invalid auth tag length/i));
+    expect(validation.errors).toEqual(
+      expect.arrayContaining([expect.stringMatching(/invalid auth tag length/i)])
+    );
   });
 
   it('should detect missing participant keys', () => {
@@ -462,7 +466,9 @@ describe('SelfEncryptingMessage - Format Validation', () => {
 
     const validation = validateEncryptedMessage(invalidMessage);
     expect(validation.valid).toBe(false);
-    expect(validation.errors).toContain(expect.stringMatching(/no participant keys/i));
+    expect(validation.errors).toEqual(
+      expect.arrayContaining([expect.stringMatching(/no participant keys/i)])
+    );
   });
 });
 
@@ -493,7 +499,6 @@ describe('SelfEncryptingMessage - Utility Functions', () => {
   it('should check if user can decrypt message', async () => {
     const plaintext = 'Test';
     const alice = await generateParticipant('alice-123');
-    const bob = await generateParticipant('bob-456');
 
     const encrypted = await encryptSelfEncryptingMessage(
       plaintext,

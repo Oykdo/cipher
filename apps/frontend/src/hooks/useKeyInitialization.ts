@@ -19,7 +19,6 @@ import {
   getPublicKeys as getLocalPublicKeys,
 } from '../lib/e2ee/keyManager';
 import { uploadPublicKeys } from '../services/api-v2';
-import _sodium from 'libsodium-wrappers';
 
 interface KeyInitializationState {
   initialized: boolean;

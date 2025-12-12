@@ -24,6 +24,8 @@ import {
   DEFAULT_FEDERATION_CONFIG,
 } from './types';
 
+import { debugLogger } from '../debugLogger';
+
 export class FederationClient {
   private config: FederationConfig;
   private knownServers: Map<string, FederatedServer> = new Map();

@@ -28,6 +28,11 @@ out/
 .env
 .env.*
 !.env.example
+
+# =============================================================================
+# E2EE-V2 SETUP REPORTS (AUTO-GENERATED)
+# =============================================================================
+E2EE_V2_SETUP_REPORT.md
 *.pem
 *.key
 *.cert
@@ -47,6 +52,7 @@ credentials/
 *.sqlite
 *.sqlite3
 apps/bridge/data/
+apps/bridge/backups/
 data/
 !apps/bridge/data/.gitkeep
 

@@ -11,27 +11,32 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import { BurnCountdown } from '../BurnCountdown';
+import { apiv2 } from '../../services/api-v2';
 import {
   decryptAttachment,
   isAttachmentLocked,
   getTimeUntilUnlock,
   formatFileSize,
   getFileIcon,
-  burnAttachment,
   type EncryptedAttachment,
 } from '../../lib/attachment';
 
 interface AttachmentMessageProps {
+  messageId: string;
+  conversationId: string;
+  burnDelay?: number;
   attachment: EncryptedAttachment;
   isOwn: boolean;
-  onBurnComplete?: (attachmentId: string) => void;
   formatTime: (timestamp: number) => string;
 }
 
 export function AttachmentMessage({
+  messageId,
+  conversationId,
+  burnDelay,
   attachment,
   isOwn,
-  onBurnComplete,
   formatTime,
 }: AttachmentMessageProps) {
   const { t } = useTranslation();
@@ -39,6 +44,8 @@ export function AttachmentMessage({
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [burned, setBurned] = useState(false);
+  const [openedAt, setOpenedAt] = useState<number | null>(null);
+  const [scheduledBurnAt, setScheduledBurnAt] = useState<number | null>(null);
   const [timeUntilUnlock, setTimeUntilUnlock] = useState(
     getTimeUntilUnlock(attachment)
   );
@@ -101,14 +108,25 @@ export function AttachmentMessage({
       URL.revokeObjectURL(url);
 
       // Handle Burn After Reading
-      if (isBurnMode) {
-        // Mark as burned locally
-        await burnAttachment(attachment.id);
-        setBurned(true);
+      // Only the recipient should start the burn countdown.
+      if (isBurnMode && !isOwn && openedAt === null) {
+        const opened = Date.now();
+        setOpenedAt(opened);
 
-        // Send acknowledgment to sender
-        if (onBurnComplete) {
-          onBurnComplete(attachment.id);
+        try {
+          // Start server-side countdown (persists even if the client closes)
+          const resp = await apiv2.acknowledgeMessage(messageId, conversationId);
+          if (resp?.scheduledBurnAt) {
+            setScheduledBurnAt(resp.scheduledBurnAt);
+          } else {
+            // Fallback: local timer display only
+            const delaySeconds = typeof burnDelay === 'number' && burnDelay > 0 ? burnDelay : 0;
+            setScheduledBurnAt(opened + delaySeconds * 1000);
+          }
+        } catch (ackErr: any) {
+          console.error('Failed to acknowledge burn-after-reading attachment:', ackErr);
+          const delaySeconds = typeof burnDelay === 'number' && burnDelay > 0 ? burnDelay : 0;
+          setScheduledBurnAt(opened + delaySeconds * 1000);
         }
       }
     } catch (err: any) {
@@ -118,7 +136,7 @@ export function AttachmentMessage({
       setDownloading(false);
       setDownloadProgress(0);
     }
-  }, [attachment, isLocked, burned, isBurnMode, onBurnComplete, t]);
+  }, [isLocked, burned, attachment, isBurnMode, isOwn, openedAt, burnDelay, messageId, conversationId, t]);
 
   // Render burned state
   if (burned) {
@@ -220,7 +238,12 @@ export function AttachmentMessage({
       <div className="mt-3">
         <button
           onClick={handleDownload}
-          disabled={isLocked || downloading || burned}
+          disabled={
+            isLocked ||
+            downloading ||
+            burned ||
+            (isBurnMode && !isOwn && openedAt !== null)
+          }
           className={`
             w-full py-2 px-4 rounded-lg font-medium text-sm
             transition-all
@@ -257,6 +280,18 @@ export function AttachmentMessage({
       {isBurnMode && !burned && !isOwn && (
         <div className="mt-3 p-2 bg-error-glow/10 border border-error-glow/30 rounded text-xs text-error-glow">
           ⚠️ {t('attachments.burn_warning')}
+        </div>
+      )}
+
+      {/* Burn countdown (starts after recipient opens) */}
+      {isBurnMode && !isOwn && scheduledBurnAt && !burned && (
+        <div className="mt-3 p-3 bg-error-glow/10 rounded-lg border border-error-glow/30">
+          <BurnCountdown
+            scheduledBurnAt={scheduledBurnAt}
+            onBurnComplete={() => {
+              setBurned(true);
+            }}
+          />
         </div>
       )}
     </motion.div>

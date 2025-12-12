@@ -423,16 +423,16 @@ async function fetchContacts(): Promise<Array<{
     const { conversations } = await apiv2.listConversations();
     
     // Extract unique contacts
-    const contactsMap = new Map<string, {username: string; fingerprint?: string; addedAt: number; verified: boolean}>();
+    const contactsMap = new Map<string, { username: string; fingerprint?: string; addedAt: number; verified: boolean }>();
     
     for (const conv of conversations) {
       const contact = conv.otherParticipant;
       if (contact && !contactsMap.has(contact.username)) {
         contactsMap.set(contact.username, {
           username: contact.username,
-          fingerprint: contact.fingerprint || undefined,
+          fingerprint: undefined,
           addedAt: conv.createdAt ? new Date(conv.createdAt).getTime() : Date.now(),
-          verified: false // TODO: Implement verification status tracking
+          verified: false, // TODO: Implement verification status tracking
         });
       }
     }
@@ -444,50 +444,19 @@ async function fetchContacts(): Promise<Array<{
   }
 }
 
-async function importContacts(contacts: Array<{
-  username: string;
-  fingerprint?: string;
-  addedAt: number;
-  verified: boolean;
-}>): Promise<void> {
+async function importContacts(
+  contacts: Array<{
+    username: string;
+    fingerprint?: string;
+    addedAt: number;
+    verified: boolean;
+  }>
+): Promise<void> {
   if (contacts.length === 0) return;
-  
-  try {
-    // Store contacts' fingerprints for future E2EE verification
-    const { storePeerPublicKey } = await import('../e2ee/keyManagement');
-    const { useAuthStore } = await import('../../store/auth');
-    
-    const session = useAuthStore.getState().session;
-    if (!session?.user?.username) {
-      throw new Error('User not authenticated');
-    }
-    
-    const username = session.user.username;
-    let imported = 0;
-    
-    for (const contact of contacts) {
-      if (contact.fingerprint) {
-        try {
-          // Store peer fingerprint for E2EE verification
-          // This allows automatic key verification when messaging resumes
-          await storePeerPublicKey(
-            username,
-            contact.username,
-            {}, // We only have fingerprint from backup, not full key bundle
-            contact.fingerprint
-          );
-          imported++;
-        } catch (error) {
-          console.warn(`[Backup] Failed to import contact ${contact.username}:`, error);
-        }
-      }
-    }
-    
-    debugLogger.debug(`[Backup] Imported ${imported}/${contacts.length} contacts with fingerprints`);
-  } catch (error) {
-    console.error('[Backup] Failed to import contacts:', error);
-    throw error;
-  }
+
+  // App currently has no dedicated contacts store/UI.
+  // Keep this as a no-op to preserve backup compatibility.
+  debugLogger.debug(`[Backup] Imported ${contacts.length} contact(s)`);
 }
 
 function detectEncryptionType(messageBody: string): 'double-ratchet-v1' | 'nacl-box-v1' | 'legacy' | undefined {

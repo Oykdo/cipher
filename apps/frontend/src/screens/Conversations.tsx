@@ -32,6 +32,7 @@ import { useP2P } from '../hooks/useP2P';
 import { P2P_CONFIG, SIGNALING_SERVERS } from '../config';
 import { debugLogger } from "../lib/debugLogger";
 import { encryptAttachment, type EncryptedAttachment, type SecurityMode } from '../lib/attachment';
+import { base64ToBytes } from '../shared/crypto';
 import '../styles/fluidCrypto.css';
 
 type ViewMode = 'list' | 'chat';
@@ -240,7 +241,7 @@ export default function Conversations() {
 
   // Listen for burned messages
   useSocketEvent(socket, 'message_burned', async (data) => {
-    debugLogger.debug('🔥 Received burn event for message:', data.messageId);
+    // debugLogger.debug('🔥 Received burn event for message:', data.messageId);
     
     // ✅ FIX: Clear decrypted message cache immediately
     try {
@@ -263,6 +264,7 @@ export default function Conversations() {
     const isOwnMessage = message?.senderId === session?.user?.id;
     const isBurnMessage = message?.scheduledBurnAt && !isOwnMessage;
 
+    /*
     debugLogger.debug('Burn event details:', {
       messageId: data.messageId,
       isOwnMessage,
@@ -270,13 +272,14 @@ export default function Conversations() {
       messageExists: !!message,
       scheduledBurnAt: message?.scheduledBurnAt
     });
+    */
 
     // ✅ FIX: Remove message IMMEDIATELY from state on both sides
     // The server already filtered it from future loadMessages() calls
     if (isBurnMessage) {
       // BurnMessage component handles its own animation via isBurnedFromServer prop
       // Just update the message state - the component will animate and then disappear
-      debugLogger.debug('⚡ Updating BurnMessage state to burned (recipient)');
+      // debugLogger.debug('⚡ Updating BurnMessage state to burned (recipient)');
       setMessages(prev => prev.map(msg =>
         msg.id === data.messageId
           ? { ...msg, isBurned: true, burnedAt: data.burnedAt }
@@ -289,7 +292,7 @@ export default function Conversations() {
       }, 3500);
     } else {
       // ✅ FIX: For sender's messages, also mark as burned and remove from UI
-      debugLogger.debug('⚡ Burning sender message');
+      // debugLogger.debug('⚡ Burning sender message');
       setBurningMessages(prev => new Set(prev).add(data.messageId));
 
       // Update message state after short delay, then REMOVE from messages
@@ -406,11 +409,24 @@ export default function Conversations() {
           //   BUT we stored plaintext locally, so check for that first
           const isOwnMessage = msg.senderId === session?.user?.id;
 
+          // MESSAGE_WORKFLOW.md (Problème 1): If backend returned sender_plaintext for our own message,
+          // use it and skip decryption entirely.
+          const backendSenderPlaintext = msg.sender_plaintext;
+          if (isOwnMessage && typeof backendSenderPlaintext === 'string' && backendSenderPlaintext.length > 0) {
+            decryptedBody = backendSenderPlaintext;
+            cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
+            decryptedMessages.push({
+              ...msg,
+              body: decryptedBody,
+            });
+            continue;
+          }
+
           // CRITICAL FIX: Check cache first to avoid re-decrypting messages
           // Double Ratchet consumes keys on each decryption - re-decrypting fails!
           const cachedPlaintext = getCachedDecryptedMessage(msg.id);
           if (cachedPlaintext !== null) {
-            debugLogger.debug(`[CACHE] Found cached plaintext for message ${msg.id}`);
+            // debugLogger.debug(`[CACHE] Found cached plaintext for message ${msg.id}`);
             decryptedBody = cachedPlaintext;
           } else {
             // Try to parse message body to detect format
@@ -427,6 +443,12 @@ export default function Conversations() {
               console.log('🔐 [E2EE-v2] Detected e2ee-v2 message, decrypting...');
               
               try {
+                // Ensure keys are loaded (might be missing on first load)
+                if (!hasUserKeys(session!.user.id)) {
+                   console.warn('⚠️ [E2EE-v2] No user keys found, cannot decrypt message');
+                   throw new Error('User keys not found');
+                }
+                
                 const userKeys = await loadUserKeys(session!.user.id);
                 if (!userKeys) throw new Error('User keys not found');
                 
@@ -444,23 +466,42 @@ export default function Conversations() {
                 cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
               } catch (e2eev2Error) {
                 console.error('❌ [E2EE-v2] Decryption failed:', e2eev2Error);
-                throw e2eev2Error;
+                // Don't throw, just show error message in UI
+                decryptedBody = '[Erreur de déchiffrement]';
               }
             } else if (isOwnMessage) {
             // For own messages, we stored the plaintext in cache when sending
             // BUT if cache is empty (cleared or first load), we cannot decrypt our own E2EE messages
             // Try to parse the body - if it's E2EE encrypted, show placeholder
-            debugLogger.debug(`[DECRYPT] Own message ${msg.id} not in cache, checking format`);
+            // debugLogger.debug(`[DECRYPT] Own message ${msg.id} not in cache, checking format`);
             try {
               const parsed = JSON.parse(msg.body);
               if (parsed.version === 'e2ee-v1') {
-                // This is an encrypted message we sent - we can't decrypt our own outgoing messages
-                // The message was encrypted with peer's public key, only they can decrypt
-                console.warn(`[DECRYPT] Own message ${msg.id} is E2EE encrypted but not in cache - cannot decrypt`);
-                // Show a user-friendly placeholder
-                decryptedBody = '🔒 Message envoyé (chiffré de bout en bout)\n\nCe message a été chiffré avec la clé publique de votre destinataire. Seul le destinataire peut le déchiffrer.\n\nPour relire vos propres messages, gardez cette session ouverte ou utilisez la fonctionnalité de sauvegarde.';
-                // DON'T cache the placeholder - it would prevent future cache lookups from working
-                // If the real plaintext is cached later (e.g., via WebSocket), we want to use it
+                // Try to decrypt sender copy if available
+                if (parsed.senderCopy) {
+                   // Ensure we have our OWN public key for sender copy decryption
+                   // We don't need peerUsername here, we need session.user.username
+                   const result = await decryptReceivedMessage(
+                    session.user.username,
+                    msg.body,
+                    undefined,
+                    true
+                  );
+                  if (result.text && !result.text.startsWith('[')) {
+                    decryptedBody = result.text;
+                    cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
+                  } else {
+                    decryptedBody = '🔒 Message envoyé (chiffré de bout en bout)\n\nCe message a été chiffré avec la clé publique de votre destinataire. Seul le destinataire peut le déchiffrer.\n\nPour relire vos propres messages, gardez cette session ouverte ou utilisez la fonctionnalité de sauvegarde.';
+                  }
+                } else {
+                  // This is an encrypted message we sent (legacy) - we can't decrypt our own outgoing messages
+                  // The message was encrypted with peer's public key, only they can decrypt
+                  console.warn(`[DECRYPT] Own message ${msg.id} is E2EE encrypted but not in cache - cannot decrypt`);
+                  // Show a user-friendly placeholder
+                  decryptedBody = '🔒 Message envoyé (chiffré de bout en bout)\n\nCe message a été chiffré avec la clé publique de votre destinataire. Seul le destinataire peut le déchiffrer.\n\nPour relire vos propres messages, gardez cette session ouverte ou utilisez la fonctionnalité de sauvegarde.';
+                  // DON'T cache the placeholder - it would prevent future cache lookups from working
+                  // If the real plaintext is cached later (e.g., via WebSocket), we want to use it
+                }
               } else {
                 // Legacy format or plaintext
                 decryptedBody = msg.body;
@@ -491,27 +532,31 @@ export default function Conversations() {
                 cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
               } else {
                 // E2EE failed (old message), fallback to legacy
-                debugLogger.debug(`[DECRYPT] E2EE failed for message ${msg.id}, trying legacy`);
+                // debugLogger.debug(`[DECRYPT] E2EE failed for message ${msg.id}, trying legacy`);
                 decryptedBody = await decryptIncomingMessage(conversationId, msg);
                 cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
               }
             } catch (e2eeError) {
               // E2EE decryption threw error, fallback to legacy
-              debugLogger.debug(`[DECRYPT] E2EE error for message ${msg.id}, trying legacy:`, e2eeError);
+              // debugLogger.debug(`[DECRYPT] E2EE error for message ${msg.id}, trying legacy:`, e2eeError);
               try {
                 decryptedBody = await decryptIncomingMessage(conversationId, msg);
                 cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
               } catch (legacyError) {
                 // Both failed
                 console.error(`[DECRYPT] Both E2EE and legacy failed for ${msg.id}`);
-                throw legacyError;
+                decryptedBody = '[Erreur de déchiffrement]';
               }
             }
             } else {
               // No peer username, use legacy decryption directly
-              decryptedBody = await decryptIncomingMessage(conversationId, msg);
-              // Cache legacy decryption too
-              cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
+              try {
+                decryptedBody = await decryptIncomingMessage(conversationId, msg);
+                // Cache legacy decryption too
+                cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
+              } catch (e) {
+                decryptedBody = '[Erreur de déchiffrement]';
+              }
             }
           }
 
@@ -524,7 +569,7 @@ export default function Conversations() {
           console.error('❌ [DECRYPT] Failed to decrypt message:', decryptError);
           decryptedMessages.push({
             ...msg,
-            body: '[Decryption failed]',
+            body: '[Erreur de déchiffrement]',
           });
         }
       }
@@ -684,6 +729,34 @@ export default function Conversations() {
           securityMode,
           timeLockEpoch
         );
+
+        // Upload encrypted attachment data to the server (store ciphertext out-of-band)
+        // Then send only a small attachment envelope inside the message.
+        const { uploadId } = await apiv2.initAttachmentUpload(selectedConvId, {
+          filename: attachmentFile.name,
+          mime: attachmentFile.type || 'application/octet-stream',
+          // Encrypted size is ~same as plaintext + 16-byte GCM tag
+          size: attachmentFile.size + 16,
+        });
+
+        const total = encryptedAttachment.payload.totalChunks;
+        for (let i = 0; i < total; i++) {
+          const chunkBytes = base64ToBytes(encryptedAttachment.payload.encryptedChunks[i]);
+          await apiv2.uploadAttachmentChunk(uploadId, i, total, chunkBytes);
+        }
+
+        const committed = await apiv2.commitAttachmentUpload(uploadId);
+
+        // Replace inline chunks with a server reference to keep message size small.
+        encryptedAttachment = {
+          ...encryptedAttachment,
+          id: committed.id,
+          payload: {
+            ...encryptedAttachment.payload,
+            encryptedChunks: [],
+            remoteAttachmentId: committed.id,
+          },
+        };
       }
 
       // Try P2P first if peer is online (for simple text without special options)
@@ -725,6 +798,10 @@ export default function Conversations() {
             if (!userKeys) throw new Error('Failed to load user keys');
             
             const participantKeys = await getConversationParticipantKeys(selectedConvId);
+
+            if (participantKeys.length < 2) {
+              throw new Error('Not enough participant keys for e2ee-v2');
+            }
             
             const encrypted = await encryptSelfEncryptingMessage(
               attachmentJson,
@@ -740,7 +817,12 @@ export default function Conversations() {
             encryptedBody = JSON.stringify(encrypted);
             console.log('✅ [E2EE-v2] Attachment encrypted successfully');
           } catch (e2eev2Error) {
-            console.warn('⚠️ [E2EE-v2] Failed, falling back to e2ee-v1:', e2eev2Error);
+            const msg = e2eev2Error instanceof Error ? e2eev2Error.message : String(e2eev2Error);
+            if (msg.includes('Missing e2ee-v2 public keys') || msg.includes('Not enough participant keys')) {
+              console.info('ℹ️ [E2EE-v2] Not available (participants missing keys), using e2ee-v1');
+            } else {
+              console.warn('⚠️ [E2EE-v2] Failed, falling back to e2ee-v1:', e2eev2Error);
+            }
             // Fallback to e2ee-v1
             encryptedBody = await encryptMessageForSending(
               peerUsername,
@@ -775,6 +857,10 @@ export default function Conversations() {
           const participantKeys = await getConversationParticipantKeys(selectedConvId);
           
           console.log(`📋 [E2EE-v2] Encrypting for ${participantKeys.length} participants`);
+
+          if (participantKeys.length < 2) {
+            throw new Error('Not enough participant keys for e2ee-v2');
+          }
           
           // Determine message type
           let messageType: 'standard' | 'bar' | 'timelock' = 'standard';
@@ -797,7 +883,12 @@ export default function Conversations() {
           encryptedBody = JSON.stringify(encrypted);
           console.log('✅ [E2EE-v2] Message encrypted successfully');
         } catch (e2eev2Error) {
-          console.warn('⚠️ [E2EE-v2] Encryption failed, falling back to e2ee-v1:', e2eev2Error);
+          const msg = e2eev2Error instanceof Error ? e2eev2Error.message : String(e2eev2Error);
+          if (msg.includes('Missing e2ee-v2 public keys') || msg.includes('Not enough participant keys')) {
+            console.info('ℹ️ [E2EE-v2] Not available (participants missing keys), using e2ee-v1');
+          } else {
+            console.warn('⚠️ [E2EE-v2] Encryption failed, falling back to e2ee-v1:', e2eev2Error);
+          }
           
           // Fallback to e2ee-v1
           encryptedBody = await encryptMessageForSending(
@@ -822,7 +913,7 @@ export default function Conversations() {
       }
 
       // Calculate options
-      const options: { scheduledBurnAt?: number; unlockBlockHeight?: number; burnDelay?: number } = {};
+      const options: { scheduledBurnAt?: number; unlockBlockHeight?: number; burnDelay?: number; senderPlaintext?: string } = {};
 
       if (burnAfterReading) {
         // IMPORTANT: For Burn-After-Reading, store the delay (in seconds)
@@ -835,6 +926,10 @@ export default function Conversations() {
         options.unlockBlockHeight = unlockDate.getTime();
       }
 
+      // MESSAGE_WORKFLOW.md (Problème 1): send a plaintext copy for the sender so they can re-read after reconnect
+      const textToCache = attachmentFile ? JSON.stringify(encryptedAttachment) : plaintextBody;
+      options.senderPlaintext = textToCache;
+
       // Send encrypted message via server
       const sentMessage = await apiv2.sendMessage(selectedConvId, encryptedBody, options);
       console.log(`[SEND] Server returned message with ID: ${sentMessage.id}`);
@@ -842,7 +937,6 @@ export default function Conversations() {
       // CRITICAL: Cache the plaintext for this message ID
       // This ensures we can display it on reload without re-decryption
       // For attachments, cache the attachment JSON (not the plaintext description)
-      const textToCache = attachmentFile ? JSON.stringify(encryptedAttachment) : plaintextBody;
       cacheDecryptedMessage(sentMessage.id, selectedConvId, textToCache);
       console.log(`[SEND] Cached message ${sentMessage.id} after sending (text length: ${textToCache.length})`);
       
@@ -930,7 +1024,8 @@ export default function Conversations() {
 
   // Handle burn message reveal - just start countdown, don't send to server yet
   const handleBurnReveal = useCallback(async (messageId: string) => {
-    debugLogger.debug('🔓 Message revealed, starting countdown:', messageId);
+    void messageId;
+    // debugLogger.debug('🔓 Message revealed, starting countdown:', messageId);
     // Countdown and animation handled by BurnMessage component
     // Server notification happens in handleBurnComplete after animation
   }, []);
@@ -939,7 +1034,7 @@ export default function Conversations() {
   const handleBurnComplete = useCallback(async (messageId: string) => {
     if (!selectedConvId || !socket || !session?.user?.username) return;
 
-    debugLogger.debug('🔥 Burn animation complete, notifying server:', messageId);
+    // debugLogger.debug('🔥 Burn animation complete, notifying server:', messageId);
 
     try {
       let signedData = '';

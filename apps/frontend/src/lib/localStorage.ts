@@ -5,6 +5,8 @@
  * Detects if user has previously logged in on this device
  */
 
+import { debugLogger } from './debugLogger';
+
 export interface LocalAccount {
   username: string;
   securityTier: 'standard' | 'dice-key';

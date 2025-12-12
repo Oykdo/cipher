@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS messages (
   conversation_id TEXT NOT NULL,
   sender_id TEXT NOT NULL,
   body TEXT NOT NULL,                     -- Ciphertext chiffré E2E
+  sender_plaintext TEXT,                  -- Plaintext copy for the sender (see MESSAGE_WORKFLOW.md)
   created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
   
   -- Fonctionnalités avancées (futures)

@@ -2,6 +2,18 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // DB-backed tests must not run concurrently (they share the same database)
+    fileParallelism: false,
+    maxWorkers: 1,
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        singleThread: true,
+      },
+    },
+    sequence: {
+      concurrent: false,
+    },
     globals: true,
     environment: 'node',
     coverage: {

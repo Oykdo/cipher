@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS messages (
   conversation_id VARCHAR(255) NOT NULL,
   sender_id VARCHAR(255) NOT NULL,
   body TEXT NOT NULL,                     -- Ciphertext chiffré E2E
+  sender_plaintext TEXT,                  -- Plaintext copy for the sender (see MESSAGE_WORKFLOW.md)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   
   -- Fonctionnalités avancées

@@ -5,6 +5,7 @@ import { getDatabase } from '../../../../db/database.js';
 import { UserRepository } from '../../../../infrastructure/database/repositories/UserRepository.js';
 import * as bip39 from 'bip39';
 import { createHash } from 'crypto';
+import { randomUUID } from 'crypto';
 
 // Test helpers
 const generateTestCredentials = () => {
@@ -22,7 +23,9 @@ const mockJwtService = {
   verifyRefreshToken: (token: string) => ({ userId: token.replace('refresh_token_', '') }),
 };
 
-describe('LoginUseCase', () => {
+const describeDb = process.env.DATABASE_URL_TEST ? describe : describe.skip;
+
+describeDb('LoginUseCase', () => {
   let loginUseCase: LoginUseCase;
   let signupUseCase: SignupUseCase;
   let db: ReturnType<typeof getDatabase>;
@@ -37,9 +40,10 @@ describe('LoginUseCase', () => {
 
   describe('Standard Login', () => {
     it('should login with correct credentials', async () => {
+      const username = `alice_${randomUUID()}`;
       // Setup: create user with auto-generated mnemonic
       const signupResult = await signupUseCase.execute({
-        username: 'alice',
+        username,
         securityTier: 'standard',
         mnemonicLength: 12,
       });
@@ -51,12 +55,12 @@ describe('LoginUseCase', () => {
 
       // Test: login
       const result = await loginUseCase.execute({
-        username: 'alice',
+        username,
         masterKey,
       });
 
       expect(result).toHaveProperty('user');
-      expect(result.user.username).toBe('alice');
+      expect(result.user.username).toBe(username);
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
     });
@@ -72,9 +76,10 @@ describe('LoginUseCase', () => {
     });
 
     it('should reject login with incorrect master key', async () => {
+      const username = `alice_${randomUUID()}`;
       // Setup: create user
       await signupUseCase.execute({
-        username: 'alice',
+        username,
         securityTier: 'standard',
         mnemonicLength: 12,
       });
@@ -84,16 +89,17 @@ describe('LoginUseCase', () => {
 
       await expect(
         loginUseCase.execute({
-          username: 'alice',
+          username,
           masterKey: wrongKey,
         })
       ).rejects.toThrow();
     });
 
     it('should return valid JWT tokens', async () => {
+      const username = `alice_${randomUUID()}`;
       // Setup: create user
       const signupResult = await signupUseCase.execute({
-        username: 'alice',
+        username,
         securityTier: 'standard',
         mnemonicLength: 12,
       });
@@ -105,7 +111,7 @@ describe('LoginUseCase', () => {
 
       // Test: login
       const result = await loginUseCase.execute({
-        username: 'alice',
+        username,
         masterKey,
       });
 
@@ -118,9 +124,12 @@ describe('LoginUseCase', () => {
 
   describe('Case Insensitivity', () => {
     it('should login with different case username', async () => {
+      const usernameMixed = `Alice_${randomUUID()}`;
+      const usernameLower = usernameMixed.toLowerCase();
+
       // Setup: create user with capitalized username
       const signupResult = await signupUseCase.execute({
-        username: 'Alice',
+        username: usernameMixed,
         securityTier: 'standard',
         mnemonicLength: 12,
       });
@@ -132,12 +141,12 @@ describe('LoginUseCase', () => {
 
       // Test: login with lowercase
       const result = await loginUseCase.execute({
-        username: 'alice',
+        username: usernameLower,
         masterKey,
       });
 
       expect(result).toHaveProperty('user');
-      expect(result.user.username.toLowerCase()).toBe('alice');
+      expect(result.user.username.toLowerCase()).toBe(usernameLower);
     });
   });
 });

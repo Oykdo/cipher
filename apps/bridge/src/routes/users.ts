@@ -93,14 +93,31 @@ export async function usersRoutes(fastify: FastifyInstance) {
           return { error: 'User not found' };
         }
 
-        // Determine key length from master_key_hex for standard accounts
-        let keyBits = 256; // Default for dice-key
-        if (user.security_tier === 'standard' && user.master_key_hex) {
-          // master_key_hex is base64 encoded
-          // 12 words = 128 bits = 16 bytes = ~24 chars base64
-          // 24 words = 256 bits = 32 bytes = ~44 chars base64
-          const hexLength = user.master_key_hex.length;
-          keyBits = hexLength <= 30 ? 128 : 256;
+        // Determine key length from mnemonic ciphertext length for standard accounts
+        let keyBits = 256; // Default
+        if (user.security_tier === 'standard' && user.mnemonic) {
+          try {
+            // Check if it's the encrypted JSON format
+            if (user.mnemonic.startsWith('{')) {
+              const mnemonicData = JSON.parse(user.mnemonic);
+              if (mnemonicData && typeof mnemonicData.ct === 'string') {
+                // Estimate based on ciphertext length (Base64)
+                // 12 words (128 bits) -> ~100-160 chars Base64
+                // 24 words (256 bits) -> ~200-300 chars Base64
+                // Threshold set to 180 to separate them
+                keyBits = mnemonicData.ct.length < 180 ? 128 : 256;
+              }
+            } else {
+              // Legacy plaintext format (array of strings)
+              const words = JSON.parse(user.mnemonic);
+              if (Array.isArray(words)) {
+                 keyBits = words.length === 12 ? 128 : 256;
+              }
+            }
+          } catch (e) {
+            // Default to 256 on error
+            keyBits = 256;
+          }
         } else if (user.security_tier === 'dice-key') {
           keyBits = 775; // DiceKey entropy
         }

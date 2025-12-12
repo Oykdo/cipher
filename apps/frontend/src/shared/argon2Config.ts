@@ -199,7 +199,8 @@ export async function benchmarkArgon2(
   const testPassword = 'test-password-for-benchmark';
   
   // Dynamic import to avoid loading in production
-  const argon2 = await import('argon2-browser');
+  const argon2Module: any = await import('argon2-browser/dist/argon2-bundled.min.js');
+  const argon2 = argon2Module?.default ?? argon2Module;
   const config = getEnvironmentConfig();
 
   for (let i = 0; i < testIterations; i++) {
@@ -212,7 +213,7 @@ export async function benchmarkArgon2(
       mem: config.memoryCost,
       parallelism: config.parallelism,
       hashLen: config.hashLength,
-      type: argon2.ArgonType.Argon2id,
+      type: argon2.ArgonType?.Argon2id ?? 2,
     });
 
     const endTime = performance.now();

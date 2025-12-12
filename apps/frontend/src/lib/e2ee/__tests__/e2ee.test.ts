@@ -9,6 +9,7 @@ import {
   initializeCrypto,
   generateIdentityKeyPair,
   generateKeyExchangeKeyPair,
+  generateSigningKeyPair,
   deriveSharedSecret,
   deriveEncryptionKey,
   encryptSymmetric,
@@ -108,7 +109,7 @@ describe('E2EE Core Functionality', () => {
   describe('Digital Signatures', () => {
     it('should sign and verify data', async () => {
       const data = 'Important data';
-      const alice = await generateIdentityKeyPair();
+      const alice = await generateSigningKeyPair();
       
       const signature = await signData(data, alice.privateKey);
       const isValid = await verifySignature(data, signature, alice.publicKey);
@@ -119,7 +120,7 @@ describe('E2EE Core Functionality', () => {
     it('should fail verification with wrong data', async () => {
       const data = 'Original data';
       const tamperedData = 'Tampered data';
-      const alice = await generateIdentityKeyPair();
+      const alice = await generateSigningKeyPair();
       
       const signature = await signData(data, alice.privateKey);
       const isValid = await verifySignature(tamperedData, signature, alice.publicKey);

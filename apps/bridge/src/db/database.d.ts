@@ -40,6 +40,7 @@ export interface DbInstance {
   getConversationMessagesPaged(conversationId: string, before: number, limit: number): Promise<any[]>;
   getLastMessage(conversationId: string): Promise<any | null>;
   burnMessage(messageId: string, burnedAt: number): Promise<void>;
+  deleteMessage(messageId: string): Promise<void>;
   scheduleBurn(messageId: string, when: number): Promise<void>;
   getScheduledBurnsDue(now?: number): Promise<Array<{ id: string; conversation_id: string }>>;
   getPendingBurns(): Promise<Array<{ messageId: string; conversationId: string; scheduledBurnAt: number }>>;
@@ -60,6 +61,7 @@ export interface DbInstance {
   // Attachments
   createAttachment(data: any): Promise<any>;
   getAttachmentById(id: string): Promise<any | null>;
+  deleteAttachment(attachmentId: string): Promise<any>;
 
   // SRP
   updateUserSRP(userId: string, salt: string, verifier: string): Promise<void>;
@@ -90,6 +92,12 @@ export interface DbInstance {
   getDatabasePath(): string;
   close(): void;
   exec(sql: string): Promise<any>;
+
+  // Public keys (e2ee-v2)
+  getPublicKeysByUserIds(userIds: string[]): Promise<any[]>;
+  updateUserPublicKeys(userId: string, publicKey: string, signPublicKey: string): Promise<void>;
+  isConversationMember(conversationId: string, userId: string): Promise<boolean>;
+  getConversationMembersWithKeys(conversationId: string): Promise<any[]>;
 
   // E2EE Key Bundles
   getE2eeKeyBundle(userId: string): Promise<any | null>;

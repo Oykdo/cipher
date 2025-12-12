@@ -219,7 +219,7 @@ export async function fetchWithRefresh(
  * @param options - Options fetch
  * @returns Données JSON
  */
-export async function fetchV2WithRefresh<T>(
+export async function fetchV2WithRefresh<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -254,7 +254,7 @@ export async function fetchV2WithRefresh<T>(
  * @param options - Options fetch
  * @returns Données JSON
  */
-export async function authFetchV2WithRefresh<T>(
+export async function authFetchV2WithRefresh<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
