@@ -272,6 +272,19 @@
     "burn_warning": "阅读后消息将被销毁",
     "burn_timeout_triggered": "未收到销毁信号，消息已自动删除"
   },
+  "attachments": {
+    "select_file": "选择文件",
+    "attach_file": "附加文件",
+    "remove": "移除附件",
+    "download": "下载",
+    "locked": "已锁定",
+    "unlocks_in": "解锁时间",
+    "time_locked": "时间锁定的附件",
+    "burn_after_reading": "下载后销毁",
+    "burn_warning": "此附件将在下载后销毁",
+    "attachment_burned": "附件已销毁",
+    "download_error": "下载失败"
+  },
   "settings": {
     "title": "设置",
     "description": "管理您的账户和数据",

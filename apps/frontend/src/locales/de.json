@@ -272,6 +272,19 @@
     "burn_warning": "Nachricht wird nach dem Lesen zerstort",
     "burn_timeout_triggered": "Burn-Signal nicht erhalten, Nachricht automatisch geloscht"
   },
+  "attachments": {
+    "select_file": "Datei auswählen",
+    "attach_file": "Datei anhängen",
+    "remove": "Anhang entfernen",
+    "download": "Herunterladen",
+    "locked": "Gesperrt",
+    "unlocks_in": "Entsperrt in",
+    "time_locked": "Zeitlich gesperrter Anhang",
+    "burn_after_reading": "Zerstörung nach Download",
+    "burn_warning": "Dieser Anhang wird nach dem Download zerstört",
+    "attachment_burned": "Anhang zerstört",
+    "download_error": "Download fehlgeschlagen"
+  },
   "settings": {
     "title": "Einstellungen",
     "description": "Verwalten Sie Ihr Konto und Ihre Daten",

@@ -28,6 +28,7 @@ import ConversationRequests from '../components/ConversationRequests';
 import { useP2P } from '../hooks/useP2P';
 import { P2P_CONFIG, SIGNALING_SERVERS } from '../config';
 import { debugLogger } from "../lib/debugLogger";
+import { encryptAttachment, type EncryptedAttachment, type SecurityMode } from '../lib/attachment';
 import '../styles/fluidCrypto.css';
 
 type ViewMode = 'list' | 'chat';
@@ -60,6 +61,9 @@ export default function Conversations() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [messageBody, setMessageBody] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  
+  // Attachment state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
   // Archived messages indicator (from backup import)
   const [hasArchived, setHasArchived] = useState(false);
@@ -501,12 +505,15 @@ export default function Conversations() {
    * Messages are reconciled when server confirms, preventing duplicates.
    * 
    * P2P ENHANCEMENT: Try P2P first, fallback to WebSocket/server relay
+   * ATTACHMENT SUPPORT: Handle both text messages and file attachments
    */
   const sendMessage = async () => {
-    if (!session?.accessToken || !selectedConvId || !messageBody.trim()) return;
+    if (!session?.accessToken || !selectedConvId) return;
+    if (!messageBody.trim() && !selectedFile) return;
 
     // Store plaintext for local display
     const plaintextBody = messageBody;
+    const attachmentFile = selectedFile;
 
     // Generate temporary ID for optimistic update
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -521,22 +528,51 @@ export default function Conversations() {
       id: tempId,
       conversationId: selectedConvId,
       senderId: session.user.id,
-      body: plaintextBody,
+      body: attachmentFile ? `📎 ${attachmentFile.name}` : plaintextBody,
       createdAt: Date.now(),
       isPending: true,
+      hasAttachment: !!attachmentFile,
     };
 
     setMessages(prev => [...prev, optimisticMessage]);
 
     // Clear input immediately for better UX
     setMessageBody('');
+    setSelectedFile(null);
 
     try {
       setSendingMessage(true);
 
+      // Handle attachment encryption
+      let encryptedAttachment: EncryptedAttachment | null = null;
+      
+      if (attachmentFile) {
+        // Determine security mode
+        let securityMode: SecurityMode = 'none';
+        let timeLockEpoch: number | undefined;
+
+        if (burnAfterReading) {
+          securityMode = 'burnAfterReading';
+        } else if (timeLockEnabled && timeLockDate && timeLockTime) {
+          securityMode = 'timeLock';
+          const unlockDate = new Date(`${timeLockDate}T${timeLockTime}`);
+          timeLockEpoch = unlockDate.getTime();
+        }
+
+        // Encrypt attachment
+        encryptedAttachment = await encryptAttachment(
+          attachmentFile,
+          session.user.id,
+          peerId || '',
+          securityMode,
+          timeLockEpoch
+        );
+      }
+
       // Try P2P first if peer is online (for simple text without special options)
       // ARCHITECTURE FIX: P2P now uses unified E2EE, requires peerUsername
-      const canUseP2P = peerId && peerUsername && !burnAfterReading && !timeLockEnabled;
+      // NOTE: Attachments always use server relay for now
+      const canUseP2P = peerId && peerUsername && !burnAfterReading && !timeLockEnabled && !attachmentFile;
       let sentViaP2P = false;
 
       if (canUseP2P) {
@@ -554,12 +590,15 @@ export default function Conversations() {
         return;
       }
 
-      // Fallback to server relay (also required for burn/time-lock features)
+      // Fallback to server relay (also required for burn/time-lock features and attachments)
       updateConnectionMode(selectedConvId, 'relayed');
 
       let encryptedBody: string;
 
-      if (peerUsername) {
+      if (encryptedAttachment) {
+        // For attachments, body is the encrypted attachment envelope
+        encryptedBody = JSON.stringify(encryptedAttachment);
+      } else if (peerUsername) {
         // Try E2EE encryption with legacy fallback
         encryptedBody = await encryptMessageForSending(
           peerUsername,
@@ -896,6 +935,9 @@ export default function Conversations() {
                 timeLockTime={timeLockTime}
                 setTimeLockTime={setTimeLockTime}
                 setTyping={setTyping}
+                selectedFile={selectedFile}
+                onAttachmentSelect={setSelectedFile}
+                onAttachmentClear={() => setSelectedFile(null)}
               />
             </>
           ) : (

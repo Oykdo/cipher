@@ -291,6 +291,19 @@
     "burn_warning": "Message will be destroyed after reading",
     "burn_timeout_triggered": "Burn signal not received, message auto-deleted"
   },
+  "attachments": {
+    "select_file": "Select file",
+    "attach_file": "Attach file",
+    "remove": "Remove attachment",
+    "download": "Download",
+    "locked": "Locked",
+    "unlocks_in": "Unlocks in",
+    "time_locked": "Time-locked attachment",
+    "burn_after_reading": "Burn after download",
+    "burn_warning": "This attachment will be destroyed after download",
+    "attachment_burned": "Attachment destroyed",
+    "download_error": "Failed to download attachment"
+  },
   "settings": {
     "title": "Settings",
     "description": "Manage your account and data",

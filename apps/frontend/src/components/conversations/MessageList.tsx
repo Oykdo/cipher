@@ -6,6 +6,8 @@ import { BurnAnimation } from '../BurnAnimation';
 import { BurnCountdown } from '../BurnCountdown';
 import { TimeLockCountdown } from '../TimeLockCountdown';
 import { BurnMessage } from '../BurnMessage';
+import { AttachmentMessage } from './AttachmentMessage';
+import type { EncryptedAttachment } from '../../lib/attachment';
 
 import { debugLogger } from "../../lib/debugLogger";
 interface MessageListProps {
@@ -80,6 +82,17 @@ export function MessageList({
           // A message is a burn message if it has scheduledBurnAt (even if already burned for animation)
           const isBurnMessage = message.scheduledBurnAt && !locked;
           const isBurning = burningMessages.has(message.id);
+          
+          // Check if message is an attachment
+          let attachmentData: EncryptedAttachment | null = null;
+          try {
+            const parsed = JSON.parse(message.body);
+            if (parsed.type === 'attachment' && parsed.payload) {
+              attachmentData = parsed as EncryptedAttachment;
+            }
+          } catch {
+            // Not an attachment, continue as text message
+          }
 
           // Debug log temporarily
           debugLogger.debug('MessageDebug:', {
@@ -93,6 +106,23 @@ export function MessageList({
             body: message.body,
           });
 
+          // Handle attachment messages
+          if (attachmentData && !burned) {
+            return (
+              <div
+                key={message.id}
+                className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+              >
+                <AttachmentMessage
+                  attachment={attachmentData}
+                  isOwn={isOwn}
+                  onBurnComplete={onBurnComplete}
+                  formatTime={formatTime}
+                />
+              </div>
+            );
+          }
+          
           // Use BurnMessage component for burn after reading messages (recipient only)
           // Continue rendering even if burned to show animation
           if (isBurnMessage && !isOwn && !burned && !isBurning) {

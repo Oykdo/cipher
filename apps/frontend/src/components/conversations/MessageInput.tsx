@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { BurnDelaySelector } from '../BurnDelaySelector';
+import { AttachmentInput } from './AttachmentInput';
 
 interface MessageInputProps {
   messageBody: string;
@@ -18,6 +19,9 @@ interface MessageInputProps {
   timeLockTime: string;
   setTimeLockTime: (value: string) => void;
   setTyping: (isTyping: boolean) => void;
+  selectedFile: File | null;
+  onAttachmentSelect: (file: File) => void;
+  onAttachmentClear: () => void;
 }
 
 export function MessageInput({
@@ -36,6 +40,9 @@ export function MessageInput({
   timeLockTime,
   setTimeLockTime,
   setTyping,
+  selectedFile,
+  onAttachmentSelect,
+  onAttachmentClear,
 }: MessageInputProps) {
   const { t } = useTranslation();
 
@@ -106,8 +113,30 @@ export function MessageInput({
         </motion.div>
       )}
 
+      {/* Attachment Preview (if file selected) */}
+      {selectedFile && (
+        <div className="mb-3">
+          <AttachmentInput
+            onAttachmentSelect={onAttachmentSelect}
+            onAttachmentClear={onAttachmentClear}
+            selectedFile={selectedFile}
+            disabled={sendingMessage}
+          />
+        </div>
+      )}
+
       {/* Input */}
       <div className="flex gap-2">
+        {/* Attachment button (if no file selected) */}
+        {!selectedFile && (
+          <AttachmentInput
+            onAttachmentSelect={onAttachmentSelect}
+            onAttachmentClear={onAttachmentClear}
+            selectedFile={null}
+            disabled={sendingMessage}
+          />
+        )}
+        
         <textarea
           value={messageBody}
           onChange={(e) => {
@@ -129,7 +158,7 @@ export function MessageInput({
         />
         <button
           onClick={onSend}
-          disabled={!messageBody.trim() || sendingMessage}
+          disabled={(!messageBody.trim() && !selectedFile) || sendingMessage}
           className="btn btn-primary px-4 md:px-6"
         >
           {sendingMessage ? '⏳' : '📤'}

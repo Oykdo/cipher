@@ -279,6 +279,19 @@
     "burn_warning": "Le message sera detruit apres lecture",
     "burn_timeout_triggered": "Signal de destruction non recu, message auto-supprime"
   },
+  "attachments": {
+    "select_file": "Sélectionner un fichier",
+    "attach_file": "Joindre un fichier",
+    "remove": "Retirer la pièce jointe",
+    "download": "Télécharger",
+    "locked": "Verrouillé",
+    "unlocks_in": "Déverrouillage dans",
+    "time_locked": "Pièce jointe verrouillée",
+    "burn_after_reading": "Destruction après téléchargement",
+    "burn_warning": "Cette pièce jointe sera détruite après téléchargement",
+    "attachment_burned": "Pièce jointe détruite",
+    "download_error": "Échec du téléchargement"
+  },
   "settings": {
     "title": "Paramètres",
     "description": "Gérez votre compte et vos données",

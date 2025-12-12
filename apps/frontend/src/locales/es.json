@@ -272,6 +272,19 @@
     "burn_warning": "El mensaje sera destruido despues de leerlo",
     "burn_timeout_triggered": "Senal de burn no recibida, mensaje auto-eliminado"
   },
+  "attachments": {
+    "select_file": "Seleccionar archivo",
+    "attach_file": "Adjuntar archivo",
+    "remove": "Eliminar adjunto",
+    "download": "Descargar",
+    "locked": "Bloqueado",
+    "unlocks_in": "Se desbloquea en",
+    "time_locked": "Adjunto bloqueado temporalmente",
+    "burn_after_reading": "Destrucción después de descargar",
+    "burn_warning": "Este adjunto se destruirá después de descargar",
+    "attachment_burned": "Adjunto destruido",
+    "download_error": "Error al descargar"
+  },
   "settings": {
     "title": "Configuración",
     "description": "Administre su cuenta y datos",
