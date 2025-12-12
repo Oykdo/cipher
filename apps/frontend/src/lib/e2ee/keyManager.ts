@@ -14,7 +14,7 @@
  */
 
 import _sodium from 'libsodium-wrappers';
-import argon2 from 'argon2-browser';
+import * as argon2 from 'argon2-browser';
 
 // ============================================================================
 // TYPES
