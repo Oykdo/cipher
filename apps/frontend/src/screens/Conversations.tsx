@@ -229,27 +229,29 @@ export default function Conversations() {
       scheduledBurnAt: message?.scheduledBurnAt
     });
 
+    // ✅ FIX: Burn messages on BOTH sides (sender and recipient)
     if (isBurnMessage) {
       // BurnMessage component handles its own animation via isBurnedFromServer prop
       // Just update the message state - the component will animate and then disappear
-      debugLogger.debug('⚡ Updating BurnMessage state to burned');
+      debugLogger.debug('⚡ Updating BurnMessage state to burned (recipient)');
       setMessages(prev => prev.map(msg =>
         msg.id === data.messageId
           ? { ...msg, isBurned: true, burnedAt: data.burnedAt }
           : msg
       ));
     } else {
-      // For sender's messages, use the old BurnAnimation overlay
-      debugLogger.debug('⚡ Adding sender message to burning set');
+      // ✅ FIX: For sender's messages, also mark as burned and remove from UI
+      debugLogger.debug('⚡ Burning sender message');
       setBurningMessages(prev => new Set(prev).add(data.messageId));
 
-      // Update message state after animation
+      // Update message state after short delay, then REMOVE from messages
       setTimeout(() => {
-        setMessages(prev => prev.map(msg =>
-          msg.id === data.messageId
-            ? { ...msg, isBurned: true, burnedAt: data.burnedAt }
-            : msg
-        ));
+        setMessages(prev => prev.filter(msg => msg.id !== data.messageId));
+        setBurningMessages(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(data.messageId);
+          return newSet;
+        });
       }, 2000); // Match animation duration
     }
   });
@@ -596,8 +598,22 @@ export default function Conversations() {
       let encryptedBody: string;
 
       if (encryptedAttachment) {
-        // For attachments, body is the encrypted attachment envelope
-        encryptedBody = JSON.stringify(encryptedAttachment);
+        // For attachments, encrypt the attachment envelope with E2EE
+        const attachmentJson = JSON.stringify(encryptedAttachment);
+        if (peerUsername) {
+          encryptedBody = await encryptMessageForSending(
+            peerUsername,
+            attachmentJson,
+            async (text) => {
+              const encrypted = await encryptMessage(selectedConvId, text);
+              return encrypted;
+            }
+          );
+        } else {
+          console.warn('⚠️ [E2EE] No peer username for attachment, using legacy encryption');
+          const encrypted = await encryptMessage(selectedConvId, attachmentJson);
+          encryptedBody = JSON.stringify(encrypted);
+        }
       } else if (peerUsername) {
         // Try E2EE encryption with legacy fallback
         encryptedBody = await encryptMessageForSending(
@@ -631,7 +647,9 @@ export default function Conversations() {
 
       // CRITICAL: Cache the plaintext for this message ID
       // This ensures we can display it on reload without re-decryption
-      cacheDecryptedMessage(sentMessage.id, selectedConvId, plaintextBody);
+      // For attachments, cache the attachment JSON (not the plaintext description)
+      const textToCache = attachmentFile ? JSON.stringify(encryptedAttachment) : plaintextBody;
+      cacheDecryptedMessage(sentMessage.id, selectedConvId, textToCache);
 
       // Schedule burn timeout for sender (5 min fallback)
       if (burnAfterReading && sentMessage.id) {
@@ -666,7 +684,7 @@ export default function Conversations() {
 
         return [...withoutTemp, {
           ...sentMessage,
-          body: plaintextBody,
+          body: attachmentFile ? JSON.stringify(encryptedAttachment) : plaintextBody,
           conversationId: selectedConvId,
           isPending: false,
           isP2P: false,
