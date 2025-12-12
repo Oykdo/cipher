@@ -139,6 +139,7 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
       preHandler: fastify.authenticate,
     },
     async (request: FastifyRequest<GetConversationMembersRequest>, reply: FastifyReply) => {
+      console.log('[PublicKeys] GET /conversations/:id/members called for:', request.params.id);
       try {
         const userId = (request.user as any).sub;
         const conversationId = request.params.id;
@@ -163,8 +164,13 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
         };
       } catch (error) {
         console.error('[PublicKeys] Error fetching conversation members:', error);
+        console.error('[PublicKeys] Error details:', {
+          message: (error as Error).message,
+          stack: (error as Error).stack,
+          conversationId: request.params.id,
+        });
         reply.code(500);
-        return { error: 'Failed to fetch conversation members' };
+        return { error: 'Failed to fetch conversation members', details: (error as Error).message };
       }
     }
   );
