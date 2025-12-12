@@ -418,9 +418,11 @@ class DatabaseService {
     }
 
     async getConversationMessages(conversationId, limit = 100) {
+        // ✅ FIX: Exclure les messages brûlés (Burn After Reading)
         return await all(this.pool, `
             SELECT * FROM messages 
             WHERE conversation_id = $1 
+              AND (is_burned = false OR is_burned IS NULL)
             ORDER BY created_at ASC 
             LIMIT $2
         `, [conversationId, limit]);
@@ -429,18 +431,23 @@ class DatabaseService {
     async getConversationMessagesPaged(conversationId, before, limit) {
         // Convert JS timestamp (milliseconds) to PostgreSQL timestamp
         // to_timestamp expects seconds, so divide by 1000
+        // ✅ FIX: Exclure les messages brûlés (Burn After Reading)
         return await all(this.pool, `
             SELECT * FROM messages 
-            WHERE conversation_id = $1 AND created_at < to_timestamp($2 / 1000.0)
+            WHERE conversation_id = $1 
+              AND created_at < to_timestamp($2 / 1000.0)
+              AND (is_burned = false OR is_burned IS NULL)
             ORDER BY created_at DESC
             LIMIT $3
         `, [conversationId, before, limit]);
     }
 
     async getLastMessage(conversationId) {
+        // ✅ FIX: Exclure les messages brûlés (Burn After Reading)
         return await get(this.pool, `
             SELECT * FROM messages 
             WHERE conversation_id = $1 
+              AND (is_burned = false OR is_burned IS NULL)
             ORDER BY created_at DESC 
             LIMIT 1
         `, [conversationId]);
