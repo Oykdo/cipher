@@ -10,7 +10,14 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getDatabase } from '../db/database.js';
 
-const db = getDatabase();
+// Helper to get DB instance
+function getDB() {
+  const db = getDatabase();
+  if (!db) {
+    throw new Error('Database not initialized');
+  }
+  return db;
+}
 
 // ============================================================================
 // TYPES
@@ -67,7 +74,7 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
         }
         
         // Get public keys from database
-        const publicKeys = await db.getPublicKeysByUserIds(userIds);
+        const publicKeys = await getDB().getPublicKeysByUserIds(userIds);
         
         // Return keys
         return {
@@ -113,7 +120,7 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
         }
         
         // Update database
-        await db.updateUserPublicKeys(userId, publicKey, signPublicKey);
+        await getDB().updateUserPublicKeys(userId, publicKey, signPublicKey);
         
         console.log(`✅ [PublicKeys] Updated public keys for user ${userId}`);
         
@@ -145,14 +152,14 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
         const conversationId = request.params.id;
         
         // Verify user is a member of this conversation
-        const isMember = await db.isConversationMember(conversationId, userId);
+        const isMember = await getDB().isConversationMember(conversationId, userId);
         if (!isMember) {
           reply.code(403);
           return { error: 'You are not a member of this conversation' };
         }
         
         // Get all members with their public keys
-        const members = await db.getConversationMembersWithKeys(conversationId);
+        const members = await getDB().getConversationMembersWithKeys(conversationId);
         
         return {
           members: members.map(member => ({
