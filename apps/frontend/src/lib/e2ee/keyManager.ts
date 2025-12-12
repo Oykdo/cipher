@@ -23,12 +23,20 @@ async function ensureArgon2Loaded() {
   
   try {
     // Dynamic import to ensure WASM is loaded
-    argon2 = await import('argon2-browser');
+    const module = await import('argon2-browser');
+    
+    // Handle both default export and named exports
+    argon2 = module.default || module;
+    
+    console.log('[KeyManager] argon2 loaded:', typeof argon2, 'hash:', typeof argon2.hash);
     
     // Verify hash function is available
     if (typeof argon2.hash !== 'function') {
+      console.error('[KeyManager] argon2 structure:', Object.keys(argon2));
       throw new Error('argon2.hash is not a function');
     }
+    
+    console.log('[KeyManager] argon2-browser loaded successfully');
   } catch (error) {
     console.error('[KeyManager] Failed to load argon2-browser:', error);
     throw new Error('Failed to load argon2-browser. Please refresh the page.');
