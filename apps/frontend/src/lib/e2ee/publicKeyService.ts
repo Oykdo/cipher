@@ -9,7 +9,10 @@
  */
 
 import _sodium from 'libsodium-wrappers';
-import { apiv2 } from '../../services/api-v2';
+import { 
+  getPublicKeys as apiGetPublicKeys,
+  getConversationMembers as apiGetConversationMembers,
+} from '../../services/api-v2';
 
 // ============================================================================
 // TYPES
@@ -133,7 +136,7 @@ function storeInCache(keyInfo: PublicKeyInfo): void {
  */
 async function fetchPublicKeysFromAPI(userIds: string[]): Promise<PublicKeyInfo[]> {
   try {
-    const response = await apiv2.getPublicKeys(userIds);
+    const response = await apiGetPublicKeys(userIds);
     
     const results: PublicKeyInfo[] = [];
     
@@ -233,7 +236,7 @@ export async function getConversationParticipantKeys(
 ): Promise<PublicKeyInfo[]> {
   try {
     // Get conversation members from API
-    const members = await apiv2.getConversationMembers(conversationId);
+    const members = await apiGetConversationMembers(conversationId);
     
     // Get public keys for all members
     const userIds = members.map(m => m.userId);
