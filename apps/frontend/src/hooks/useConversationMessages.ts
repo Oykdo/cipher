@@ -112,7 +112,7 @@ export function useConversationMessages(session: AuthSession | null) {
           return '[Erreur: body invalide]';
         }
 
-        let encrypted: EncryptedMessage;
+        let encrypted: EncryptedMessage | any;
         try {
           encrypted = JSON.parse(message.body);
         } catch (parseErr) {
@@ -121,6 +121,14 @@ export function useConversationMessages(session: AuthSession | null) {
             parseErr
           );
           return '[Erreur: JSON invalide]';
+        }
+
+        // ✅ FIX: Check if this is an E2EE message, skip legacy decryption
+        if (encrypted.version === 'e2ee-v1') {
+          // This is an E2EE encrypted message, it should be handled by Conversations.tsx
+          // Not by this legacy hook
+          console.warn('[useConversationMessages] E2EE message passed to legacy decryption, returning as-is');
+          return message.body; // Return the encrypted envelope, will be decrypted by E2EE system
         }
 
         if (!masterKey) {

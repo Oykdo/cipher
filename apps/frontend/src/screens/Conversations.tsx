@@ -181,9 +181,24 @@ export default function Conversations() {
     const isTimeLocked = data.message.unlockBlockHeight && Date.now() < data.message.unlockBlockHeight;
     
     // Don't decrypt locked messages - show placeholder instead
-    const plaintext = isTimeLocked 
-      ? '[Message verrouillé]'
-      : await decryptIncomingMessage(data.conversationId, data.message);
+    let plaintext: string;
+    if (isTimeLocked) {
+      plaintext = '[Message verrouillé]';
+    } else {
+      // ✅ FIX: Try E2EE decryption first, fallback to legacy
+      const peerUsername = conversations.find(c => c.id === data.conversationId)?.otherParticipant?.username;
+      
+      if (peerUsername) {
+        try {
+          const result = await decryptReceivedMessage(peerUsername, data.message.body, undefined, true);
+          plaintext = result.text && !result.text.startsWith('[') ? result.text : await decryptIncomingMessage(data.conversationId, data.message);
+        } catch {
+          plaintext = await decryptIncomingMessage(data.conversationId, data.message);
+        }
+      } else {
+        plaintext = await decryptIncomingMessage(data.conversationId, data.message);
+      }
+    }
 
     setMessages((prev) => {
       if (prev.some((msg) => msg.id === data.message.id)) {
