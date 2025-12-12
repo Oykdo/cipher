@@ -57,8 +57,9 @@ const MASTER_KEY_STORAGE = 'cipher-pulse-master-key';
 const KEY_VERSION = 'key-v1';
 
 // Argon2 parameters for master key derivation
+// Note: type 2 = Argon2id (0 = Argon2d, 1 = Argon2i, 2 = Argon2id)
 const ARGON2_PARAMS = {
-  type: argon2.ArgonType.Argon2id,
+  type: 2, // Argon2id
   hashLen: 32,
   time: 3,          // iterations
   mem: 65536,       // 64 MB
