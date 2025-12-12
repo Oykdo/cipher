@@ -541,7 +541,7 @@ export interface PublicKeyResponseV2 {
  * @returns Array of public keys
  */
 export async function getPublicKeys(userIds: string[]): Promise<{ keys: PublicKeyResponseV2[] }> {
-  const response = await authFetchV2WithRefresh(`${API_BASE_URL}/api/v2/users/public-keys`, {
+  const response = await authFetchV2WithRefresh('/users/public-keys', {
     method: 'POST',
     body: JSON.stringify({ userIds }),
   });
@@ -557,7 +557,7 @@ export async function getPublicKeys(userIds: string[]): Promise<{ keys: PublicKe
  * @param signPublicKey Base64 encoded Ed25519 public key
  */
 export async function uploadPublicKeys(publicKey: string, signPublicKey: string): Promise<void> {
-  await authFetchV2WithRefresh(`${API_BASE_URL}/api/v2/users/me/public-keys`, {
+  await authFetchV2WithRefresh('/users/me/public-keys', {
     method: 'PUT',
     body: JSON.stringify({ publicKey, signPublicKey }),
   });
@@ -579,7 +579,7 @@ export interface ConversationMemberV2 {
  */
 export async function getConversationMembers(conversationId: string): Promise<ConversationMemberV2[]> {
   const response = await authFetchV2WithRefresh(
-    `${API_BASE_URL}/api/v2/conversations/${conversationId}/members`,
+    `/conversations/${conversationId}/members`,
     {
       method: 'GET',
     }
