@@ -14,7 +14,26 @@
  */
 
 import _sodium from 'libsodium-wrappers';
-import * as argon2 from 'argon2-browser';
+
+// Dynamic import for argon2-browser to handle WASM loading
+let argon2: any = null;
+
+async function ensureArgon2Loaded() {
+  if (argon2) return;
+  
+  try {
+    // Dynamic import to ensure WASM is loaded
+    argon2 = await import('argon2-browser');
+    
+    // Verify hash function is available
+    if (typeof argon2.hash !== 'function') {
+      throw new Error('argon2.hash is not a function');
+    }
+  } catch (error) {
+    console.error('[KeyManager] Failed to load argon2-browser:', error);
+    throw new Error('Failed to load argon2-browser. Please refresh the page.');
+  }
+}
 
 // ============================================================================
 // TYPES
@@ -77,6 +96,8 @@ const ARGON2_PARAMS = {
  * SECURITY: Never store password - derive key on-the-fly
  */
 async function deriveMasterKey(password: string, salt: Uint8Array): Promise<Uint8Array> {
+  await ensureArgon2Loaded();
+  
   const result = await argon2.hash({
     pass: password,
     salt: salt,
