@@ -26,16 +26,16 @@ const db = getDatabase();
 ---
 
 ### 2. Fix argon2-browser Import (Frontend)
-**Commit** : `9073aa1`
+**Commits** : `9073aa1`, `dc4a04a`
 
-**Erreur** :
+**Erreur #1** :
 ```
 Uncaught SyntaxError: The requested module 
 '/node_modules/argon2-browser/lib/argon2.js' 
 does not provide an export named 'default'
 ```
 
-**Solution** :
+**Solution #1** :
 ```typescript
 // ❌ Avant
 import argon2 from 'argon2-browser';
@@ -44,20 +44,42 @@ import argon2 from 'argon2-browser';
 import * as argon2 from 'argon2-browser';
 ```
 
+**Erreur #2** :
+```
+Uncaught TypeError: Cannot read properties of undefined 
+(reading 'Argon2id')
+```
+
+**Solution #2** :
+```typescript
+// ❌ Avant
+const ARGON2_PARAMS = {
+  type: argon2.ArgonType.Argon2id,
+  ...
+};
+
+// ✅ Après
+const ARGON2_PARAMS = {
+  type: 2, // Argon2id (0=d, 1=i, 2=id)
+  ...
+};
+```
+
 **Fichier** : `apps/frontend/src/lib/e2ee/keyManager.ts`
 
-**Raison** : argon2-browser utilise CommonJS exports, pas d'export par défaut
+**Raison** : argon2-browser charge ses enums de manière asynchrone, utiliser constante numérique directement
 
 ---
 
 ## 📊 Commits e2ee-v2
 
 ```bash
-git log --oneline -5
+git log --oneline -6
 ```
 
 Résultat :
 ```
+dc4a04a fix: use numeric constant for Argon2id type instead of enum
 9073aa1 fix: correct argon2-browser import to use namespace import
 b59ee05 docs: add quick fix guide and update testing instructions
 98d334b fix: correct database import in publicKeys route
@@ -71,7 +93,7 @@ ff2c9ab feat: implement e2ee-v2 'Self-Encrypting Message' architecture
 | Composant | Status | Notes |
 |-----------|--------|-------|
 | **Backend** | ✅ **PRÊT** | Database import corrigé |
-| **Frontend** | ✅ **PRÊT** | argon2 import corrigé |
+| **Frontend** | ✅ **PRÊT** | argon2 namespace + constante numérique |
 | **e2ee-v2** | ✅ **PRÊT** | Tous les imports OK |
 | **Tests** | 🧪 **À FAIRE** | Lancer l'app et tester |
 
