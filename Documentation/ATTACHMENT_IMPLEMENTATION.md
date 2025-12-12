@@ -209,7 +209,7 @@ Ce document décrit l'implémentation complète du système d'envoi de pièces j
 **Structure fileKey :**
 ```json
 {
-  "fileKey": "nP8vF2kL9mQ3hR7tY1uJ4wX6aZ0sD5gH8jK2lM3nP9qR"
+  "fileKey": "[base64_encoded_256_bit_key]"
 }
 ```
 
