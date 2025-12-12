@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/auth';
+import _sodium from 'libsodium-wrappers';
 import {
   hasUserKeys,
   loadUserKeys,
@@ -90,8 +91,10 @@ export function useKeyInitialization() {
         console.log('✅ [KeyInit] Keys stored locally');
 
         // Upload public keys to server
-        const publicKeyB64 = _sodium.to_base64(keys.publicKey);
-        const signPublicKeyB64 = _sodium.to_base64(keys.signPublicKey);
+        await _sodium.ready; // Ensure libsodium is loaded
+        const sodium = _sodium;
+        const publicKeyB64 = sodium.to_base64(keys.publicKey);
+        const signPublicKeyB64 = sodium.to_base64(keys.signPublicKey);
 
         try {
           await uploadPublicKeys(publicKeyB64, signPublicKeyB64);
