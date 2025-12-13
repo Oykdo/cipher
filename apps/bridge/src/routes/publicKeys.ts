@@ -112,15 +112,17 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
           reply.code(400);
           return { error: 'publicKey and signPublicKey are required' };
         }
-        
-        // Validate base64 format
-        if (!isValidBase64(publicKey) || !isValidBase64(signPublicKey)) {
+
+        // Accept both base64 and base64url (with/without padding) and normalize before storing.
+        const publicKeyB64 = normalizeBase64(publicKey);
+        const signPublicKeyB64 = normalizeBase64(signPublicKey);
+        if (!publicKeyB64 || !signPublicKeyB64) {
           reply.code(400);
           return { error: 'publicKey and signPublicKey must be valid base64 strings' };
         }
-        
+
         // Update database
-        await getDB().updateUserPublicKeys(userId, publicKey, signPublicKey);
+        await getDB().updateUserPublicKeys(userId, publicKeyB64, signPublicKeyB64);
         
         console.log(`✅ [PublicKeys] Updated public keys for user ${userId}`);
         
@@ -191,11 +193,31 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
  * Validate base64 string
  */
 function isValidBase64(str: string): boolean {
-  try {
-    // Check if it's a valid base64 string
-    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-    return base64Regex.test(str) && str.length > 0;
-  } catch {
-    return false;
-  }
+  return normalizeBase64(str) !== null;
+}
+
+/**
+ * Normalize base64/base64url input into standard padded base64.
+ * Returns null if invalid.
+ */
+function normalizeBase64(str: string): string | null {
+  const raw = String(str ?? '').trim();
+  if (!raw) return null;
+
+  // Convert base64url -> base64
+  let b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
+
+  // Add padding if missing
+  const mod = b64.length % 4;
+  if (mod === 1) return null; // impossible length
+  if (mod === 2) b64 += '==';
+  else if (mod === 3) b64 += '=';
+
+  // Validate characters (after normalization)
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return null;
+
+  // Sanity check decode/re-encode roundtrip
+  const decoded = Buffer.from(b64, 'base64');
+  if (decoded.length === 0) return null;
+  return decoded.toString('base64');
 }

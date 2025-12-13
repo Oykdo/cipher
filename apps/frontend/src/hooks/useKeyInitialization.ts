@@ -92,8 +92,8 @@ export function useKeyInitialization() {
         // Upload public keys to server
         await _sodium.ready; // Ensure libsodium is loaded
         const sodium = _sodium;
-        const publicKeyB64 = sodium.to_base64(keys.publicKey);
-        const signPublicKeyB64 = sodium.to_base64(keys.signPublicKey);
+        const publicKeyB64 = sodium.to_base64(keys.publicKey, sodium.base64_variants.ORIGINAL);
+        const signPublicKeyB64 = sodium.to_base64(keys.signPublicKey, sodium.base64_variants.ORIGINAL);
 
         try {
           await uploadPublicKeys(publicKeyB64, signPublicKeyB64);
@@ -173,8 +173,8 @@ export function useManualKeyInitialization() {
       await storeUserKeys(keys);
 
       // Upload to server
-      const publicKeyB64 = _sodium.to_base64(keys.publicKey);
-      const signPublicKeyB64 = _sodium.to_base64(keys.signPublicKey);
+      const publicKeyB64 = _sodium.to_base64(keys.publicKey, _sodium.base64_variants.ORIGINAL);
+      const signPublicKeyB64 = _sodium.to_base64(keys.signPublicKey, _sodium.base64_variants.ORIGINAL);
       await uploadPublicKeys(publicKeyB64, signPublicKeyB64);
 
       console.log('✅ [ManualKeyInit] Success');
