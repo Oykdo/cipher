@@ -12,6 +12,16 @@ import { UsernameSchema, AvatarHashSchema, UserIdSchema } from '../validation/se
 
 const db = getDatabase();
 
+function isUsernameUniqueViolation(err: any): boolean {
+  return (
+    err?.code === '23505' &&
+    (err?.constraint === 'users_username_key' ||
+      String(err?.message || '').includes('users_username_key') ||
+      String(err?.detail || '').includes('(username)=') ||
+      String(err?.detail || '').toLowerCase().includes('username'))
+  );
+}
+
 // ============================================================================
 // SECURITY FIX VULN-006: Server-side SRP session storage
 // Never send server ephemeral secrets to the client
@@ -119,8 +129,13 @@ export async function authRoutes(fastify: FastifyInstance) {
           });
         } catch (error: any) {
           request.log.error({ error, username }, 'Signup failed during user creation');
+          if (isUsernameUniqueViolation(error)) {
+            reply.code(409);
+            return { error: "Nom d'utilisateur déjà utilisé" };
+          }
+
           reply.code(500);
-          return { error: 'Erreur lors de la création de l\'utilisateur: ' + error.message };
+          return { error: "Erreur lors de la création de l'utilisateur: " + error.message };
         }
       }
 
@@ -170,6 +185,11 @@ export async function authRoutes(fastify: FastifyInstance) {
         });
       } catch (error: any) {
         request.log.error({ error, username }, 'DiceKey Signup failed during user creation');
+        if (isUsernameUniqueViolation(error)) {
+          reply.code(409);
+          return { error: "Nom d'utilisateur déjà utilisé" };
+        }
+
         reply.code(500);
         return { error: 'Erreur lors de la création du compte DiceKey: ' + error.message };
       }
