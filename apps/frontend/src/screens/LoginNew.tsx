@@ -833,7 +833,10 @@ export default function LoginNew() {
           if (signupData.masterKeyHex) {
             masterKeyHex = signupData.masterKeyHex;
             try {
-              const vault = await getKeyVault(newPassword);
+              // For DiceKey / Avatar login flows, we must be able to unlock KeyVault using the avatar hash
+              // (the only secret available during file login). Fall back to password only when avatarHash is missing.
+              const vaultPassword = signupData.avatarHash || newPassword;
+              const vault = await getKeyVault(vaultPassword);
               await vault.storeData(`masterKey:${username}`, masterKeyHex);
               // Clean up any legacy clear-text storage if it exists
               localStorage.removeItem(`master_${username}`);
@@ -941,7 +944,18 @@ export default function LoginNew() {
           // Get masterKey from KeyVault (for local encryption only)
           let storedMasterKey: string | null = null;
           try {
-            const vault = await getKeyVault(newPassword);
+            // Same KeyVault password logic as above: prefer avatarHash so file-login can unlock E2EE keys.
+            let vaultPassword = newPassword;
+            try {
+              const signupData = pendingSignup ? JSON.parse(pendingSignup) : null;
+              if (signupData?.avatarHash) {
+                vaultPassword = signupData.avatarHash;
+              }
+            } catch {
+              // Ignore
+            }
+
+            const vault = await getKeyVault(vaultPassword);
             storedMasterKey = await vault.getData(`masterKey:${username}`);
           } catch (vaultError) {
             console.error('Failed to open KeyVault for auto-login:', vaultError);
