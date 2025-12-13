@@ -667,9 +667,20 @@ function UsernameStep({
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder=""
+            placeholder={t('signup.username_placeholder')}
             className="input mb-4"
             autoFocus
+            onFocus={(e) => {
+              if (e.currentTarget.value) {
+                e.currentTarget.select();
+              }
+            }}
+            onClick={(e) => {
+              // If the user clicks into an already-focused field, keep the behavior consistent.
+              if (e.currentTarget.value) {
+                e.currentTarget.select();
+              }
+            }}
             onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
           />
 
