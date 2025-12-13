@@ -15,6 +15,7 @@ interface AttachmentInputProps {
   onAttachmentClear: () => void;
   selectedFile: File | null;
   disabled?: boolean;
+  compact?: boolean;
 }
 
 export function AttachmentInput({
@@ -22,6 +23,7 @@ export function AttachmentInput({
   onAttachmentClear,
   selectedFile,
   disabled = false,
+  compact = false,
 }: AttachmentInputProps) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,7 +63,7 @@ export function AttachmentInput({
   }, [onAttachmentClear]);
 
   return (
-    <div className="attachment-input">
+    <div className="attachment-input w-full min-w-0">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -97,11 +99,12 @@ export function AttachmentInput({
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="
-              flex items-center gap-3 p-3 
+            className={`
+              flex items-center gap-3 ${compact ? 'p-2' : 'p-3'}
               bg-dark-matter-lighter border border-quantum-cyan/30 
               rounded-lg
-            "
+              min-w-0
+            `}
           >
             {/* Thumbnail or icon */}
             <div className="flex-shrink-0">
@@ -109,10 +112,16 @@ export function AttachmentInput({
                 <img
                   src={thumbnail}
                   alt={selectedFile.name}
-                  className="w-12 h-12 object-cover rounded"
+                  className={compact ? 'w-9 h-9 object-cover rounded' : 'w-12 h-12 object-cover rounded'}
                 />
               ) : (
-                <div className="w-12 h-12 flex items-center justify-center text-2xl bg-dark-matter rounded">
+                <div
+                  className={
+                    compact
+                      ? 'w-9 h-9 flex items-center justify-center text-xl bg-dark-matter rounded'
+                      : 'w-12 h-12 flex items-center justify-center text-2xl bg-dark-matter rounded'
+                  }
+                >
                   {getFileIcon(selectedFile.type)}
                 </div>
               )}

@@ -49,7 +49,10 @@ export function MessageInput({
   return (
     <div className="p-4 border-t border-quantum-cyan/20 bg-dark-matter-lighter">
       {/* Options (kept scrollable so it fits in short frames) */}
-      <div className="mb-3 max-h-56 overflow-y-auto pr-1">
+      <div
+        className="mb-3 overflow-y-auto pr-1"
+        style={{ maxHeight: 'min(14rem, 35vh)' }}
+      >
         <div className="flex flex-wrap gap-2">
           {/* Burn After Reading */}
           <button
@@ -94,6 +97,19 @@ export function MessageInput({
           </button>
         </div>
 
+        {/* Attachment preview goes INSIDE the scroll area so it doesn't push input out of the viewport */}
+        {selectedFile && (
+          <div className="mt-2">
+            <AttachmentInput
+              onAttachmentSelect={onAttachmentSelect}
+              onAttachmentClear={onAttachmentClear}
+              selectedFile={selectedFile}
+              disabled={sendingMessage}
+              compact
+            />
+          </div>
+        )}
+
         {/* Burn After Reading Options */}
         {burnAfterReading && (
           <div className="mt-2">
@@ -131,18 +147,6 @@ export function MessageInput({
         )}
       </div>
 
-      {/* Attachment Preview (if file selected) */}
-      {selectedFile && (
-        <div className="mb-3">
-          <AttachmentInput
-            onAttachmentSelect={onAttachmentSelect}
-            onAttachmentClear={onAttachmentClear}
-            selectedFile={selectedFile}
-            disabled={sendingMessage}
-          />
-        </div>
-      )}
-
       {/* Input */}
       <div className="flex gap-2">
         {/* Attachment button (if no file selected) */}
@@ -152,6 +156,7 @@ export function MessageInput({
             onAttachmentClear={onAttachmentClear}
             selectedFile={null}
             disabled={sendingMessage}
+            compact
           />
         )}
         
