@@ -48,70 +48,88 @@ export function MessageInput({
 
   return (
     <div className="p-4 border-t border-quantum-cyan/20 bg-dark-matter-lighter">
-      {/* Options */}
-      <div className="mb-3 flex flex-wrap gap-2">
-        {/* Burn After Reading */}
-        <button
-          onClick={() => setBurnAfterReading(!burnAfterReading)}
-          className={`
-            text-xs px-3 py-1 rounded-full border transition-colors
-            ${burnAfterReading
-              ? 'bg-error-glow/20 border-error-glow text-error-glow'
-              : 'border-muted-grey text-muted-grey hover:border-error-glow hover:text-error-glow'
-            }
-          `}
-        >
-          🔥 {burnAfterReading ? t('messages.burn_delay', { delay: burnDelay }) : t('messages.burn_after_reading')}
-        </button>
+      {/* Options (kept scrollable so it fits in short frames) */}
+      <div className="mb-3 max-h-56 overflow-y-auto pr-1">
+        <div className="flex flex-wrap gap-2">
+          {/* Burn After Reading */}
+          <button
+            onClick={() => {
+              // Mutual exclusion: avoid stacking large panels in small frames.
+              if (!burnAfterReading) {
+                setTimeLockEnabled(false);
+                setTimeLockDate('');
+                setTimeLockTime('');
+              }
+              setBurnAfterReading(!burnAfterReading);
+            }}
+            className={`
+              text-xs px-3 py-1 rounded-full border transition-colors
+              ${burnAfterReading
+                ? 'bg-error-glow/20 border-error-glow text-error-glow'
+                : 'border-muted-grey text-muted-grey hover:border-error-glow hover:text-error-glow'
+              }
+            `}
+          >
+            🔥 {burnAfterReading ? t('messages.burn_delay', { delay: burnDelay }) : t('messages.burn_after_reading')}
+          </button>
 
-        {/* Time-Lock */}
-        <button
-          onClick={() => setTimeLockEnabled(!timeLockEnabled)}
-          className={`
-            text-xs px-3 py-1 rounded-full border transition-colors
-            ${timeLockEnabled
-              ? 'bg-quantum-cyan/20 border-quantum-cyan text-quantum-cyan'
-              : 'border-muted-grey text-muted-grey hover:border-quantum-cyan hover:text-quantum-cyan'
-            }
-          `}
-        >
-          🔒 {timeLockEnabled ? t('messages.time_lock_enabled') : t('messages.time_lock')}
-        </button>
-      </div>
+          {/* Time-Lock */}
+          <button
+            onClick={() => {
+              // Mutual exclusion: avoid stacking large panels in small frames.
+              if (!timeLockEnabled) {
+                setBurnAfterReading(false);
+              }
+              setTimeLockEnabled(!timeLockEnabled);
+            }}
+            className={`
+              text-xs px-3 py-1 rounded-full border transition-colors
+              ${timeLockEnabled
+                ? 'bg-quantum-cyan/20 border-quantum-cyan text-quantum-cyan'
+                : 'border-muted-grey text-muted-grey hover:border-quantum-cyan hover:text-quantum-cyan'
+              }
+            `}
+          >
+            🔒 {timeLockEnabled ? t('messages.time_lock_enabled') : t('messages.time_lock')}
+          </button>
+        </div>
 
-      {/* Burn After Reading Options */}
-      {burnAfterReading && (
-        <BurnDelaySelector value={burnDelay} onChange={setBurnDelay} />
-      )}
-
-      {/* Time-Lock Options */}
-      {timeLockEnabled && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          className="mb-3 p-3 bg-quantum-cyan/10 rounded-lg border border-quantum-cyan/30"
-        >
-          <p className="text-xs text-quantum-cyan mb-2 font-semibold">
-            🔒 {t('messages.scheduled_unlock')}
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="date"
-              value={timeLockDate}
-              onChange={(e) => setTimeLockDate(e.target.value)}
-              className="input flex-1 text-sm"
-              min={new Date().toISOString().split('T')[0]}
-            />
-            <input
-              type="time"
-              value={timeLockTime}
-              onChange={(e) => setTimeLockTime(e.target.value)}
-              className="input flex-1 text-sm"
-            />
+        {/* Burn After Reading Options */}
+        {burnAfterReading && (
+          <div className="mt-2">
+            <BurnDelaySelector value={burnDelay} onChange={setBurnDelay} />
           </div>
-        </motion.div>
-      )}
+        )}
+
+        {/* Time-Lock Options */}
+        {timeLockEnabled && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-2 p-3 bg-quantum-cyan/10 rounded-lg border border-quantum-cyan/30"
+          >
+            <p className="text-xs text-quantum-cyan mb-2 font-semibold">
+              🔒 {t('messages.scheduled_unlock')}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={timeLockDate}
+                onChange={(e) => setTimeLockDate(e.target.value)}
+                className="input text-sm"
+                min={new Date().toISOString().split('T')[0]}
+              />
+              <input
+                type="time"
+                value={timeLockTime}
+                onChange={(e) => setTimeLockTime(e.target.value)}
+                className="input text-sm"
+              />
+            </div>
+          </motion.div>
+        )}
+      </div>
 
       {/* Attachment Preview (if file selected) */}
       {selectedFile && (
