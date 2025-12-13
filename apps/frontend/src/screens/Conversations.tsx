@@ -677,6 +677,12 @@ export default function Conversations() {
     const plaintextBody = messageBody;
     const attachmentFile = selectedFile;
 
+    // Pre-compute timelock timestamp (used both for optimistic UI and server options)
+    const unlockEpoch =
+      timeLockEnabled && timeLockDate && timeLockTime
+        ? new Date(`${timeLockDate}T${timeLockTime}`).getTime()
+        : undefined;
+
     // Generate temporary ID for optimistic update
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -694,6 +700,8 @@ export default function Conversations() {
       createdAt: Date.now(),
       isPending: true,
       hasAttachment: !!attachmentFile,
+      // Ensure timelock countdown appears immediately on send
+      unlockBlockHeight: unlockEpoch,
     };
 
     setMessages(prev => [...prev, optimisticMessage]);
@@ -922,8 +930,7 @@ export default function Conversations() {
       }
 
       if (timeLockEnabled && timeLockDate && timeLockTime) {
-        const unlockDate = new Date(`${timeLockDate}T${timeLockTime}`);
-        options.unlockBlockHeight = unlockDate.getTime();
+        options.unlockBlockHeight = unlockEpoch;
       }
 
       // MESSAGE_WORKFLOW.md (Problème 1): send a plaintext copy for the sender so they can re-read after reconnect
@@ -986,6 +993,8 @@ export default function Conversations() {
           isPending: false,
           isP2P: false,
           encryptionType,
+          // Some backends may not echo unlockBlockHeight; keep it for correct client-side countdown
+          unlockBlockHeight: sentMessage.unlockBlockHeight ?? unlockEpoch,
         }];
       });
 
