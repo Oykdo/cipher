@@ -14,25 +14,34 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import QuickUnlock from '../components/QuickUnlock';
-import { getLastUsedAccount, getLocalAccounts, type LocalAccount } from '../lib/localStorage';
+import {
+  clearLocalAccount,
+  clearQuickConnectCache,
+  getLastUsedAccount,
+  getLocalAccounts,
+  type LocalAccount,
+} from '../lib/localStorage';
 import { LanguageSelector } from '../components/LanguageSelector';
 import '../styles/fluidCrypto.css';
 
-type ViewMode = 'landing' | 'quickUnlock';
+type AccountSwitcherMode = 'landing' | 'quickUnlock' | 'switchAccount';
 
 export default function Landing() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
   // Quick Unlock state
-  const [viewMode, setViewMode] = useState<ViewMode>('landing');
+  const [viewMode, setViewMode] = useState<AccountSwitcherMode>('landing');
   const [localAccount, setLocalAccount] = useState<LocalAccount | null>(null);
   const [hasMultipleAccounts, setHasMultipleAccounts] = useState(false);
+  const [accounts, setAccounts] = useState<LocalAccount[]>([]);
+  const [openOptionsForUsername, setOpenOptionsForUsername] = useState<string | null>(null);
 
   // Check for local accounts on mount
   useEffect(() => {
     const lastAccount = getLastUsedAccount();
     const allAccounts = getLocalAccounts();
+    setAccounts(allAccounts);
 
     // Only show quick unlock if we have valid accounts
     // Skip if localStorage has stale data (after DB clear)
@@ -65,22 +74,172 @@ export default function Landing() {
               key="quickUnlock"
               account={localAccount}
               onSwitchAccount={hasMultipleAccounts ? () => {
-                // TODO: Implement account switcher
-                setViewMode('landing');
+                setViewMode('switchAccount');
               } : undefined}
               onCreateNew={() => setViewMode('landing')}
               onAccountDeleted={() => {
                 // Refresh accounts list
-                const accounts = getLocalAccounts();
-                if (accounts.length > 0) {
-                  setLocalAccount(accounts[0]);
-                  setHasMultipleAccounts(accounts.length > 1);
+                const nextAccounts = getLocalAccounts();
+                setAccounts(nextAccounts);
+                if (nextAccounts.length > 0) {
+                  setLocalAccount(nextAccounts[0]);
+                  setHasMultipleAccounts(nextAccounts.length > 1);
                 } else {
                   setLocalAccount(null);
                   setViewMode('landing');
                 }
               }}
             />
+          )}
+
+          {/* Account Switcher (pick a cached account without going to full login) */}
+          {viewMode === 'switchAccount' && (
+            <motion.div
+              key="switchAccount"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="flex items-center justify-center min-h-screen p-8"
+            >
+              <div className="max-w-md w-full">
+                <div className="text-center mb-6">
+                  <h2
+                    className="text-3xl font-black mb-2 glow-text-cyan"
+                    style={{ color: 'var(--quantum-cyan)' }}
+                  >
+                    🔄 {t('quick_unlock.switch_account')}
+                  </h2>
+                  <p className="text-soft-grey text-sm">
+                    {t('settings.security_settings.cached_accounts', 'Comptes en cache')}
+                  </p>
+                </div>
+
+                <div className="glass-card p-6 mb-4">
+                  <div className="space-y-2">
+                    {(accounts.length ? accounts : getLocalAccounts()).map((acct) => (
+                      <div key={acct.username} className="relative">
+                        <div className="flex items-stretch gap-2">
+                          <button
+                            type="button"
+                            className="flex-1 text-left p-3 rounded-lg border border-slate-700 hover:border-brand-400 bg-slate-900/40 hover:bg-slate-900/70 transition-colors"
+                            onClick={() => {
+                              setOpenOptionsForUsername(null);
+                              setLocalAccount(acct);
+                              setHasMultipleAccounts((accounts.length ? accounts : getLocalAccounts()).length > 1);
+                              setViewMode('quickUnlock');
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="text-pure-white font-semibold">@{acct.username}</div>
+                                <div className="text-xs text-muted-grey">
+                                  {acct.securityTier === 'dice-key'
+                                    ? `🎲 ${t('auth.dicekey')}`
+                                    : `🔑 ${t('auth.method_standard')}`}
+                                </div>
+                              </div>
+                              <span className="text-soft-grey">→</span>
+                            </div>
+                          </button>
+
+                          {/* 3-dots options */}
+                          <button
+                            type="button"
+                            className="btn btn-ghost px-3"
+                            aria-haspopup="menu"
+                            aria-expanded={openOptionsForUsername === acct.username}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOpenOptionsForUsername((prev) => (prev === acct.username ? null : acct.username));
+                            }}
+                          >
+                            ⋮
+                          </button>
+                        </div>
+
+                        {openOptionsForUsername === acct.username && (
+                          <div
+                            role="menu"
+                            className="absolute right-0 mt-2 w-64 rounded-lg border border-slate-700 bg-slate-950 shadow-lg z-50 overflow-hidden"
+                          >
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="w-full text-left px-4 py-3 text-sm text-pure-white hover:bg-slate-900 transition-colors"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                const confirmText = t(
+                                  'settings.security_settings.clear_cache_confirm',
+                                  'Clear QuickConnect cache?'
+                                );
+                                if (!window.confirm(confirmText)) return;
+
+                                clearQuickConnectCache();
+                                const nextAccounts = getLocalAccounts();
+                                setAccounts(nextAccounts);
+                                setHasMultipleAccounts(nextAccounts.length > 1);
+                                setOpenOptionsForUsername(null);
+                              }}
+                            >
+                              🧹 {t('settings.security_settings.clear_cache', 'Vider le cache QuickConnect')}
+                            </button>
+
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="w-full text-left px-4 py-3 text-sm text-error-glow hover:bg-slate-900 transition-colors"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                const confirmText = `⚠️ ${t(
+                                  'settings.security_settings.forget_account',
+                                  'Oublier ce compte'
+                                )} @${acct.username} ?`;
+                                if (!window.confirm(confirmText)) return;
+
+                                clearLocalAccount(acct.username);
+                                const nextAccounts = getLocalAccounts();
+                                setAccounts(nextAccounts);
+                                setHasMultipleAccounts(nextAccounts.length > 1);
+                                setOpenOptionsForUsername(null);
+
+                                if (nextAccounts.length === 0) {
+                                  setLocalAccount(null);
+                                  setViewMode('landing');
+                                }
+                              }}
+                            >
+                              🗑️ {t('settings.security_settings.forget_account', 'Supprimer le compte')}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="btn btn-ghost flex-1"
+                    onClick={() => setViewMode('quickUnlock')}
+                  >
+                    ← {t('common.back')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary flex-1"
+                    onClick={() => setViewMode('landing')}
+                  >
+                    🔐 {t('auth.login_button')}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           )}
 
           {/* Landing View (Standard) */}

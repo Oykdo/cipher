@@ -64,13 +64,18 @@ export default function SignupFluid() {
   const [standardPasswordConfirm, setStandardPasswordConfirm] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
+  const [standardSignupSubmitting, setStandardSignupSubmitting] = useState(false);
+
   const handleMethodChoice = (selectedMethod: 'standard' | 'dicekey') => {
     setMethod(selectedMethod);
     setStep('username');
   };
 
   const handleUsernameSubmit = async () => {
-    if (username.length < 3) {
+    const cleanedUsername = username.trim().toLowerCase();
+    setUsername(cleanedUsername);
+
+    if (cleanedUsername.length < 3) {
       alert(t('signup.username_error'));
       return;
     }
@@ -85,14 +90,17 @@ export default function SignupFluid() {
   };
 
   const handleStandardLengthSubmit = async (length: 12 | 24) => {
+    if (standardSignupSubmitting) return;
     setMnemonicLength(length);
+
+    setStandardSignupSubmitting(true);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/v2/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username,
+          username: username.trim().toLowerCase(),
           method: 'standard',
           mnemonicLength: length,
         }),
@@ -122,6 +130,8 @@ export default function SignupFluid() {
     } catch (error: any) {
       console.error('Standard signup error:', error);
       alert(`${t('common.error')} : ${error.message}`);
+    } finally {
+      setStandardSignupSubmitting(false);
     }
   };
 
