@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { TFunction } from 'i18next';
 import { useAuthStore } from '../store/auth';
 import { API_BASE_URL } from '../config';
-import { getKeyVault } from '../lib/keyVault';
+import { closeKeyVault, getKeyVault } from '../lib/keyVault';
 import { saveKnownAccount } from '../lib/localStorage';
 import { setTemporaryMasterKey } from '../lib/secureKeyAccess';
 import { setSessionMasterKey } from '../lib/masterKeyResolver';
@@ -836,6 +836,25 @@ export default function LoginNew() {
               // For DiceKey / Avatar login flows, we must be able to unlock KeyVault using the avatar hash
               // (the only secret available during file login). Fall back to password only when avatarHash is missing.
               const vaultPassword = signupData.avatarHash || newPassword;
+
+              // If older versions initialized KeyVault with the password, migrate any existing data
+              // so file-login can decrypt E2EE identity keys using avatarHash.
+              if (signupData.avatarHash) {
+                try {
+                  closeKeyVault();
+                  const oldVault = await getKeyVault(newPassword);
+                  const exported = await oldVault.exportVault();
+                  closeKeyVault();
+
+                  const newVault = await getKeyVault(signupData.avatarHash);
+                  for (const [k, v] of Object.entries(exported)) {
+                    await newVault.storeData(k, String(v));
+                  }
+                } catch (migrationError) {
+                  console.warn('[LoginNew] KeyVault migration (password -> avatarHash) failed:', migrationError);
+                }
+              }
+
               const vault = await getKeyVault(vaultPassword);
               await vault.storeData(`masterKey:${username}`, masterKeyHex);
               // Clean up any legacy clear-text storage if it exists
