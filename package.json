@@ -37,7 +37,7 @@
   "homepage": "https://github.com/Oykdo/Project_Chimera#readme",
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "electron": "^30.5.1",
+    "electron": "^35.7.5",
     "electron-builder": "^25.1.7",
     "wait-on": "^8.0.1"
   },
