@@ -177,7 +177,7 @@ export function MessageInput({
       </div>
 
       {/* Input */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
         {/* Attachment button (if no file selected) */}
         {!selectedFile && (
           <AttachmentInput
@@ -204,7 +204,7 @@ export function MessageInput({
             }
           }}
           placeholder={t('messages.type_message_placeholder')}
-          className="input flex-1 resize-none"
+          className="input flex-1 min-w-0 resize-none text-center sm:text-left"
           rows={2}
           disabled={sendingMessage}
         />
