@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BurnDelaySelector } from '../BurnDelaySelector';
 import { AttachmentInput } from './AttachmentInput';
@@ -46,14 +47,23 @@ export function MessageInput({
 }: MessageInputProps) {
   const { t } = useTranslation();
 
+  const [showSecurityOptions, setShowSecurityOptions] = useState(false);
+
+  // If an attachment is selected and a mode is enabled, keep options visible.
+  useEffect(() => {
+    if (selectedFile && (burnAfterReading || timeLockEnabled)) {
+      setShowSecurityOptions(true);
+    }
+  }, [selectedFile, burnAfterReading, timeLockEnabled]);
+
   return (
     <div className="p-4 border-t border-quantum-cyan/20 bg-dark-matter-lighter">
       {/* Options (kept scrollable so it fits in short frames) */}
       <div
         className="mb-3 overflow-y-auto pr-1"
-        style={{ maxHeight: 'min(14rem, 35vh)' }}
+        style={{ maxHeight: 'min(14rem, 32vh)' }}
       >
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Burn After Reading */}
           <button
             onClick={() => {
@@ -95,6 +105,17 @@ export function MessageInput({
           >
             🔒 {timeLockEnabled ? t('messages.time_lock_enabled') : t('messages.time_lock')}
           </button>
+
+          {/* When an attachment is selected, allow collapsing advanced options to keep everything in-frame */}
+          {selectedFile && (
+            <button
+              type="button"
+              onClick={() => setShowSecurityOptions((v) => !v)}
+              className="text-xs px-3 py-1 rounded-full border border-muted-grey text-muted-grey hover:border-quantum-cyan hover:text-quantum-cyan transition-colors"
+            >
+              ⚙️ {showSecurityOptions ? t('common.hide', 'Masquer') : t('common.show', 'Afficher')}
+            </button>
+          )}
         </div>
 
         {/* Attachment preview goes INSIDE the scroll area so it doesn't push input out of the viewport */}
@@ -110,40 +131,45 @@ export function MessageInput({
           </div>
         )}
 
-        {/* Burn After Reading Options */}
-        {burnAfterReading && (
-          <div className="mt-2">
-            <BurnDelaySelector value={burnDelay} onChange={setBurnDelay} />
-          </div>
-        )}
+        {/* Burn/TimeLock options can be collapsed when attachment is selected */}
+        {(!selectedFile || showSecurityOptions) && (
+          <>
+            {/* Burn After Reading Options */}
+            {burnAfterReading && (
+              <div className="mt-2">
+                <BurnDelaySelector value={burnDelay} onChange={setBurnDelay} />
+              </div>
+            )}
 
-        {/* Time-Lock Options */}
-        {timeLockEnabled && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-2 p-3 bg-quantum-cyan/10 rounded-lg border border-quantum-cyan/30"
-          >
-            <p className="text-xs text-quantum-cyan mb-2 font-semibold">
-              🔒 {t('messages.scheduled_unlock')}
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input
-                type="date"
-                value={timeLockDate}
-                onChange={(e) => setTimeLockDate(e.target.value)}
-                className="input text-sm"
-                min={new Date().toISOString().split('T')[0]}
-              />
-              <input
-                type="time"
-                value={timeLockTime}
-                onChange={(e) => setTimeLockTime(e.target.value)}
-                className="input text-sm"
-              />
-            </div>
-          </motion.div>
+            {/* Time-Lock Options */}
+            {timeLockEnabled && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-2 p-3 bg-quantum-cyan/10 rounded-lg border border-quantum-cyan/30"
+              >
+                <p className="text-xs text-quantum-cyan mb-2 font-semibold">
+                  🔒 {t('messages.scheduled_unlock')}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={timeLockDate}
+                    onChange={(e) => setTimeLockDate(e.target.value)}
+                    className="input text-sm"
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                  <input
+                    type="time"
+                    value={timeLockTime}
+                    onChange={(e) => setTimeLockTime(e.target.value)}
+                    className="input text-sm"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </>
         )}
       </div>
 
