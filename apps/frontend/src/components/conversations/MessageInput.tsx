@@ -113,7 +113,10 @@ export function MessageInput({
               onClick={() => setShowSecurityOptions((v) => !v)}
               className="text-xs px-3 py-1 rounded-full border border-muted-grey text-muted-grey hover:border-quantum-cyan hover:text-quantum-cyan transition-colors"
             >
-              ⚙️ {showSecurityOptions ? t('common.hide', 'Masquer') : t('common.show', 'Afficher')}
+              ⚙️ {showSecurityOptions
+                ? t('messages.hide_security_options', 'Masquer options sécurité')
+                : t('messages.show_security_options', 'Afficher options sécurité (Burn/TimeLock)')
+              }
             </button>
           )}
         </div>
