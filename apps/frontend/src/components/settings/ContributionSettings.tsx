@@ -32,12 +32,12 @@ export function ContributionSettings() {
             color: "from-blue-500 to-purple-600",
             note: t('settings.contribution_settings.info_eth_network'),
         },
-        xmr: {
-            name: "Monero",
-            symbol: "XMR",
-            address: "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A",
-            icon: "/crypto-logos/monero-xmr-logo.png",
-            color: "from-orange-600 to-red-600",
+        pi: {
+            name: "Pi",
+            symbol: "PI",
+            address: "[YOUR_PI_ADDRESS]",
+            icon: "/crypto-logos/pi-network.jpg",
+            color: "from-purple-600 to-yellow-500",
         },
         sol: {
             name: "Solana",
