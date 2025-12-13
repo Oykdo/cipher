@@ -28,6 +28,7 @@ import { acknowledgeRoutes } from './routes/acknowledge.js';
 import { avatarRoutes } from './routes/avatar.js';
 import { conversationRequestRoutes } from './routes/conversationRequests.js';
 import publicKeysRoutes from './routes/publicKeys.js';
+import { paymentsRoutes } from './routes/payments.js';
 import { enforceHttps, DEFAULT_HTTPS_CONFIG } from "./utils/httpsEnforcement.js";
 import { cspNonceMiddleware, DEFAULT_CSP_CONFIG } from "./middleware/cspNonce.js";
 import { csrfProtection, addSecurityHeaders, csrfTokenRoute } from "./middleware/csrfProtection.js";
@@ -97,7 +98,7 @@ await app.register(cors, {
         return cb(null, false);
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
 });
 
@@ -195,6 +196,7 @@ await app.register(blockchainRoutes);
 await app.register(attachmentRoutes);
 await app.register(usersRoutes);
 await app.register(settingsRoutes);
+await app.register(paymentsRoutes);
 await app.register(trustStarRoutes);
 await app.register(recoveryRoutes);
 await app.register(acknowledgeRoutes);
