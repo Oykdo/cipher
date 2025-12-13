@@ -53,7 +53,7 @@ export function MessageList({
 
   if (loadingMessages) {
     return (
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         <div className="text-center text-soft-grey">{t('messages.loading_messages')}</div>
       </div>
     );
@@ -61,7 +61,7 @@ export function MessageList({
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         <div className="text-center text-soft-grey">
           {t('messages.no_messages')}<br />
           <span className="text-xs">{t('messages.send_first_message')}</span>
@@ -71,7 +71,7 @@ export function MessageList({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
       <AnimatePresence>
         {messages
           .filter(message => !message.isBurned) // ✅ FIX: Don't display burned messages

@@ -1197,7 +1197,7 @@ export default function Conversations() {
         <div
           className={`
           ${viewMode === 'chat' ? 'flex' : 'hidden md:flex'}
-          flex-1 flex flex-col
+          flex-1 flex flex-col min-h-0 overflow-hidden
         `}
         >
           {selectedConv ? (
