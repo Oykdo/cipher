@@ -676,10 +676,12 @@ export default function LoginNew() {
 
       // Try to decrypt masterKey using file hash
       const encryptedMasterKey = localStorage.getItem(`avatarAuth_${fileHash}`);
+      let decryptedMasterKeyHex: string | null = null;
       if (encryptedMasterKey) {
         try {
           const masterKeyHex = await decryptData(encryptedMasterKey, fileHash);
           if (masterKeyHex) {
+            decryptedMasterKeyHex = masterKeyHex;
             await setSessionMasterKey(masterKeyHex);
             // SECURITY: MasterKey decrypted (not logging for security)
           } else {
@@ -690,6 +692,20 @@ export default function LoginNew() {
         }
       } else {
         console.warn('[LoginNew] No avatarAuth found for file hash. User may need to re-setup on this device.');
+      }
+
+      // Initialize KeyVault BEFORE initializing E2EE (E2EE key storage depends on KeyVault)
+      try {
+        const vault = await getKeyVault(fileHash);
+
+        // Store decrypted masterKey in KeyVault for this username (best-effort)
+        if (decryptedMasterKeyHex) {
+          await vault.storeData(`masterKey:${data.user.username}`, decryptedMasterKeyHex);
+          // Clean up any legacy clear-text storage if it exists
+          localStorage.removeItem(`master_${data.user.username}`);
+        }
+      } catch (vaultErr) {
+        console.error('[LoginNew] Failed to initialize KeyVault during file login:', vaultErr);
       }
 
       // Initialize E2EE for message encryption
