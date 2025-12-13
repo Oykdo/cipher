@@ -238,6 +238,7 @@ export class KeyVault {
 
 // Singleton instance
 let keyVaultInstance: KeyVault | null = null;
+let keyVaultInitPromise: Promise<void> | null = null;
 
 /**
  * Get or create KeyVault instance
@@ -245,8 +246,19 @@ let keyVaultInstance: KeyVault | null = null;
 export async function getKeyVault(password: string): Promise<KeyVault> {
   if (!keyVaultInstance) {
     keyVaultInstance = new KeyVault();
-    await keyVaultInstance.initialize(password);
   }
+
+  // Prevent races: concurrent callers must all await the same initialization.
+  if (!keyVaultInitPromise) {
+    keyVaultInitPromise = keyVaultInstance.initialize(password).catch((error) => {
+      // Allow a clean retry after a failed initialization attempt.
+      keyVaultInstance = null;
+      keyVaultInitPromise = null;
+      throw error;
+    });
+  }
+
+  await keyVaultInitPromise;
   return keyVaultInstance;
 }
 
@@ -265,4 +277,5 @@ export function closeKeyVault(): void {
     keyVaultInstance.close();
     keyVaultInstance = null;
   }
+  keyVaultInitPromise = null;
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth";
 import { getRecoveryKeys } from "../../services/api-interceptor";
@@ -45,6 +45,21 @@ export function BackupSettings() {
     const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
     const [unlockPassword, setUnlockPassword] = useState("");
     const [unlockError, setUnlockError] = useState("");
+    const unlockPasswordInputRef = useRef<HTMLInputElement | null>(null);
+
+    useEffect(() => {
+        if (!showPasswordPrompt) return;
+
+        // Focus is unreliable with animations/portals; force it after mount.
+        const timeout = setTimeout(() => {
+            unlockPasswordInputRef.current?.focus();
+            if (unlockPasswordInputRef.current?.value) {
+                unlockPasswordInputRef.current.select();
+            }
+        }, 0);
+
+        return () => clearTimeout(timeout);
+    }, [showPasswordPrompt]);
 
     // Data Portability Export/Import states
     const [showExportModal, setShowExportModal] = useState(false);
@@ -534,7 +549,12 @@ export function BackupSettings() {
                             placeholder={t('settings.backup_settings.password_placeholder')}
                             className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white mb-4 focus:outline-none focus:ring-2 focus:ring-amber-500"
                             onKeyDown={(e) => e.key === 'Enter' && handleUnlockVault()}
-                            autoFocus
+                            ref={unlockPasswordInputRef}
+                            onFocus={(e) => {
+                                if (e.currentTarget.value) {
+                                    e.currentTarget.select();
+                                }
+                            }}
                         />
                         {unlockError && (
                             <p className="text-red-400 text-sm mb-4">{unlockError}</p>

@@ -5,7 +5,7 @@
  * when they've previously logged in on this device
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -37,10 +37,21 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
   const [showPassword, setShowPassword] = useState(false);
   const [hasPassword, setHasPassword] = useState(true);
 
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+
   // Check if local password exists on mount
   useEffect(() => {
     setHasPassword(hasLocalPassword(account.username));
   }, [account.username]);
+
+  // Ensure the password input can be focused reliably (especially when the view animates in)
+  useEffect(() => {
+    if (!hasPassword || unlocking) return;
+    const id = window.setTimeout(() => {
+      passwordInputRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [hasPassword, unlocking]);
 
   // Hash password with PBKDF2
   async function hashPassword(password: string, salt: string): Promise<string> {
@@ -271,7 +282,13 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={t('quick_unlock.password_placeholder')}
                   className="input w-full pr-12"
-                  autoFocus
+                  ref={passwordInputRef}
+                  onFocus={(e) => {
+                    // If the field already has a value, make it easy to replace it.
+                    if (e.currentTarget.value) {
+                      e.currentTarget.select();
+                    }
+                  }}
                   disabled={unlocking}
                 />
                 <button
