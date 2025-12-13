@@ -56,6 +56,10 @@ apps/bridge/backups/
 data/
 !apps/bridge/data/.gitkeep
 
+# Local admin/maintenance scripts
+apps/bridge/scripts/clear_database.mjs
+fix-corrupt-message.sql
+
 # =============================================================================
 # INTERNAL DOCUMENTATION (NOT PUBLISHED)
 # =============================================================================
@@ -160,3 +164,29 @@ codebuff.json
 # ARCHIVE (Development logs - not for production)
 # =============================================================================
 .archive/
+
+# =============================================================================
+# LOCAL SIGNING / TIMESTAMPING SCRIPTS & OUTPUTS (LOCAL-ONLY)
+# =============================================================================
+scripts/create-signed-bundle.js
+scripts/opentimestamps-stamp.js
+signed_bundle_*/
+
+# =============================================================================
+# LOCAL REPO COPIES / WORKDIR ARTIFACTS
+# =============================================================================
+project_chimera_repo/
+
+# =============================================================================
+# PACKAGE MANAGER AUTH FILES (CAN CONTAIN TOKENS)
+# =============================================================================
+.npmrc
+.pnpmrc
+.yarnrc
+.yarnrc.yml
+
+# =============================================================================
+# DATABASE CLIENT SECRETS / LOCAL AUTH
+# =============================================================================
+.pgpass
+.psqlrc
