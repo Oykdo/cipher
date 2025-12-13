@@ -172,7 +172,7 @@ npm run build:linux    # Linux (AppImage + DEB)
 - **Zod** - Runtime type validation
 
 #### Desktop
-- **Electron 30** - Cross-platform desktop application
+- **Electron 35** - Cross-platform desktop application
 
 ### Project Structure
 
@@ -291,9 +291,32 @@ cipher-pulse/
 
 **Not Protected Against:**
 - ❌ Device compromise (malware, physical access)
-- ❌ Quantum computers (future threat - post-quantum crypto planned)
+- ❌ Quantum computers (future threat - see the Post-Quantum section below)
 - ❌ Social engineering
 - ❌ Screen capturing / keyloggers
+
+### Post-Quantum Security (PQS)
+
+Large-scale quantum computers would change the security landscape for widely-used public-key cryptography:
+
+- **Shor’s algorithm** can break the math behind most **RSA/ECC** systems. In practice, that puts **X25519/Ed25519-style** primitives at risk once a sufficiently capable quantum computer exists.
+- This enables the **“store now, decrypt later”** threat: an adversary can record encrypted traffic today and decrypt it in the future.
+- **Grover’s algorithm** reduces the effective strength of symmetric primitives, which is why we already use **AES-256**-class parameters and conservative KDF settings.
+
+Why we’re working on PQS now:
+
+1. **Migration takes time** (protocol design, interoperability, testing, and rollout).
+2. We want a **backwards-compatible** path that doesn’t break existing users.
+3. We want to keep the current security properties (E2EE, PFS, post-compromise security) while adding post-quantum resistance.
+
+Our approach is a **hybrid** handshake and identity scheme:
+
+- **Hybrid key establishment**: classical X25519 + **ML-KEM (Kyber)**
+- **Hybrid signatures**: classical Ed25519 + **ML-DSA (Dilithium)**
+
+As long as *either* side of the hybrid remains unbroken, the resulting session remains secure.
+
+Design notes and integration plan: **[`PQC_HYBRID_PLAN.md`](./PQC_HYBRID_PLAN.md)**.
 
 ### Security Audit
 

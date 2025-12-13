@@ -174,7 +174,7 @@ npm run build:linux    # Linux (AppImage + DEB)
 - **Zod** - Validation de types à l'exécution
 
 #### Desktop
-- **Electron 30** - Application desktop multiplateforme
+- **Electron 35** - Application desktop multiplateforme
 
 ### Structure du projet
 
@@ -294,9 +294,32 @@ cipher-pulse/
 
 **Non protégé contre :**
 - ❌ Compromission de l'appareil (malware, accès physique)
-- ❌ Ordinateurs quantiques (menace future - crypto post-quantique prévue)
+- ❌ Ordinateurs quantiques (menace future — voir la section PQS ci-dessous)
 - ❌ Ingénierie sociale
 - ❌ Capture d'écran / keyloggers
+
+### Sécurité Post‑Quantique (PQS)
+
+L’augmentation future de la puissance de calcul quantique peut remettre en cause une grande partie de la cryptographie asymétrique utilisée aujourd’hui :
+
+- **L’algorithme de Shor** permet, à terme, de casser les familles **RSA/ECC**. Concrètement, cela met en danger des primitives de type **X25519/Ed25519** si un ordinateur quantique suffisamment puissant devient réalisable.
+- Cela ouvre le scénario **« store now, decrypt later »** : un adversaire peut enregistrer aujourd’hui des communications chiffrées et les déchiffrer plus tard.
+- **L’algorithme de Grover** réduit la sécurité effective du symétrique ; c’est pourquoi nous privilégions déjà des paramètres **classe AES‑256** et des KDF conservateurs.
+
+Pourquoi on s’y prépare dès maintenant :
+
+1. **Une migration crypto est longue** (design protocolaire, compatibilité, tests, déploiement progressif).
+2. Nous voulons un chemin **rétrocompatible** (sans casser les utilisateurs existants).
+3. Nous voulons conserver les propriétés actuelles (E2EE, PFS, sécurité post‑compromission) tout en ajoutant de la résistance post‑quantique.
+
+Notre approche : un mode **hybride** (classique + post‑quantique) :
+
+- **Établissement de clé hybride** : X25519 + **ML‑KEM (Kyber)**
+- **Signatures hybrides** : Ed25519 + **ML‑DSA (Dilithium)**
+
+Tant qu’au moins une des deux composantes reste sûre, la session dérivée reste sûre.
+
+Plan détaillé d’intégration : **[`PQC_HYBRID_PLAN.md`](./PQC_HYBRID_PLAN.md)**.
 
 ### Audit de sécurité
 
