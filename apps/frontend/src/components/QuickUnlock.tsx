@@ -289,6 +289,12 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
                       e.currentTarget.select();
                     }
                   }}
+                  onClick={(e) => {
+                    // When the field is already focused, clicking again should still select.
+                    if (e.currentTarget.value) {
+                      e.currentTarget.select();
+                    }
+                  }}
                   disabled={unlocking}
                 />
                 <button
