@@ -60,6 +60,10 @@ data/
 apps/bridge/scripts/clear_database.mjs
 fix-corrupt-message.sql
 
+# Local deployment helpers (can push/tags/force-push)
+scripts/deploy.sh
+scripts/deploy.ps1
+
 # =============================================================================
 # INTERNAL DOCUMENTATION (NOT PUBLISHED)
 # =============================================================================
