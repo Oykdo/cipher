@@ -177,44 +177,50 @@ export function MessageInput({
       </div>
 
       {/* Input */}
-      <div className="flex gap-2 items-center">
-        {/* Attachment button (if no file selected) */}
-        {!selectedFile && (
-          <AttachmentInput
-            onAttachmentSelect={onAttachmentSelect}
-            onAttachmentClear={onAttachmentClear}
-            selectedFile={null}
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+        {/* On small screens we center the textarea by giving it its own centered row */}
+        <div className="w-full sm:flex-1 flex justify-center">
+          <textarea
+            value={messageBody}
+            onChange={(e) => {
+              onChangeMessageBody(e.target.value);
+              if (e.target.value.length > 0) {
+                setTyping(true);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                onSend();
+              }
+            }}
+            placeholder={t('messages.type_message_placeholder')}
+            className="input w-full sm:flex-1 max-w-[42rem] resize-none text-center sm:text-left"
+            rows={2}
             disabled={sendingMessage}
-            compact
           />
-        )}
-        
-        <textarea
-          value={messageBody}
-          onChange={(e) => {
-            onChangeMessageBody(e.target.value);
-            if (e.target.value.length > 0) {
-              setTyping(true);
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              onSend();
-            }
-          }}
-          placeholder={t('messages.type_message_placeholder')}
-          className="input flex-1 min-w-0 resize-none text-center sm:text-left"
-          rows={2}
-          disabled={sendingMessage}
-        />
-        <button
-          onClick={onSend}
-          disabled={(!messageBody.trim() && !selectedFile) || sendingMessage}
-          className="btn btn-primary px-4 md:px-6"
-        >
-          {sendingMessage ? '⏳' : '📤'}
-        </button>
+        </div>
+
+        <div className="flex gap-2 w-full sm:w-auto">
+          {/* Attachment button (if no file selected) */}
+          {!selectedFile && (
+            <AttachmentInput
+              onAttachmentSelect={onAttachmentSelect}
+              onAttachmentClear={onAttachmentClear}
+              selectedFile={null}
+              disabled={sendingMessage}
+              compact
+            />
+          )}
+
+          <button
+            onClick={onSend}
+            disabled={(!messageBody.trim() && !selectedFile) || sendingMessage}
+            className="btn btn-primary px-4 md:px-6 flex-1 sm:flex-none"
+          >
+            {sendingMessage ? '⏳' : '📤'}
+          </button>
+        </div>
       </div>
 
       <p className="text-xs text-muted-grey mt-2">
