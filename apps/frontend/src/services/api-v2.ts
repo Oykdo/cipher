@@ -268,6 +268,25 @@ export const apiv2 = {
     });
   },
 
+  // ========================
+  // PAYMENTS (Stripe)
+  // ========================
+
+  createStripeCheckoutSession: async (payload: {
+    priceId?: string;
+    quantity?: number;
+    amount?: number;
+    currency?: string;
+    productName?: string;
+    successUrl: string;
+    cancelUrl: string;
+  }): Promise<{ id: string; url: string | null }> => {
+    return authFetchV2WithRefresh('/payments/checkout-session', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   /**
    * Brûler un message immédiatement
    */
