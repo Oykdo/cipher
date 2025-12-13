@@ -62,8 +62,8 @@ export function ConversationList({
                   }
                     `}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-pure-white flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
+                  <span className="font-semibold text-pure-white flex items-center gap-2 min-w-0">
                     {conv.otherParticipant.username}
                     {/* Online Status Indicator */}
                     <span
@@ -75,7 +75,7 @@ export function ConversationList({
                     />
                   </span>
                   {conv.lastMessageAt && (
-                    <span className="text-xs text-muted-grey">
+                    <span className="text-xs text-muted-grey sm:text-right">
                       {formatTime(conv.lastMessageAt)}
                     </span>
                   )}
