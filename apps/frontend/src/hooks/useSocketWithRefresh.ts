@@ -15,7 +15,21 @@ import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/auth';
 
 import { debugLogger } from "../lib/debugLogger";
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
+
+function normalizeSocketIoBaseUrl(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+
+  // socket.io expects an http(s) base URL; allow users to provide ws(s) and normalize.
+  if (raw.startsWith('ws://')) return `http://${raw.slice('ws://'.length)}`;
+  if (raw.startsWith('wss://')) return `https://${raw.slice('wss://'.length)}`;
+  return raw;
+}
+
+const SOCKET_URL =
+  normalizeSocketIoBaseUrl(import.meta.env.VITE_SOCKET_URL) ||
+  normalizeSocketIoBaseUrl(import.meta.env.VITE_API_BASE_URL) ||
+  normalizeSocketIoBaseUrl(import.meta.env.VITE_WS_BASE_URL) ||
+  'http://localhost:4000';
 
 interface UseSocketWithRefreshReturn {
   socket: Socket | null;
@@ -50,6 +64,8 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
     // Déconnecter l'ancien socket si existant
     if (socketRef.current) {
       debugLogger.debug('[useSocket] Disconnecting old socket');
+      socketRef.current.io.opts.reconnection = false;
+      socketRef.current.removeAllListeners();
       socketRef.current.disconnect();
       socketRef.current = null;
     }
@@ -61,7 +77,9 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
         auth: {
           token,
         },
-        transports: ['websocket', 'polling'],
+        // Try polling first, then upgrade to websocket.
+        // Reduces noisy console warnings when a socket is created/destroyed quickly (e.g. React StrictMode).
+        transports: ['polling', 'websocket'],
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
@@ -84,6 +102,7 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
         // Si erreur d'authentification, ne pas retry automatiquement
         if (err.message.includes('Authentication') || err.message.includes('token')) {
           console.warn('[useSocket] Authentication error, stopping reconnection');
+          socket.io.opts.reconnection = false;
           socket.disconnect();
         }
       });
@@ -124,6 +143,7 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
     if (socketRef.current) {
       debugLogger.debug('[useSocket] Disconnecting socket');
       // Remove all listeners before disconnecting to avoid warnings
+      socketRef.current.io.opts.reconnection = false;
       socketRef.current.removeAllListeners();
       socketRef.current.disconnect();
       socketRef.current = null;
