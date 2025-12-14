@@ -41,6 +41,9 @@ export interface CspConfig {
     defaultSrc?: string[];
     scriptSrc?: string[];
     styleSrc?: string[];
+    // CSP Level 3 finer-grained directives
+    styleSrcAttr?: string[];
+    styleSrcElem?: string[];
     imgSrc?: string[];
     connectSrc?: string[];
     fontSrc?: string[];
@@ -71,9 +74,9 @@ export function buildCspHeader(config: CspConfig, nonce: string): string {
     // Convert camelCase to kebab-case (scriptSrc -> script-src)
     const directiveName = directive.replace(/([A-Z])/g, '-$1').toLowerCase();
 
-    // Add nonce to script-src and style-src
+    // Add nonce to script-src and style-src (and style-src-elem when used)
     let sourcesWithNonce = [...sources];
-    if (directive === 'scriptSrc' || directive === 'styleSrc') {
+    if (directive === 'scriptSrc' || directive === 'styleSrc' || directive === 'styleSrcElem') {
       sourcesWithNonce = sourcesWithNonce.map(src =>
         src === "'nonce'" ? `'nonce-${nonce}'` : src
       );
@@ -105,7 +108,10 @@ export const DEFAULT_CSP_CONFIG: CspConfig = {
   directives: {
     defaultSrc: ["'self'"],
     scriptSrc: ["'self'", "'nonce'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'blob:'], // nonce will be replaced per request, blob: for workers
-    styleSrc: ["'self'", "'nonce'"],  // nonce will be replaced per request, NO unsafe-inline
+    // NOTE: React/Framer Motion and some UI libs may rely on style="..." attributes.
+    // Allowing style attributes is far less risky than allowing inline scripts.
+    styleSrc: ["'self'", "'nonce'"],
+    styleSrcAttr: ["'unsafe-inline'"],
     imgSrc: ["'self'", 'data:', 'blob:'], // data: for base64 images, blob: for generated images
     connectSrc: ["'self'", 'ws:', 'wss:'],
     fontSrc: ["'self'", 'data:'], // data: for inline fonts if needed
