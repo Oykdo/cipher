@@ -93,11 +93,13 @@ const frontendDist = resolve(__dirname, '..', '..', 'frontend', 'dist');
 const hasFrontend = existsSync(join(frontendDist, 'index.html'));
 
 if (hasFrontend) {
+    const indexHtmlPath = join(frontendDist, 'index.html');
+    const indexHtml = readFileSync(indexHtmlPath, 'utf8');
+
     await app.register(fastifyStatic, {
         root: frontendDist,
         prefix: '/',
-        // Needed for reply.sendFile() used below.
-        decorateReply: true,
+        decorateReply: false,
         index: false,
         setHeaders: (res, filePath) => {
             // Prevent stale HTML being cached across deploys (can cause assets mismatch)
@@ -117,8 +119,10 @@ if (hasFrontend) {
     });
 
     app.get('/', async (_request, reply) => {
+        // Serve HTML directly so fastify-static doesn't overwrite Cache-Control.
         reply.header('Cache-Control', 'no-store');
-        return reply.sendFile('index.html', frontendDist);
+        reply.type('text/html; charset=utf-8');
+        return reply.send(indexHtml);
     });
 
     // SPA fallback for client-side routing
@@ -146,7 +150,8 @@ if (hasFrontend) {
         }
 
         reply.header('Cache-Control', 'no-store');
-        return reply.sendFile('index.html', frontendDist);
+        reply.type('text/html; charset=utf-8');
+        return reply.send(indexHtml);
     });
 }
 
