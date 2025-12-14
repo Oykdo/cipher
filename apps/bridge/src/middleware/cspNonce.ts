@@ -155,14 +155,33 @@ export function cspNonceMiddleware(config: CspConfig = DEFAULT_CSP_CONFIG) {
  */
 export async function handleCspReport(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const report = request.body as { 'csp-report': CspViolation };
+    const body: any = request.body;
 
-    if (!report || !report['csp-report']) {
+    // report-uri format (legacy): { "csp-report": { ... } }
+    // Reporting API format: [ { type: "csp-violation", url, body: { ... } }, ... ]
+    let reportData: any | null = null;
+
+    if (body && typeof body === 'object' && body['csp-report']) {
+      reportData = body['csp-report'];
+    } else if (Array.isArray(body)) {
+      const entry = body.find((e) => e && typeof e === 'object' && (e.type === 'csp-violation' || e.body));
+      if (entry?.body) {
+        reportData = entry.body;
+        if (entry.url && !reportData.documentUri) {
+          reportData.documentUri = entry.url;
+        }
+        // Chrome sometimes uses blockedURL instead of blockedUri
+        if (reportData.blockedURL && !reportData.blockedUri) {
+          reportData.blockedUri = reportData.blockedURL;
+        }
+      }
+    }
+
+    if (!reportData || typeof reportData !== 'object') {
       reply.code(400);
       return { error: 'Invalid CSP report format' };
     }
 
-    const reportData = report['csp-report'];
     const violation: CspViolation = {
       ...reportData,
       timestamp: Date.now(), // Override with server timestamp

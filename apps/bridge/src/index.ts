@@ -39,6 +39,17 @@ import { randomUUID } from "crypto";
 const app = Fastify({ logger: true, trustProxy: true });
 const db = getDatabase();
 
+// Accept CSP violation reports from browsers.
+// Browsers can POST these using content-types like application/csp-report or application/reports+json.
+app.addContentTypeParser(['application/csp-report', 'application/reports+json'], { parseAs: 'string' }, (_req, body, done) => {
+    try {
+        const text = typeof body === 'string' ? body : '';
+        done(null, text ? JSON.parse(text) : {});
+    } catch (err) {
+        done(err as Error);
+    }
+});
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
