@@ -18,6 +18,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { setUserOnline, setUserOffline } from '../routes/users.js';
 import { getDatabase } from '../db/database.js';
+import { config } from '../config.js';
 
 const db = getDatabase();
 
@@ -140,8 +141,8 @@ interface MessageUnlockedPayload {
  */
 export function setupSocketServer(httpServer: HTTPServer, fastify: FastifyInstance): SocketIOServer {
   // CORS configuration for Socket.IO
-  const isProd = process.env.NODE_ENV === 'production';
-  const allowedOrigins = process.env.FRONTEND_URL?.split(',') || ['http://localhost:5173'];
+  const isProd = config.isProd;
+  const allowedOrigins = config.security.allowedOrigins;
 
   const io = new SocketIOServer(httpServer, {
     cors: {
