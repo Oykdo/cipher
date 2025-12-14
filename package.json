@@ -9,6 +9,10 @@
     "dev:bridge": "cd apps/bridge && npm run dev",
     "dev:frontend": "cd apps/frontend && npm run dev",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
+
+    "render:build": "npm run build:frontend && npm run build:bridge",
+    "render:start": "node apps/bridge/dist/index.js",
+
     "build:frontend": "cd apps/frontend && npm run build",
     "build:bridge": "cd apps/bridge && npm run build",
     "build:all": "npm run build:frontend && npm run build:bridge",
