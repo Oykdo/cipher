@@ -85,7 +85,8 @@ if (hasFrontend) {
     await app.register(fastifyStatic, {
         root: frontendDist,
         prefix: '/',
-        decorateReply: false,
+        // Needed for reply.sendFile() used below.
+        decorateReply: true,
         index: false,
     });
 
