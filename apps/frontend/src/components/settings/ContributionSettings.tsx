@@ -5,7 +5,7 @@ export function ContributionSettings() {
     const { t } = useTranslation();
     const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
 
-    // Crypto addresses (remplacez par vos vraies adresses)
+    // Crypto addresses
     type CryptoAddress = {
         name: string;
         symbol: string;
@@ -20,39 +20,38 @@ export function ContributionSettings() {
         btc: {
             name: "Bitcoin",
             symbol: "BTC",
-            address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+            address: "bc1pqu5zya672tma8q36ww9c6mzk7uryq6cuavqn04jqka43qjm6nxtqs8am6t",
             icon: "/crypto-logos/Bitcoin.svg.webp",
             color: "from-orange-500 to-yellow-600",
         },
         eth: {
             name: "Ethereum (EVM)",
             symbol: "ETH",
-            address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+            address: "0x979a6093d3a1662054b89667e6dbfac001fa2617",
             icon: "/crypto-logos/ethereum.jpg",
             color: "from-blue-500 to-purple-600",
             note: t('settings.contribution_settings.info_eth_network'),
         },
-        xmr: {
-            name: "Monero",
-            symbol: "XMR",
-            address: "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A",
-            icon: "/crypto-logos/monero-xmr-logo.png",
-            color: "from-orange-600 to-red-600",
-        },
         sol: {
             name: "Solana",
             symbol: "SOL",
-            address: "DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK",
+            address: "HshrizaXzs6i6yse3YjkpDsQ4S7WjRoDALeVr6tN1yM8",
             icon: "/crypto-logos/solana.jpg",
             color: "from-purple-500 to-pink-600",
         },
         xrp: {
-            name: "Ripple",
+            name: "XRP",
             symbol: "XRP",
-            address: "rN7n7otQDd6FczFgLdlqtyMVrn3NnrcVcV",
+            address: "rspbrWJkPr8jSyz9wVVLwpxuSfosBM8ocM",
             icon: "/crypto-logos/xrp-xrp-logo.png",
             color: "from-gray-600 to-slate-700",
-            tag: "123456789", // Destination Tag si nécessaire
+        },
+        pi: {
+            name: "Pi Network",
+            symbol: "PI",
+            address: "GCUGVJDK4TY6KTVWFYXTDH2OXRSTTFQUYPLU2CH523AHCZOPWUVEVDC6",
+            icon: "/crypto-logos/pi-network.svg",
+            color: "from-violet-700 to-yellow-500",
         },
     };
 
