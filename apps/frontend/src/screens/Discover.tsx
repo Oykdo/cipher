@@ -59,7 +59,7 @@ export default function Discover() {
           <div className="flex flex-wrap gap-3">
             <span className="badge badge-quantum">
               <span>🔐</span>
-              <span>Signal Protocol</span>
+              <span>{t('discover.badge_signal_protocol')}</span>
             </span>
             <span className="badge badge-trust">
               <span>🎲</span>
@@ -166,15 +166,11 @@ export default function Discover() {
               <ul className="space-y-2 text-xs text-soft-grey">
                 <li className="flex items-start gap-2">
                   <span className="text-quantum-cyan">🔥</span>
-                  <span><strong>{t('discover.burn_mode_immediate')}</strong> : {t('discover.burn_mode_immediate_desc')}</span>
+                  <span><strong>{t('discover.burn_mode_after_reading')}</strong> : {t('discover.burn_mode_after_reading_desc')}</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-magenta-trust">⏰</span>
-                  <span><strong>{t('discover.burn_mode_scheduled')}</strong> : {t('discover.burn_mode_scheduled_desc')}</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-quantum-cyan">👁️</span>
-                  <span><strong>{t('discover.burn_mode_unique')}</strong> : {t('discover.burn_mode_unique_desc')}</span>
+                  <span><strong>{t('discover.burn_mode_delay')}</strong> : {t('discover.burn_mode_delay_desc')}</span>
                 </li>
               </ul>
             </div>
@@ -237,11 +233,11 @@ export default function Discover() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <ArchCard title={t('discover.frontend_title')} icon="⚛️">
               <ul className="space-y-1 text-xs text-soft-grey">
-                <li>• <strong className="text-quantum-cyan">Vite</strong> + React 18 + TypeScript</li>
-                <li>• Framer Motion (animations)</li>
-                <li>• TailwindCSS + Custom</li>
-                <li>• libsodium-wrappers (crypto)</li>
-                <li>• argon2-browser (KDF)</li>
+                <li>• {t('discover.arch_frontend_stack_1')}</li>
+                <li>• {t('discover.arch_frontend_stack_2')}</li>
+                <li>• {t('discover.arch_frontend_stack_3')}</li>
+                <li>• {t('discover.arch_frontend_stack_4')}</li>
+                <li>• {t('discover.arch_frontend_stack_5')}</li>
               </ul>
               <div className="mt-3 p-2 bg-dark-matter rounded text-xs">
                 <span className="text-green-400">✓</span>
@@ -249,114 +245,111 @@ export default function Discover() {
               </div>
             </ArchCard>
 
-            <ArchCard title="Backend" icon="🚀">
+            <ArchCard title={t('discover.backend_title')} icon="🚀">
               <ul className="space-y-1 text-xs text-soft-grey">
-                <li>• Fastify (Node.js)</li>
-                <li>• SQLite + SQLCipher</li>
-                <li>• JWT + Refresh Tokens</li>
-                <li>• Rate Limiting</li>
-                <li>• Audit Logging</li>
+                <li>• {t('discover.arch_backend_stack_1')}</li>
+                <li>• {t('discover.arch_backend_stack_2')}</li>
+                <li>• {t('discover.arch_backend_stack_3')}</li>
+                <li>• {t('discover.arch_backend_stack_4')}</li>
+                <li>• {t('discover.arch_backend_stack_5')}</li>
               </ul>
             </ArchCard>
 
-            <ArchCard title="Sécurité" icon="🛡️">
+            <ArchCard title={t('discover.security_card_title')} icon="🛡️">
               <ul className="space-y-1 text-xs text-soft-grey">
-                <li>• Zero-Knowledge</li>
-                <li>• E2E Encryption</li>
-                <li>• Perfect Forward Secrecy</li>
-                <li>• Post-Quantum Ready</li>
-                <li>• OWASP Compliant</li>
+                <li>• {t('discover.arch_security_stack_1')}</li>
+                <li>• {t('discover.arch_security_stack_2')}</li>
+                <li>• {t('discover.arch_security_stack_3')}</li>
+                <li>• {t('discover.arch_security_stack_4')}</li>
+                <li>• {t('discover.arch_security_stack_5')}</li>
               </ul>
             </ArchCard>
           </div>
 
           {/* Vite Security Section */}
           <div className="bg-dark-matter-lighter p-6 rounded-lg mb-6">
-            <h4 className="text-sm font-bold text-pure-white mb-3">🛡️ Pourquoi Vite + React (et non Next.js) ?</h4>
-            <p className="text-soft-grey text-xs mb-4">
-              Cipher Pulse utilise <strong className="text-quantum-cyan">Vite</strong> comme bundler avec React en mode SPA (Single Page Application).
-              Ce choix architectural nous protège des vulnérabilités récentes affectant les frameworks SSR.
-            </p>
+            <h4 className="text-sm font-bold text-pure-white mb-3">🛡️ {t('discover.vite_section_title')}</h4>
+            <p className="text-soft-grey text-xs mb-4">{t('discover.vite_section_desc')}</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div className="bg-dark-matter p-3 rounded">
-                <h5 className="text-xs font-bold text-green-400 mb-2">✓ Architecture Vite + React SPA</h5>
+                <h5 className="text-xs font-bold text-green-400 mb-2">✓ {t('discover.vite_good_title')}</h5>
                 <ul className="text-xs text-soft-grey space-y-1">
-                  <li>• Pas de SSR (Server-Side Rendering)</li>
-                  <li>• Pas de middleware serveur côté frontend</li>
-                  <li>• Logique d'authentification côté client uniquement</li>
-                  <li>• API sécurisée séparée (Fastify)</li>
+                  <li>• {t('discover.vite_good_bullet_1')}</li>
+                  <li>• {t('discover.vite_good_bullet_2')}</li>
+                  <li>• {t('discover.vite_good_bullet_3')}</li>
+                  <li>• {t('discover.vite_good_bullet_4')}</li>
                 </ul>
               </div>
               <div className="bg-dark-matter p-3 rounded">
-                <h5 className="text-xs font-bold text-red-400 mb-2">✗ Vulnérabilités Next.js (non applicables)</h5>
+                <h5 className="text-xs font-bold text-red-400 mb-2">✗ {t('discover.vite_bad_title')}</h5>
                 <ul className="text-xs text-soft-grey space-y-1">
-                  <li>• <strong>CVE-2025-29927</strong> : Bypass middleware auth</li>
-                  <li>• Failles SSR injection</li>
-                  <li>• Server Actions vulnerabilities</li>
-                  <li>• Headers x-middleware-subrequest exploits</li>
+                  <li>• <strong>{t('discover.vite_bad_bullet_1_strong')}</strong> : {t('discover.vite_bad_bullet_1')}</li>
+                  <li>• {t('discover.vite_bad_bullet_2')}</li>
+                  <li>• {t('discover.vite_bad_bullet_3')}</li>
+                  <li>• {t('discover.vite_bad_bullet_4')}</li>
                 </ul>
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-magenta-trust">
               <span>💡</span>
-              <span>L'authentification est gérée par JWT + SRP (Zero-Knowledge) via notre API Fastify, jamais par le frontend.</span>
+              <span>{t('discover.vite_auth_note')}</span>
             </div>
           </div>
 
           <div className="bg-dark-matter-lighter p-6 rounded-lg">
-            <h4 className="text-sm font-bold text-pure-white mb-3">📊 Comparaison avec d'autres Messengers</h4>
+            <h4 className="text-sm font-bold text-pure-white mb-3">📊 {t('discover.compare_title')}</h4>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-soft-grey border-b border-dark-matter-lighter">
-                    <th className="pb-2">Fonctionnalité</th>
-                    <th className="pb-2">WhatsApp</th>
-                    <th className="pb-2">Signal</th>
-                    <th className="pb-2 text-quantum-cyan">Cipher Pulse</th>
+                    <th className="pb-2">{t('discover.compare_header_feature')}</th>
+                    <th className="pb-2">{t('discover.compare_header_whatsapp')}</th>
+                    <th className="pb-2">{t('discover.compare_header_signal')}</th>
+                    <th className="pb-2 text-quantum-cyan">{t('discover.compare_header_cipher')}</th>
                   </tr>
                 </thead>
                 <tbody className="text-soft-grey">
                   <tr className="border-b border-dark-matter-light">
-                    <td className="py-2">E2E Encryption</td>
+                    <td className="py-2">{t('discover.compare_row_e2ee')}</td>
                     <td>✅</td>
                     <td>✅</td>
                     <td className="text-quantum-cyan">✅</td>
                   </tr>
                   <tr className="border-b border-dark-matter-light">
-                    <td className="py-2">Zero-Knowledge</td>
+                    <td className="py-2">{t('discover.compare_row_zero_knowledge')}</td>
                     <td>❌</td>
                     <td>✅</td>
                     <td className="text-quantum-cyan">✅</td>
                   </tr>
                   <tr className="border-b border-dark-matter-light">
-                    <td className="py-2">DiceKey (775 bits)</td>
+                    <td className="py-2">{t('discover.compare_row_dicekey')}</td>
                     <td>❌</td>
                     <td>❌</td>
                     <td className="text-quantum-cyan">✅</td>
                   </tr>
                   <tr className="border-b border-dark-matter-light">
-                    <td className="py-2">Burn After Reading</td>
+                    <td className="py-2">{t('discover.compare_row_burn')}</td>
                     <td>❌</td>
                     <td>✅</td>
                     <td className="text-quantum-cyan">✅</td>
                   </tr>
                   <tr className="border-b border-dark-matter-light">
-                    <td className="py-2">Time-Lock Blockchain</td>
+                    <td className="py-2">{t('discover.compare_row_timelock')}</td>
                     <td>❌</td>
                     <td>❌</td>
                     <td className="text-quantum-cyan">✅</td>
                   </tr>
                   <tr className="border-b border-dark-matter-light">
-                    <td className="py-2">Open Source</td>
+                    <td className="py-2">{t('discover.compare_row_open_source')}</td>
                     <td>❌</td>
                     <td>✅</td>
                     <td className="text-quantum-cyan">✅</td>
                   </tr>
                   <tr>
-                    <td className="py-2">Immune CVE-2025-29927</td>
+                    <td className="py-2">{t('discover.compare_row_immune_cve')}</td>
                     <td>N/A</td>
                     <td>N/A</td>
-                    <td className="text-quantum-cyan">✅ (Vite SPA)</td>
+                    <td className="text-quantum-cyan">{t('discover.compare_value_immune_cve')}</td>
                   </tr>
                 </tbody>
               </table>
@@ -372,7 +365,7 @@ export default function Discover() {
           className="text-center"
         >
           <h3 className="text-2xl font-bold mb-4 text-pure-white">
-            Prêt à sécuriser vos conversations ?
+            {t('discover.cta_title')}
           </h3>
           
           <div className="flex gap-4 justify-center">
@@ -382,7 +375,7 @@ export default function Discover() {
               onClick={() => navigate('/signup')}
               className="btn btn-primary"
             >
-              Créer un compte 🎲
+              {t('discover.cta_signup')}
             </motion.button>
             
             <motion.button
@@ -391,7 +384,7 @@ export default function Discover() {
               onClick={() => navigate('/login')}
               className="btn btn-ghost"
             >
-              Se connecter 🔑
+              {t('discover.cta_login')}
             </motion.button>
           </div>
         </motion.div>
