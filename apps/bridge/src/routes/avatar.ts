@@ -10,6 +10,10 @@ export async function avatarRoutes(fastify: FastifyInstance) {
         async (request, reply) => {
             const { checksums, userId } = request.body;
 
+            // This endpoint is part of the signup flow and may include user-specific data.
+            // Explicitly prevent caching to avoid stale or shared responses.
+            reply.header('Cache-Control', 'no-store');
+
             if (!checksums || !Array.isArray(checksums) || checksums.length !== 30) {
                 reply.code(400);
                 return { error: 'Invalid checksums provided' };
