@@ -73,10 +73,12 @@ export async function securityHeaders(
  */
 export const CORS_CONFIG = {
   origin: (origin: string, callback: (err: Error | null, allow?: boolean) => void) => {
-    const allowedOrigins = process.env.FRONTEND_URL?.split(',') || [
-      'http://localhost:5173',
-      'http://localhost:3000',
-    ];
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',')
+      ?.map((s) => s.trim())
+      .filter(Boolean) || [
+        'http://localhost:5173',
+        'http://localhost:3000',
+      ];
 
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) {

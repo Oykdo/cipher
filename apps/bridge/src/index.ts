@@ -10,7 +10,8 @@ import { setupSocketServer } from './websocket/socketServer.js';
 import { initBroadcast, broadcast } from './utils/broadcast.js';
 import { SignalingServer } from './signaling/index.js';
 import { mkdirSync, readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
-import { join } from "path";
+import { join, resolve, dirname } from "path";
+import { fileURLToPath } from 'url';
 import { getDatabase } from "./db/database.js";
 import { createRateLimiter } from "./middleware/rateLimiter.js";
 import { authRoutes } from './routes/auth.js';
@@ -39,6 +40,9 @@ import { randomUUID } from "crypto";
 const app = Fastify({ logger: true, trustProxy: true });
 const db = getDatabase();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 // Initialize Backup Service
 const backupService = new BackupService(app.log);
 
@@ -63,7 +67,41 @@ await app.register(rateLimit, {
 await app.register(fastifyStatic, {
     root: join(process.cwd(), 'public'),
     prefix: '/', // Serve files at root (e.g. /avatars/foo.png)
+    index: false,
 });
+
+// Serve the built frontend (SPA) when present (e.g. Render production deploy)
+const frontendDist = resolve(__dirname, '..', '..', 'frontend', 'dist');
+const hasFrontend = existsSync(join(frontendDist, 'index.html'));
+
+if (hasFrontend) {
+    await app.register(fastifyStatic, {
+        root: frontendDist,
+        prefix: '/',
+        decorateReply: false,
+        index: false,
+    });
+
+    app.get('/', async (_request, reply) => {
+        return reply.sendFile('index.html', frontendDist);
+    });
+
+    // SPA fallback for client-side routing
+    app.setNotFoundHandler((request, reply) => {
+        if (request.method !== 'GET') {
+            reply.code(404).send({ error: 'Not Found' });
+            return;
+        }
+
+        // Let API routes return 404 normally
+        if (request.url.startsWith('/api') || request.url === '/health') {
+            reply.code(404).send({ error: 'Not Found' });
+            return;
+        }
+
+        return reply.sendFile('index.html', frontendDist);
+    });
+}
 
 // SECURITY FIX VULN-008: Stricter CORS configuration
 const ALLOWED_DEV_ORIGINS = [

@@ -7,6 +7,8 @@ dotenv.config();
 const isProd = process.env.NODE_ENV === 'production';
 const dataDir = process.env.BRIDGE_DATA_DIR || './data';
 
+const DEFAULT_PROD_ORIGINS = ['https://cipher.onrender.com', 'https://www.cipher.onrender.com'];
+
 // Helper to read secret from file or env
 function getSecret(key: string): string | undefined {
     const envVal = process.env[key];
@@ -41,7 +43,9 @@ export const config = {
     security: {
         jwtSecret: getSecret('JWT_SECRET'),
         dbKey: getSecret('BRIDGE_DB_KEY'),
-        allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173'],
+        allowedOrigins: (process.env.ALLOWED_ORIGINS?.split(',')
+            ?.map((s) => s.trim())
+            .filter(Boolean)) || (isProd ? DEFAULT_PROD_ORIGINS : ['http://localhost:5173']),
         maxActiveUploadsPerUser: Number(process.env.MAX_ACTIVE_UPLOADS_PER_USER || 3),
     },
 
