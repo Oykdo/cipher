@@ -136,6 +136,7 @@
     "error_incorrect_password": "Mot de passe incorrect",
     "error_encryption_key_not_found": "Clé de chiffrement introuvable pour ce compte sur cet appareil. Connectez-vous avec votre phrase mnémonique, votre DiceKey ou utilisez les options de récupération.",
     "error_invalid_credentials": "Identifiants incorrects",
+    "error_seed_login_not_configured": "La connexion par seed n'est pas encore activée pour ce compte. Connectez-vous une fois avec votre mot de passe sur un appareil de confiance pour l'activer.",
     "error_login_generic": "Erreur de connexion",
     "error_fill_all_fields": "Veuillez remplir tous les champs",
     "error_id_length": "L'identifiant doit faire exactement 12 caractères",

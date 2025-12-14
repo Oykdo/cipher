@@ -135,6 +135,7 @@
     "error_incorrect_password": "Contraseña incorrecta",
     "error_encryption_key_not_found": "Clave de cifrado no encontrada para esta cuenta en este dispositivo. Inicie sesión con su frase mnemónica, DiceKey o use opciones de recuperación.",
     "error_invalid_credentials": "Credenciales inválidas",
+    "error_seed_login_not_configured": "El inicio de sesión por seed aún no está habilitado para esta cuenta. Inicie sesión una vez con su contraseña en un dispositivo de confianza para habilitarlo.",
     "error_login_generic": "Error de inicio de sesión",
     "error_fill_all_fields": "Por favor complete todos los campos",
     "error_id_length": "El ID debe tener exactamente 12 caracteres",

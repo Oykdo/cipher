@@ -25,6 +25,7 @@ interface SrpSession {
 }
 
 const srpSessions = new Map<string, SrpSession>();
+const srpSeedSessions = new Map<string, SrpSession>();
 
 // Cleanup expired SRP sessions every 5 minutes
 setInterval(() => {
@@ -32,6 +33,12 @@ setInterval(() => {
   for (const [sessionId, session] of srpSessions.entries()) {
     if (session.expiresAt < now) {
       srpSessions.delete(sessionId);
+    }
+  }
+
+  for (const [sessionId, session] of srpSeedSessions.entries()) {
+    if (session.expiresAt < now) {
+      srpSeedSessions.delete(sessionId);
     }
   }
 }, 5 * 60 * 1000);
@@ -543,6 +550,113 @@ export async function authRoutes(fastify: FastifyInstance) {
       }
     }
   );
+
+  // ============================================================================
+  // SRP SEED (Mnemonic/MasterKey) LOGIN
+  // Allows login from username + 12/24-word seed without any device password.
+  // Uses a separate SRP verifier stored in users.srp_seed_*.
+  // ============================================================================
+
+  // 1. Init: Client sends username + A, Server returns salt + B + sessionId
+  fastify.post<{ Body: { username: string; A: string } }>(
+    '/api/v2/auth/srp-seed/login/init',
+    async (request, reply) => {
+      const { username, A } = request.body;
+      const user = await db.getUserByUsername(username);
+
+      if (!user || !user.srp_seed_salt || !user.srp_seed_verifier) {
+        reply.code(404);
+        return { error: 'User not found or SRP seed not configured' };
+      }
+
+      const serverEphemeral = srp.generateEphemeral(user.srp_seed_verifier);
+      const sessionId = randomUUID();
+
+      srpSeedSessions.set(sessionId, {
+        userId: user.id,
+        b: serverEphemeral.secret,
+        B: serverEphemeral.public,
+        A: A,
+        expiresAt: Date.now() + 5 * 60 * 1000,
+      });
+
+      return {
+        salt: user.srp_seed_salt,
+        B: serverEphemeral.public,
+        sessionId,
+      };
+    }
+  );
+
+  // 2. Verify: Client sends M1 + sessionId, Server verifies and returns M2 + Token
+  fastify.post<{ Body: { username: string; M1: string; sessionId: string } }>(
+    '/api/v2/auth/srp-seed/login/verify',
+    async (request, reply) => {
+      const { username, M1, sessionId } = request.body;
+
+      const session = srpSeedSessions.get(sessionId);
+      if (!session) {
+        reply.code(401);
+        return { error: 'Invalid or expired session' };
+      }
+
+      if (session.expiresAt < Date.now()) {
+        srpSeedSessions.delete(sessionId);
+        reply.code(401);
+        return { error: 'Session expired' };
+      }
+
+      srpSeedSessions.delete(sessionId);
+
+      const user = await db.getUserById(session.userId);
+      if (!user || !user.srp_seed_salt || !user.srp_seed_verifier) {
+        reply.code(401);
+        return { error: 'User not found or SRP seed not configured' };
+      }
+
+      try {
+        const serverSession = srp.deriveSession(
+          session.b,
+          session.A,
+          user.srp_seed_salt,
+          username,
+          user.srp_seed_verifier,
+          M1
+        );
+
+        await logAuthAction(user.id, 'LOGIN_SRP_SEED_SUCCESS', request, 'INFO');
+
+        return generateAuthResponse(reply, request, user, {
+          M2: serverSession.proof,
+        });
+      } catch (error) {
+        await logAuthAction(user.id, 'LOGIN_SRP_SEED_FAILED', request, 'WARNING');
+        reply.code(401);
+        return { error: 'Invalid password proof' };
+      }
+    }
+  );
+
+  // 3. Setup SRP Seed (Authenticated)
+  fastify.post<{ Body: { srpSalt: string; srpVerifier: string } }>(
+    '/api/v2/auth/srp-seed/setup',
+    {
+      preHandler: fastify.authenticate as any,
+    },
+    async (request, reply) => {
+      const userId = (request.user as any).sub;
+      const { srpSalt, srpVerifier } = request.body;
+
+      if (!srpSalt || !srpVerifier) {
+        reply.code(400);
+        return { error: 'srpSalt and srpVerifier are required' };
+      }
+
+      await (db as any).updateUserSRPSeed(userId, srpSalt, srpVerifier);
+      return { success: true };
+    }
+  );
+
   // 3. Setup SRP (Authenticated)
   fastify.post<{ Body: { srpSalt: string; srpVerifier: string } }>(
     '/api/v2/auth/srp/setup',

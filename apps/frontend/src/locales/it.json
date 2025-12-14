@@ -135,6 +135,7 @@
     "error_incorrect_password": "Password errata",
     "error_encryption_key_not_found": "Chiave di crittografia non trovata per questo account su questo dispositivo. Accedi con la tua frase mnemonica, DiceKey o usa opzioni di recupero.",
     "error_invalid_credentials": "Credenziali non valide",
+    "error_seed_login_not_configured": "L'accesso tramite seed non è ancora abilitato per questo account. Accedi una volta con la tua password su un dispositivo fidato per abilitarlo.",
     "error_login_generic": "Errore di accesso",
     "error_fill_all_fields": "Compila tutti i campi",
     "error_id_length": "L'ID deve essere lungo esattamente 12 caratteri",

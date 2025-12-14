@@ -101,6 +101,7 @@ class DatabaseService {
         });
 
         this._ensureSenderPlaintextColumnPromise = null;
+        this._ensureSrpSeedColumnsPromise = null;
 
         // Initialize schema (check connection)
         this.initialize();
@@ -177,6 +178,9 @@ class DatabaseService {
 
         // Ensure critical column for sender self-read is present (safe no-op if table missing)
         await this.ensureSenderPlaintextColumn();
+
+        // Ensure SRP seed auth columns exist (for mnemonic/seed login)
+        await this.ensureSrpSeedColumns();
     }
 
     async ensureSenderPlaintextColumn() {
@@ -207,6 +211,44 @@ class DatabaseService {
         });
 
         return this._ensureSenderPlaintextColumnPromise;
+    }
+
+    async ensureSrpSeedColumns() {
+        if (this._ensureSrpSeedColumnsPromise) {
+            return this._ensureSrpSeedColumnsPromise;
+        }
+
+        this._ensureSrpSeedColumnsPromise = run(this.pool, `
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'users'
+                ) THEN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = 'users'
+                          AND column_name = 'srp_seed_salt'
+                    ) THEN
+                        ALTER TABLE users ADD COLUMN srp_seed_salt TEXT;
+                    END IF;
+
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = 'users'
+                          AND column_name = 'srp_seed_verifier'
+                    ) THEN
+                        ALTER TABLE users ADD COLUMN srp_seed_verifier TEXT;
+                    END IF;
+                END IF;
+            END $$;
+        `).catch((error) => {
+            console.warn('[Database] Failed to ensure SRP seed columns:', error?.message || error);
+        });
+
+        return this._ensureSrpSeedColumnsPromise;
     }
 
     async migrate() {
@@ -920,6 +962,10 @@ class DatabaseService {
 
     async updateUserSRP(userId, salt, verifier) {
         await run(this.pool, `UPDATE users SET srp_salt = $1, srp_verifier = $2 WHERE id = $3`, [salt, verifier, userId]);
+    }
+
+    async updateUserSRPSeed(userId, salt, verifier) {
+        await run(this.pool, `UPDATE users SET srp_seed_salt = $1, srp_seed_verifier = $2 WHERE id = $3`, [salt, verifier, userId]);
     }
 
     async exec(sql) {

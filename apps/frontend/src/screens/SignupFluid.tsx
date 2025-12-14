@@ -105,6 +105,33 @@ export default function SignupFluid() {
 
       const data = await response.json();
 
+      // Configure SRP "seed" login (mnemonic-based) so the user can login on a new device
+      // using username + 12/24 words without needing a pre-existing local password.
+      try {
+        const normalizedUsername = username.toLowerCase();
+        const seedSrpSalt = srp.generateSalt();
+        const seedPrivateKey = srp.derivePrivateKey(seedSrpSalt, normalizedUsername, data.masterKeyHex);
+        const seedSrpVerifier = srp.deriveVerifier(seedPrivateKey);
+
+        const seedSetupRes = await fetch(`${API_BASE_URL}/api/v2/auth/srp-seed/setup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${data.accessToken}`
+          },
+          body: JSON.stringify({
+            srpSalt: seedSrpSalt,
+            srpVerifier: seedSrpVerifier,
+          }),
+        });
+
+        if (!seedSetupRes.ok) {
+          console.warn('[SignupFluid] SRP seed setup failed:', await seedSetupRes.text());
+        }
+      } catch (seedSetupError) {
+        console.warn('[SignupFluid] SRP seed setup error:', seedSetupError);
+      }
+
       // Store mnemonic
       setGeneratedMnemonic(data.mnemonic);
 

@@ -135,6 +135,7 @@
     "error_incorrect_password": "Falsches Passwort",
     "error_encryption_key_not_found": "Verschlüsselungsschlüssel für dieses Konto auf diesem Gerät nicht gefunden. Melden Sie sich mit Ihrer mnemonischen Phrase, Ihrem DiceKey an oder verwenden Sie Wiederherstellungsoptionen.",
     "error_invalid_credentials": "Ungültige Anmeldedaten",
+    "error_seed_login_not_configured": "Seed-Login ist für dieses Konto noch nicht aktiviert. Bitte melden Sie sich einmal mit Ihrem Passwort auf einem vertrauenswürdigen Gerät an, um es zu aktivieren.",
     "error_login_generic": "Anmeldefehler",
     "error_fill_all_fields": "Bitte füllen Sie alle Felder aus",
     "error_id_length": "ID muss genau 12 Zeichen lang sein",

@@ -150,6 +150,7 @@
     "error_incorrect_password": "Incorrect password",
     "error_encryption_key_not_found": "Encryption key not found for this account on this device. Log in with your mnemonic phrase, DiceKey, or use recovery options.",
     "error_invalid_credentials": "Invalid credentials",
+    "error_seed_login_not_configured": "Seed login is not enabled for this account yet. Please log in once with your password on a trusted device to enable it.",
     "error_login_generic": "Login error",
     "error_fill_all_fields": "Please fill in all fields",
     "error_id_length": "ID must be exactly 12 characters",

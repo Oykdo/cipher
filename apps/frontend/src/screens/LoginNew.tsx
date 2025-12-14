@@ -311,6 +311,31 @@ export default function LoginNew() {
             if (masterKeyHex) {
               await setSessionMasterKey(masterKeyHex);
               // SECURITY: MasterKey loaded (not logging for security)
+
+              // Best-effort: enable mnemonic/seed login for this account (for other devices)
+              if (verifyData.user.securityTier === 'standard') {
+                try {
+                  const normalizedUsername = verifyData.user.username.toLowerCase();
+                  const seedSrpSalt = srp.generateSalt();
+                  const seedPrivateKey = srp.derivePrivateKey(seedSrpSalt, normalizedUsername, masterKeyHex);
+                  const seedSrpVerifier = srp.deriveVerifier(seedPrivateKey);
+
+                  const seedSetupRes = await fetch(`${API_BASE_URL}/api/v2/auth/srp-seed/setup`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${verifyData.accessToken}`
+                    },
+                    body: JSON.stringify({ srpSalt: seedSrpSalt, srpVerifier: seedSrpVerifier }),
+                  });
+
+                  if (!seedSetupRes.ok) {
+                    console.warn('[LoginNew] SRP seed setup failed:', await seedSetupRes.text());
+                  }
+                } catch (seedSetupError) {
+                  console.warn('[LoginNew] SRP seed setup error:', seedSetupError);
+                }
+              }
             } else {
               console.warn('[LoginNew] No masterKey in KeyVault for SRP login');
             }
@@ -380,7 +405,9 @@ export default function LoginNew() {
     setMnemonicError('');
 
     try {
-      if (!mnemonicUsername.trim() || !mnemonicPhrase.trim()) {
+      const normalizedUsername = mnemonicUsername.trim().toLowerCase();
+
+      if (!normalizedUsername || !mnemonicPhrase.trim()) {
         throw new Error(t('auth.error_fill_all_fields'));
       }
 
@@ -408,33 +435,76 @@ export default function LoginNew() {
       // SECURITY: masterKey stays LOCAL - never sent to server
       await setSessionMasterKey(masterKeyHex);
 
-      // SECURITY: Use SRP for authentication (zero-knowledge)
-      // The mnemonic is used to derive masterKey locally, but auth is via SRP
-      // We need a password stored locally to do SRP - redirect to recovery if not available
-      const storedPasswordHash = localStorage.getItem(`pwd_${mnemonicUsername.toLowerCase()}`);
-      
-      if (!storedPasswordHash) {
-        // No local password - need to set one up via recovery flow
-        // Store masterKey temporarily for recovery process
-        try {
-          await setTemporaryMasterKey(masterKeyHex);
-        } catch (e) {
-          console.warn('[LoginNew] Failed to store temp masterKey:', e);
-        }
-        setMnemonicError(t('auth.error_need_password_setup') || 'Please set up a password for this device first.');
-        navigate('/recovery', { 
-          state: { 
-            reason: 'MNEMONIC_RECOVERY', 
-            username: mnemonicUsername,
-            hasMasterKey: true 
-          } 
-        });
-        return;
+      // Persist masterKey as non-extractable CryptoKey in IndexedDB (so encryption works after reload)
+      // Note: hex itself is only cached in memory (SecureMemoryCache)
+      await setTemporaryMasterKey(masterKeyHex);
+
+      // SRP-SEED login: authenticate using a verifier derived from the masterKey
+      // so the user can login from username + mnemonic on a new device.
+      const ephemeral = srp.generateEphemeral();
+      const initResponse = await fetch(`${API_BASE_URL}/api/v2/auth/srp-seed/login/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: normalizedUsername,
+          A: ephemeral.public,
+        }),
+      });
+
+      if (!initResponse.ok) {
+        const payload = await initResponse.json().catch(() => null);
+        const msg = payload?.error || t('auth.error_seed_login_not_configured') || 'Seed login not configured for this account. Login once with password to enable it.';
+        throw new Error(msg);
       }
 
-      // Use SRP with the stored password
-      // For mnemonic recovery, user should use the recovery flow instead
-      throw new Error(t('auth.error_use_password_login') || 'Please use password login. Mnemonic is for account recovery only.');
+      const initData = await initResponse.json();
+      const { salt, B, sessionId } = initData;
+
+      const privateKey = srp.derivePrivateKey(salt, normalizedUsername, masterKeyHex);
+      const session = srp.deriveSession(ephemeral.secret, B, salt, normalizedUsername, privateKey);
+
+      const verifyResponse = await fetch(`${API_BASE_URL}/api/v2/auth/srp-seed/login/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: normalizedUsername,
+          M1: session.proof,
+          sessionId,
+        }),
+      });
+
+      if (!verifyResponse.ok) {
+        const payload = await verifyResponse.json().catch(() => null);
+        throw new Error(payload?.error || t('auth.error_invalid_credentials'));
+      }
+
+      const data = await verifyResponse.json();
+      srp.verifySession(ephemeral.public, session, data.M2);
+
+      // Initialize E2EE for message encryption
+      try {
+        await initializeE2EE(data.user.username);
+        debugLogger.debug('[LoginNew] E2EE initialized for SRP seed login');
+      } catch (e2eeError) {
+        console.warn('[LoginNew] E2EE initialization failed:', e2eeError);
+      }
+
+      setSession({
+        user: {
+          id: data.user.id,
+          username: data.user.username,
+          securityTier: data.user.securityTier,
+        },
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+      });
+
+      saveKnownAccount({
+        username: data.user.username,
+        securityTier: data.user.securityTier,
+      });
+
+      navigate('/conversations');
     } catch (error: any) {
       console.error('Mnemonic login error:', error);
       setMnemonicError(error.message || t('auth.error_login_generic'));

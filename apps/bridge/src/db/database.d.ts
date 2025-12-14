@@ -66,6 +66,9 @@ export interface DbInstance {
   // SRP
   updateUserSRP(userId: string, salt: string, verifier: string): Promise<void>;
 
+  // SRP seed (mnemonic/masterKey login)
+  updateUserSRPSeed(userId: string, salt: string, verifier: string): Promise<void>;
+
   // Identity Keys
   saveIdentityKey(userId: string, publicKey: string, fingerprint: string): Promise<void>;
   getIdentityKeyByPublicKey(publicKey: string): Promise<any | null>;
