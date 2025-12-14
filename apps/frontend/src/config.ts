@@ -1,21 +1,46 @@
 const RUNTIME_ORIGIN =
   typeof window !== 'undefined' && window.location ? window.location.origin : '';
 
+const isLocalhostUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
+  } catch {
+    return value.includes('localhost');
+  }
+};
+
+const pickProdUrl = (envValue: string | undefined, fallback: string) => {
+  if (!envValue) return fallback;
+  // Guard against misconfigured Render env vars accidentally pointing to localhost.
+  if (isLocalhostUrl(envValue)) return fallback;
+  return envValue;
+};
+
 // In production, default to same-origin to avoid CSP/mixed-content issues on hosted deployments.
 const DEFAULT_API_BASE_URL = import.meta.env.PROD ? RUNTIME_ORIGIN : 'http://localhost:4000';
 const DEFAULT_WS_BASE_URL = import.meta.env.PROD
   ? RUNTIME_ORIGIN.replace(/^http/, 'ws')
   : 'ws://localhost:4000';
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
-export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || DEFAULT_WS_BASE_URL;
+export const API_BASE_URL = import.meta.env.PROD
+  ? pickProdUrl(import.meta.env.VITE_API_BASE_URL, DEFAULT_API_BASE_URL)
+  : import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
+
+export const WS_BASE_URL = import.meta.env.PROD
+  ? pickProdUrl(import.meta.env.VITE_WS_BASE_URL, DEFAULT_WS_BASE_URL)
+  : import.meta.env.VITE_WS_BASE_URL || DEFAULT_WS_BASE_URL;
 
 // Socket.IO uses http(s) URL (not ws(s) directly)
-export const SOCKET_BASE_URL = import.meta.env.VITE_SOCKET_URL || API_BASE_URL;
+export const SOCKET_BASE_URL = import.meta.env.PROD
+  ? pickProdUrl(import.meta.env.VITE_SOCKET_URL, API_BASE_URL)
+  : import.meta.env.VITE_SOCKET_URL || API_BASE_URL;
 
 // P2P Signaling servers with failover support
 export const SIGNALING_SERVERS = [
-  import.meta.env.VITE_SIGNALING_PRIMARY || API_BASE_URL,
+  (import.meta.env.PROD
+    ? pickProdUrl(import.meta.env.VITE_SIGNALING_PRIMARY, API_BASE_URL)
+    : import.meta.env.VITE_SIGNALING_PRIMARY) || API_BASE_URL,
   import.meta.env.VITE_SIGNALING_SECONDARY || '',
   import.meta.env.VITE_SIGNALING_COMMUNITY || '',
 ].filter(Boolean);
