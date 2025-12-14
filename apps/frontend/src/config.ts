@@ -1,9 +1,21 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
-export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:4000';
+const RUNTIME_ORIGIN =
+  typeof window !== 'undefined' && window.location ? window.location.origin : '';
+
+// In production, default to same-origin to avoid CSP/mixed-content issues on hosted deployments.
+const DEFAULT_API_BASE_URL = import.meta.env.PROD ? RUNTIME_ORIGIN : 'http://localhost:4000';
+const DEFAULT_WS_BASE_URL = import.meta.env.PROD
+  ? RUNTIME_ORIGIN.replace(/^http/, 'ws')
+  : 'ws://localhost:4000';
+
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
+export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || DEFAULT_WS_BASE_URL;
+
+// Socket.IO uses http(s) URL (not ws(s) directly)
+export const SOCKET_BASE_URL = import.meta.env.VITE_SOCKET_URL || API_BASE_URL;
 
 // P2P Signaling servers with failover support
 export const SIGNALING_SERVERS = [
-  import.meta.env.VITE_SIGNALING_PRIMARY || 'http://localhost:4000',
+  import.meta.env.VITE_SIGNALING_PRIMARY || API_BASE_URL,
   import.meta.env.VITE_SIGNALING_SECONDARY || '',
   import.meta.env.VITE_SIGNALING_COMMUNITY || '',
 ].filter(Boolean);

@@ -9,7 +9,9 @@ import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 import { debugLogger } from "../lib/debugLogger";
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
+import { SOCKET_BASE_URL } from '../config';
+
+const SOCKET_URL = SOCKET_BASE_URL;
 
 interface UseSocketOptions {
   token: string;

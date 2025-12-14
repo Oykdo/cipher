@@ -17,6 +17,7 @@ import type { Message, TransportStatus } from '@/core/messaging/MessageTransport
 import { CircuitBreaker } from '@/core/resilience/CircuitBreaker';
 import { useAuthStore } from '@/store/auth';
 import { logger } from '@/core/logger';
+import { SIGNALING_SERVERS } from '@/config';
 
 export interface UseResilientMessagingOptions {
   signalingUrl?: string;
@@ -56,7 +57,7 @@ export function useResilientMessaging(options: UseResilientMessagingOptions = {}
         // ARCHITECTURE FIX: masterKey removed - E2EE handled via peerUsername per message
         const p2pTransport = new P2PTransport(
           userId,
-          options.signalingUrl || 'http://localhost:4000'
+          options.signalingUrl || SIGNALING_SERVERS[0] || ''
         );
         messageRouter.registerTransport(p2pTransport);
 

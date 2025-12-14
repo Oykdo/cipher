@@ -20,6 +20,7 @@ import { P2PMessage } from '../lib/p2p/webrtc';
 import { useAuthStore } from '../store/auth';
 
 import { debugLogger } from "../lib/debugLogger";
+import { SIGNALING_SERVERS } from '../config';
 export interface UseP2POptions {
   signalingUrl?: string;
   signalingUrls?: string[]; // Multiple servers for failover
@@ -49,7 +50,7 @@ export function useP2P(options: UseP2POptions = {}) {
 
         // ARCHITECTURE FIX: No longer need masterKey - E2EE is handled via peerUsername
         const p2pManager = new P2PManager({
-          signalingUrl: options.signalingUrl || 'http://localhost:4000',
+          signalingUrl: options.signalingUrl || SIGNALING_SERVERS[0] || '',
           signalingUrls: options.signalingUrls,
           userId,
           authToken: session.accessToken,
