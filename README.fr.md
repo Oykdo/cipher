@@ -326,25 +326,31 @@ Si vous découvrez une vulnérabilité de sécurité, veuillez envoyer un email 
 
 ## 🛣️ Roadmap
 
-### Version 1.1 (T1 2025)
-- [ ] Cryptographie post-quantique (CRYSTALS-Kyber)
-- [ ] Accélération crypto WebAssembly
-- [ ] Applications mobiles (iOS/Android)
-- [ ] Support de fédération (interopérabilité avec d'autres serveurs)
+Les dates sont des estimations et peuvent évoluer selon les priorités (sécurité, stabilité, livraison).
+
+### Version 1.0 (Déc 2025) — Base actuelle
+- [x] Déploiement web (Bridge + Frontend)
+- [x] Base E2EE v2 (X3DH + Double Ratchet)
+- [x] Pièces jointes E2EE + cycle burn-after-reading
+- [x] Time-lock blockchain (hauteur de bloc)
+
+### Version 1.1 (T1 2026) — Stabilité & durcissement sécurité
+- [ ] Migration KeyVault vers IndexedDB (réduction du risque localStorage)
+- [ ] Durcissement WebSocket/Socket.IO (auth + contrôle d'accès + rate limits)
+- [ ] Revue CSP/CORS (réduire les faux positifs, scripts stricts)
+- [ ] Observabilité prod (logs actionnables, health, erreurs)
+
+### Version 1.2 (T2 2026) — UX & fonctionnalités collaboratives
+- [ ] Conversations de groupe (implémentation initiale ; recherche MLS en parallèle)
+- [ ] Accusés de lecture + indicateurs de frappe (opt-in)
+- [ ] Meilleure UX pièces jointes (quotas, cleanup, retries)
+
+### Version 2.0 (S2 2026+) — Recherche / fonctionnalités avancées
+- [ ] Échange de clés hybride post-quantique (Kyber) derrière feature flag
+- [ ] Fédération / interopérabilité (serveur-à-serveur)
+- [ ] Support Tor (option endpoint onion)
+- [ ] Exploration DID / ZK privacy
 - [ ] Appels vocaux & vidéo (chiffrés)
-
-### Version 1.2 (T2 2025)
-- [ ] Conversations de groupe (protocole Signal MLS)
-- [ ] Pièces jointes avec E2EE
-- [ ] Messages éphémères (suppression auto après X jours)
-- [ ] Accusés de lecture (optionnels)
-- [ ] Indicateurs de frappe (optionnels)
-
-### Version 2.0 (T3 2025)
-- [ ] Identité décentralisée (DID)
-- [ ] Preuves à divulgation nulle pour confidentialité des métadonnées
-- [ ] Intégration Tor
-- [ ] Support module de sécurité matériel (HSM)
 
 ---
 

@@ -329,25 +329,31 @@ _Coming soon_
 
 ## 🛣️ Roadmap
 
-### Version 1.1 (Q1 2025)
-- [ ] Post-quantum cryptography (CRYSTALS-Kyber)
-- [ ] WebAssembly crypto acceleration
-- [ ] Mobile applications (iOS/Android)
-- [ ] Federation support (interoperability with other servers)
+Dates are estimates and may shift as we prioritize security, stability, and shipping.
+
+### Version 1.0 (Dec 2025) — Current baseline
+- [x] Web deployment (Bridge + Frontend)
+- [x] E2EE v2 foundation (X3DH + Double Ratchet)
+- [x] E2EE attachments + burn-after-reading lifecycle
+- [x] Blockchain time-lock (block height)
+
+### Version 1.1 (Q1 2026) — Stability & security hardening
+- [ ] KeyVault migration to IndexedDB (reduce local storage risk)
+- [ ] WebSocket/Socket.IO hardening (auth + access control + rate limits)
+- [ ] CSP/CORS hardening pass (reduce false positives, keep strict scripts)
+- [ ] Production observability (actionable logs, health, error reporting)
+
+### Version 1.2 (Q2 2026) — UX & collaboration
+- [ ] Group conversations (initial implementation; MLS research in parallel)
+- [ ] Read receipts + typing indicators (opt-in)
+- [ ] Better attachment UX (quotas, cleanup, retries)
+
+### Version 2.0 (H2 2026+) — Research / advanced features
+- [ ] PQC hybrid key exchange (Kyber) behind a feature flag
+- [ ] Federation / interoperability (server-to-server)
+- [ ] Tor support (onion endpoint option)
+- [ ] DID / ZK privacy exploration
 - [ ] Voice & video calls (encrypted)
-
-### Version 1.2 (Q2 2025)
-- [ ] Group conversations (Signal MLS protocol)
-- [ ] File attachments with E2EE
-- [ ] Disappearing messages (auto-delete after X days)
-- [ ] Read receipts (optional)
-- [ ] Typing indicators (optional)
-
-### Version 2.0 (Q3 2025)
-- [ ] Decentralized identity (DID)
-- [ ] Zero-knowledge proofs for metadata privacy
-- [ ] Tor integration
-- [ ] Hardware security module (HSM) support
 
 ---
 
