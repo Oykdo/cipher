@@ -110,7 +110,10 @@ export const DEFAULT_CSP_CONFIG: CspConfig = {
     scriptSrc: ["'self'", "'nonce'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'blob:'], // nonce will be replaced per request, blob: for workers
     // NOTE: Some UI libs rely on inline styles (style="...") and/or injected <style> tags.
     // Allowing inline *styles* is generally far less risky than allowing inline scripts.
-    styleSrc: ["'self'", "'nonce'", "'unsafe-inline'"],
+    // IMPORTANT: If a nonce/hash is present in style-src, browsers may ignore 'unsafe-inline'.
+    // So we keep style-src strict for external CSS, and allow inline styles via style-src-elem/attr.
+    styleSrc: ["'self'"],
+    styleSrcElem: ["'self'", "'unsafe-inline'"],
     styleSrcAttr: ["'unsafe-inline'"],
     imgSrc: ["'self'", 'data:', 'blob:'], // data: for base64 images, blob: for generated images
     connectSrc: ["'self'", 'ws:', 'wss:'],
@@ -208,6 +211,7 @@ export async function handleCspReport(request: FastifyRequest, reply: FastifyRep
       // Example: await sendToSentry(violation);
     }
 
+    reply.header('Cache-Control', 'no-store');
     reply.code(204);
     return;
   } catch (error) {
