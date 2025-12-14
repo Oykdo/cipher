@@ -31,8 +31,8 @@ interface GetPublicKeysRequest {
 
 interface UploadPublicKeysRequest {
   Body: {
-    publicKey: string;       // Base64 encoded Curve25519 public key
-    signPublicKey: string;   // Base64 encoded Ed25519 public key
+    publicKey: string;       // Base64 (preferably base64url) encoded Curve25519 public key
+    signPublicKey: string;   // Base64 (preferably base64url) encoded Ed25519 public key
   };
 }
 
@@ -81,8 +81,9 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
           keys: publicKeys.map((key: any) => ({
             userId: key.user_id,
             username: key.username,
-            publicKey: key.public_key,
-            signPublicKey: key.sign_public_key,
+            // Normalize to base64url so browser libsodium can decode reliably
+            publicKey: normalize32ByteKeyToBase64Url(key.public_key) || key.public_key,
+            signPublicKey: normalize32ByteKeyToBase64Url(key.sign_public_key) || key.sign_public_key,
           })),
         };
       } catch (error) {
@@ -113,14 +114,17 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
           return { error: 'publicKey and signPublicKey are required' };
         }
         
-        // Validate base64 format
-        if (!isValidBase64(publicKey) || !isValidBase64(signPublicKey)) {
+        // Validate and normalize base64/base64url to base64url (libsodium browser default)
+        const normalizedPublicKey = normalize32ByteKeyToBase64Url(publicKey);
+        const normalizedSignPublicKey = normalize32ByteKeyToBase64Url(signPublicKey);
+
+        if (!normalizedPublicKey || !normalizedSignPublicKey) {
           reply.code(400);
-          return { error: 'publicKey and signPublicKey must be valid base64 strings' };
+          return { error: 'publicKey and signPublicKey must be valid base64/base64url strings encoding 32-byte keys' };
         }
         
         // Update database
-        await getDB().updateUserPublicKeys(userId, publicKey, signPublicKey);
+        await getDB().updateUserPublicKeys(userId, normalizedPublicKey, normalizedSignPublicKey);
         
         console.log(`✅ [PublicKeys] Updated public keys for user ${userId}`);
         
@@ -165,8 +169,8 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
           members: members.map((member: any) => ({
             userId: member.user_id,
             username: member.username,
-            publicKey: member.public_key || undefined,
-            signPublicKey: member.sign_public_key || undefined,
+            publicKey: member.public_key ? (normalize32ByteKeyToBase64Url(member.public_key) || member.public_key) : undefined,
+            signPublicKey: member.sign_public_key ? (normalize32ByteKeyToBase64Url(member.sign_public_key) || member.sign_public_key) : undefined,
           })),
         };
       } catch (error) {
@@ -188,14 +192,28 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
 // ============================================================================
 
 /**
- * Validate base64 string
+ * Normalize a 32-byte key encoded as base64/base64url into base64url.
+ *
+ * Why: libsodium-wrappers in the browser defaults to base64url (no padding),
+ * so returning base64url avoids decode failures client-side.
  */
-function isValidBase64(str: string): boolean {
+function normalize32ByteKeyToBase64Url(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+
+  // Quick charset check (accept base64 and base64url)
+  const charset = /^[A-Za-z0-9+/_-]+={0,2}$/;
+  if (!charset.test(value)) return null;
+
+  const decoded = tryDecode32Bytes(value, 'base64url') ?? tryDecode32Bytes(value, 'base64');
+  if (!decoded) return null;
+  return decoded.toString('base64url');
+}
+
+function tryDecode32Bytes(value: string, encoding: 'base64' | 'base64url'): Buffer | null {
   try {
-    // Check if it's a valid base64 string
-    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-    return base64Regex.test(str) && str.length > 0;
+    const buf = Buffer.from(value, encoding);
+    return buf.length === 32 ? buf : null;
   } catch {
-    return false;
+    return null;
   }
 }
