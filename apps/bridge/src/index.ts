@@ -99,9 +99,25 @@ if (hasFrontend) {
         // Needed for reply.sendFile() used below.
         decorateReply: true,
         index: false,
+        setHeaders: (res, filePath) => {
+            // Prevent stale HTML being cached across deploys (can cause assets mismatch)
+            if (filePath.endsWith('/index.html') || filePath.endsWith('\\index.html')) {
+                res.setHeader('Cache-Control', 'no-store');
+                return;
+            }
+
+            // Vite outputs hashed assets; safe to cache long-term.
+            if (filePath.includes('/assets/') || filePath.includes('\\assets\\')) {
+                res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+                return;
+            }
+
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+        },
     });
 
     app.get('/', async (_request, reply) => {
+        reply.header('Cache-Control', 'no-store');
         return reply.sendFile('index.html', frontendDist);
     });
 
@@ -112,12 +128,24 @@ if (hasFrontend) {
             return;
         }
 
+        const urlPath = request.url.split('?')[0] || request.url;
+        const accept = (request.headers['accept'] as string | undefined) || '';
+
+        // Never serve index.html for non-HTML requests (e.g. module scripts, css, images).
+        // Otherwise browsers may receive HTML with 200 and throw: "Expected a JavaScript module script".
+        const looksLikeAsset = urlPath.startsWith('/assets/') || urlPath.includes('.') || urlPath.startsWith('/avatars/');
+        if (looksLikeAsset || !accept.includes('text/html')) {
+            reply.code(404).send({ error: 'Not Found' });
+            return;
+        }
+
         // Let API routes return 404 normally
         if (request.url.startsWith('/api') || request.url === '/health') {
             reply.code(404).send({ error: 'Not Found' });
             return;
         }
 
+        reply.header('Cache-Control', 'no-store');
         return reply.sendFile('index.html', frontendDist);
     });
 }
