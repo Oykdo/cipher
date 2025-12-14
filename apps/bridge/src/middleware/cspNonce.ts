@@ -97,7 +97,7 @@ export function buildCspHeader(config: CspConfig, nonce: string): string {
  * Default CSP configuration for Dead Drop (STRICT MODE)
  * 
  * SECURITY:
- * - NO 'unsafe-inline' - Uses nonces instead
+ * - NO 'unsafe-inline' for scripts - Uses nonces instead
  * - NO 'unsafe-eval' - No dynamic eval()
  * - Strict directives for maximum XSS protection
  * - Report-Only in development, Enforced in production
@@ -108,9 +108,9 @@ export const DEFAULT_CSP_CONFIG: CspConfig = {
   directives: {
     defaultSrc: ["'self'"],
     scriptSrc: ["'self'", "'nonce'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'blob:'], // nonce will be replaced per request, blob: for workers
-    // NOTE: React/Framer Motion and some UI libs may rely on style="..." attributes.
-    // Allowing style attributes is far less risky than allowing inline scripts.
-    styleSrc: ["'self'", "'nonce'"],
+    // NOTE: Some UI libs rely on inline styles (style="...") and/or injected <style> tags.
+    // Allowing inline *styles* is generally far less risky than allowing inline scripts.
+    styleSrc: ["'self'", "'nonce'", "'unsafe-inline'"],
     styleSrcAttr: ["'unsafe-inline'"],
     imgSrc: ["'self'", 'data:', 'blob:'], // data: for base64 images, blob: for generated images
     connectSrc: ["'self'", 'ws:', 'wss:'],
