@@ -312,6 +312,14 @@ export default function LoginNew() {
               await setSessionMasterKey(masterKeyHex);
               // SECURITY: MasterKey loaded (not logging for security)
 
+          // Init E2EE vault (keyed by masterKey) so E2EE storage works regardless of login method
+          try {
+            const { getE2EEVault } = await import('../lib/keyVault');
+            await getE2EEVault(masterKeyHex);
+          } catch (vaultInitErr) {
+            console.warn('[LoginNew] Failed to init E2EE vault:', vaultInitErr);
+          }
+
               // Best-effort: enable mnemonic/seed login for this account (for other devices)
               if (verifyData.user.securityTier === 'standard') {
                 try {
@@ -438,6 +446,14 @@ export default function LoginNew() {
       // Persist masterKey as non-extractable CryptoKey in IndexedDB (so encryption works after reload)
       // Note: hex itself is only cached in memory (SecureMemoryCache)
       await setTemporaryMasterKey(masterKeyHex);
+
+      // Initialize E2EE vault (masterKey-based)
+      try {
+        const { getE2EEVault } = await import('../lib/keyVault');
+        await getE2EEVault(masterKeyHex);
+      } catch (vaultInitErr) {
+        console.warn('[LoginNew] Failed to init E2EE vault:', vaultInitErr);
+      }
 
       // SRP-SEED login: authenticate using a verifier derived from the masterKey
       // so the user can login from username + mnemonic on a new device.
@@ -751,6 +767,18 @@ export default function LoginNew() {
           const masterKeyHex = await decryptData(encryptedMasterKey, fileHash);
           if (masterKeyHex) {
             await setSessionMasterKey(masterKeyHex);
+            try {
+              await setTemporaryMasterKey(masterKeyHex);
+            } catch (mkErr) {
+              console.warn('[LoginNew] Failed to persist masterKey for file login:', mkErr);
+            }
+
+            try {
+              const { getE2EEVault } = await import('../lib/keyVault');
+              await getE2EEVault(masterKeyHex);
+            } catch (vaultInitErr) {
+              console.warn('[LoginNew] Failed to init E2EE vault for file login:', vaultInitErr);
+            }
             // SECURITY: MasterKey decrypted (not logging for security)
           } else {
             console.warn('[LoginNew] Failed to decrypt masterKey from avatarAuth');
@@ -975,6 +1003,12 @@ export default function LoginNew() {
 
         // Initialize E2EE immediately after account creation
         try {
+          try {
+            const { getE2EEVault } = await import('../lib/keyVault');
+            await getE2EEVault(masterKeyHex);
+          } catch (vaultInitErr) {
+            console.warn('[LoginNew] Failed to init E2EE vault for new account:', vaultInitErr);
+          }
           await initializeE2EE(username);
           debugLogger.debug('[LoginNew] E2EE initialized for new account');
         } catch (e2eeError) {
@@ -1004,6 +1038,19 @@ export default function LoginNew() {
           if (storedMasterKey) {
             // SECURITY: Store masterKey locally for encryption
             await setSessionMasterKey(storedMasterKey);
+
+            try {
+              await setTemporaryMasterKey(storedMasterKey);
+            } catch (mkErr) {
+              console.warn('[LoginNew] Failed to persist masterKey for auto-login:', mkErr);
+            }
+
+            try {
+              const { getE2EEVault } = await import('../lib/keyVault');
+              await getE2EEVault(storedMasterKey);
+            } catch (vaultInitErr) {
+              console.warn('[LoginNew] Failed to init E2EE vault for auto-login:', vaultInitErr);
+            }
 
             // SECURITY: Use SRP for authentication (zero-knowledge)
             const ephemeral = srp.generateEphemeral();

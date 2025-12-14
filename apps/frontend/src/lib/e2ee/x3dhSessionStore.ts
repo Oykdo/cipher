@@ -16,7 +16,7 @@
  */
 
 import _sodium from 'libsodium-wrappers';
-import { getExistingKeyVault } from '../keyVault';
+import { getExistingE2EEVault } from '../keyVault';
 
 import { debugLogger } from "../debugLogger";
 // ============================================================================
@@ -157,7 +157,7 @@ export async function storeHandshakeState(
 ): Promise<void> {
   await _sodium.ready;
   
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized');
   }
@@ -178,7 +178,7 @@ export async function getHandshakeState(
 ): Promise<X3DHHandshakeState | null> {
   await _sodium.ready;
   
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized');
   }
@@ -253,7 +253,7 @@ export async function deleteHandshakeState(
   username: string,
   peerUsername: string
 ): Promise<void> {
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized');
   }
@@ -281,7 +281,7 @@ export async function hasPendingHandshake(
 export async function getPendingHandshakes(
   _username: string
 ): Promise<X3DHHandshakeState[]> {
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     return [];
   }

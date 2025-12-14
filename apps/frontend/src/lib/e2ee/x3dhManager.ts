@@ -31,7 +31,7 @@ import {
   ONE_TIME_PREKEY_COUNT,
 } from './x3dh';
 import { initializeAlice, initializeBob, type RatchetState } from './doubleRatchet';
-import { getExistingKeyVault } from '../keyVault';
+import { getExistingE2EEVault } from '../keyVault';
 import { debugLogger } from "../debugLogger";
 // NOTE: These imports will be used when we fully integrate x3dhSessionStore
 // import { createDoubleRatchetSession } from './sessionManager';
@@ -96,7 +96,7 @@ export async function initializeX3DHManager(
   sendHandshakeMessage = onSendMessage;
   
   // Load or generate local key bundle
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   const stored = vault ? await vault.getData('x3dh_local_bundle') : null;
   
   if (stored) {
@@ -164,7 +164,7 @@ async function rotateSignedPreKey(): Promise<void> {
   localKeyBundle.lastRotation = Date.now();
   
   // Persist
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (vault) {
     await vault.storeData('x3dh_local_bundle', serializeLocalKeyBundle(localKeyBundle));
   }
@@ -205,7 +205,7 @@ async function consumeOneTimePreKey(id: number): Promise<OneTimePreKey | undefin
   localKeyBundle.nextOPKId++;
   
   // Persist
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (vault) {
     await vault.storeData('x3dh_local_bundle', serializeLocalKeyBundle(localKeyBundle));
   }
@@ -248,7 +248,7 @@ export async function replenishOPKs(count: number = OPK_REPLENISH_BATCH): Promis
   localKeyBundle.nextOPKId += count;
   
   // Persist locally
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (vault) {
     await vault.storeData('x3dh_local_bundle', serializeLocalKeyBundle(localKeyBundle));
   }

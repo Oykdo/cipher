@@ -19,16 +19,21 @@ const MASTER_KEY_ID = 'masterKey';
  * Key Vault for secure key storage
  */
 export class KeyVault {
+  private readonly dbName: string;
   private storage: SecureStorage | null = null;
   private sessionKeys: Map<string, string> = new Map();
   private isInitialized = false;
+
+  constructor(dbName = 'CipherPulseSecure') {
+    this.dbName = dbName;
+  }
 
   /**
    * Initialize vault with user password
    */
   async initialize(password: string): Promise<void> {
     try {
-      this.storage = await getSecureStorage(password);
+      this.storage = await getSecureStorage(password, this.dbName);
       this.isInitialized = true;
       logger.info('KeyVault initialized');
     } catch (error) {
@@ -238,13 +243,16 @@ export class KeyVault {
 
 // Singleton instance
 let keyVaultInstance: KeyVault | null = null;
+let e2eeVaultInstance: KeyVault | null = null;
+
+const E2EE_DB_NAME = 'CipherPulseSecureE2EE';
 
 /**
  * Get or create KeyVault instance
  */
 export async function getKeyVault(password: string): Promise<KeyVault> {
   if (!keyVaultInstance) {
-    keyVaultInstance = new KeyVault();
+    keyVaultInstance = new KeyVault('CipherPulseSecure');
     await keyVaultInstance.initialize(password);
   }
   return keyVaultInstance;
@@ -258,11 +266,33 @@ export function getExistingKeyVault(): KeyVault | null {
 }
 
 /**
+ * E2EE Vault (keyed by masterKey-derived secret)
+ * This is intentionally separate from the "password" KeyVault, so mnemonic login
+ * doesn't conflict with device-local password unlock.
+ */
+export async function getE2EEVault(secret: string): Promise<KeyVault> {
+  if (!e2eeVaultInstance) {
+    e2eeVaultInstance = new KeyVault(E2EE_DB_NAME);
+    await e2eeVaultInstance.initialize(secret);
+  }
+  return e2eeVaultInstance;
+}
+
+export function getExistingE2EEVault(): KeyVault | null {
+  return e2eeVaultInstance;
+}
+
+/**
  * Close and reset KeyVault instance
  */
 export function closeKeyVault(): void {
   if (keyVaultInstance) {
     keyVaultInstance.close();
     keyVaultInstance = null;
+  }
+
+  if (e2eeVaultInstance) {
+    e2eeVaultInstance.close();
+    e2eeVaultInstance = null;
   }
 }

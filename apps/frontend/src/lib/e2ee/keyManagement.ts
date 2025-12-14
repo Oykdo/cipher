@@ -7,7 +7,6 @@
 
 import {
   generateIdentityKeyPair,
-  generateKeyExchangeKeyPair,
   generateSigningKeyPair,
   generateOneTimePreKeys,
   bytesToBase64,
@@ -18,7 +17,7 @@ import {
   type SignedPreKey,
   signData,
 } from './index';
-import { getExistingKeyVault } from '../keyVault';
+import { getExistingE2EEVault } from '../keyVault';
 
 import { debugLogger } from "../debugLogger";
 // ============================================================================
@@ -63,23 +62,22 @@ export async function generateUserIdentityKeys(): Promise<UserIdentityKeys> {
   const signingKeyPair = await generateSigningKeyPair();
   // SECURITY: Sensitive log removed
   
-  // Generate signed prekey
-  const preKeyPair = await generateKeyExchangeKeyPair();
-  // Use a random ID that fits in PostgreSQL integer (max ~2.1 billion)
-  const preKeyId = Math.floor(Math.random() * 2000000000);
-  const preKeyPublicBase64 = bytesToBase64(preKeyPair.publicKey);
-  const signature = await signData(preKeyPublicBase64, signingKeyPair.privateKey);
-  
-  const signedPreKey: SignedPreKey = {
-    keyId: preKeyId,
-    publicKey: preKeyPublicBase64,
-    signature,
-  };
-  debugLogger.info('✅ [E2EE] Signed prekey generated');
-  
   // Generate one-time prekeys
   const preKeys = await generateOneTimePreKeys(100);
   debugLogger.info('✅ [E2EE] Generated ${preKeys.length} one-time prekeys');
+
+  // Generate signed prekey (we sign the first prekey's public key)
+  // Use a random ID that fits in PostgreSQL integer (max ~2.1 billion)
+  const preKeyId = Math.floor(Math.random() * 2000000000);
+  const signedPreKeyPublicBase64 = bytesToBase64(preKeys[0].publicKey);
+  const signature = await signData(signedPreKeyPublicBase64, signingKeyPair.privateKey);
+
+  const signedPreKey: SignedPreKey = {
+    keyId: preKeyId,
+    publicKey: signedPreKeyPublicBase64,
+    signature,
+  };
+  debugLogger.info('✅ [E2EE] Signed prekey generated');
   
   return {
     identityKeyPair,
@@ -100,7 +98,7 @@ export async function storeIdentityKeys(
   username: string,
   keys: UserIdentityKeys
 ): Promise<void> {
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized');
   }
@@ -132,7 +130,7 @@ export async function storeIdentityKeys(
 export async function retrieveIdentityKeys(
   username: string
 ): Promise<UserIdentityKeys | null> {
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized');
   }
@@ -218,7 +216,7 @@ export async function storePeerPublicKey(
   publicKey: Uint8Array,
   fingerprint: string
 ): Promise<void> {
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized');
   }
@@ -240,7 +238,7 @@ export async function retrievePeerPublicKey(
   username: string,
   peerUsername: string
 ): Promise<{ publicKey: Uint8Array; fingerprint: string; verifiedAt: number | null } | null> {
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized');
   }
@@ -266,7 +264,7 @@ export async function markPeerKeyVerified(
   username: string,
   peerUsername: string
 ): Promise<void> {
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized');
   }
@@ -344,7 +342,7 @@ export async function importIdentityKeys(
   JSON.parse(keysJson);
 
   // Store in KeyVault
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized');
   }

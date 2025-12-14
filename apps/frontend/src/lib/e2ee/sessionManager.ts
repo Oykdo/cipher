@@ -20,7 +20,7 @@ import {
   base64ToBytes,
   type EncryptedData,
 } from './index';
-import { getExistingKeyVault } from '../keyVault';
+import { getExistingE2EEVault } from '../keyVault';
 import { debugLogger } from "../debugLogger";
 import {
   ratchetEncrypt,
@@ -211,7 +211,7 @@ function deserializeRatchetState(json: string): RatchetState {
  * Store session in KeyVault
  */
 async function storeSession(username: string, session: E2EESession): Promise<void> {
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized');
   }
@@ -238,7 +238,7 @@ async function storeSession(username: string, session: E2EESession): Promise<voi
  * Retrieve session from KeyVault
  */
 async function retrieveSession(username: string, peerUsername: string): Promise<E2EESession | undefined> {
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized');
   }
@@ -691,7 +691,7 @@ export async function deleteSession(username: string, peerUsername: string): Pro
   activeSessions.delete(sessionId);
 
   // Remove from KeyVault
-  const vault = getExistingKeyVault();
+  const vault = getExistingE2EEVault();
   if (vault) {
     await vault.removeData(`e2ee:session:${username}:${peerUsername}`);
   }

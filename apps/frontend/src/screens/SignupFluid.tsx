@@ -295,6 +295,17 @@ export default function SignupFluid() {
 
       // Initialize E2EE immediately after account creation
       try {
+        try {
+          const { setSessionMasterKey } = await import('../lib/masterKeyResolver');
+          const { setTemporaryMasterKey } = await import('../lib/secureKeyAccess');
+          const { getE2EEVault } = await import('../lib/keyVault');
+
+          await setSessionMasterKey(masterKeyHex);
+          await setTemporaryMasterKey(masterKeyHex);
+          await getE2EEVault(masterKeyHex);
+        } catch (vaultInitErr) {
+          console.warn('[SignupFluid] Failed to init E2EE vault/masterKey:', vaultInitErr);
+        }
         await initializeE2EE(username);
         debugLogger.debug('[SignupFluid] E2EE initialized for new account');
       } catch (e2eeError) {

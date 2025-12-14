@@ -13,7 +13,6 @@
 
 import { logger } from '@/core/logger';
 
-const DB_NAME = 'CipherPulseSecure';
 const DB_VERSION = 2; // Incremented for salt storage
 const STORE_NAME = 'vault';
 const SALT_STORE_NAME = 'salts';
@@ -37,9 +36,14 @@ interface StoredSalt {
  * Secure Storage using IndexedDB with AES-GCM encryption
  */
 export class SecureStorage {
+  private readonly dbName: string;
   private db: IDBDatabase | null = null;
   private encryptionKey: CryptoKey | null = null;
   private userSalt: Uint8Array | null = null;
+
+  constructor(dbName: string) {
+    this.dbName = dbName;
+  }
 
   /**
    * Initialize secure storage with encryption key
@@ -267,7 +271,7 @@ export class SecureStorage {
    */
   private openDatabase(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = indexedDB.open(this.dbName, DB_VERSION);
 
       request.onerror = () => {
         reject(new Error('Failed to open database'));
@@ -432,26 +436,30 @@ export class SecureStorage {
   }
 }
 
-// Singleton instance
-let secureStorageInstance: SecureStorage | null = null;
+// Singleton instances (keyed by db name)
+const secureStorageInstances = new Map<string, SecureStorage>();
 
 /**
  * Get or create SecureStorage instance
  */
-export async function getSecureStorage(password: string): Promise<SecureStorage> {
-  if (!secureStorageInstance) {
-    secureStorageInstance = new SecureStorage();
-    await secureStorageInstance.initialize(password);
+export async function getSecureStorage(password: string, dbName = 'CipherPulseSecure'): Promise<SecureStorage> {
+  const existing = secureStorageInstances.get(dbName);
+  if (existing) {
+    return existing;
   }
-  return secureStorageInstance;
+
+  const storage = new SecureStorage(dbName);
+  await storage.initialize(password);
+  secureStorageInstances.set(dbName, storage);
+  return storage;
 }
 
 /**
  * Close and reset SecureStorage instance
  */
 export function closeSecureStorage(): void {
-  if (secureStorageInstance) {
-    secureStorageInstance.close();
-    secureStorageInstance = null;
+  for (const storage of secureStorageInstances.values()) {
+    storage.close();
   }
+  secureStorageInstances.clear();
 }

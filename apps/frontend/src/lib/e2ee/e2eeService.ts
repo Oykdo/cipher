@@ -88,9 +88,9 @@ export async function initializeE2EE(username: string): Promise<void> {
   // Initialize libsodium
   await initializeCrypto();
 
-  // Verify KeyVault is initialized
-  const { getExistingKeyVault } = await import('../keyVault');
-  const vault = getExistingKeyVault();
+  // Verify E2EE vault is initialized (keyed by masterKey, not the local device password)
+  const { getExistingE2EEVault } = await import('../keyVault');
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized - cannot initialize E2EE. Please re-login.');
   }
@@ -134,8 +134,8 @@ export async function ensureE2EEInitializedForSession(username?: string): Promis
     throw new Error('No active session available for E2EE initialization. Please log in again.');
   }
 
-  const { getExistingKeyVault } = await import('../keyVault');
-  const vault = getExistingKeyVault();
+  const { getExistingE2EEVault } = await import('../keyVault');
+  const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized - unlock with your password and retry.');
   }
