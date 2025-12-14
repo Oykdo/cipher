@@ -36,6 +36,19 @@ export interface BackupPayload {
     createdAt: number;
     fingerprint?: string;
   };
+  /**
+   * Optional account recovery material.
+   * 
+   * SECURITY:
+   * - This is included INSIDE the encrypted payload (BEK-encrypted).
+   * - It enables users to keep a single password-protected export that contains
+   *   their recovery keys (mnemonic or DiceKey checksums).
+   */
+  recoveryKeys?: {
+    securityTier: 'standard' | 'dice-key';
+    mnemonic?: string[];
+    checksums?: string[];
+  };
   contacts: BackupContact[];
   conversations: BackupConversation[];
   identityKeys?: {

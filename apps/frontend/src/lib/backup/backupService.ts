@@ -45,7 +45,8 @@ import { debugLogger } from "../debugLogger";
 export async function exportToBackupVault(
   password: string,
   options: ExportOptions = { includeMessages: true, includeContacts: true, includeIdentityKeys: false },
-  onProgress?: (stage: string, progress: number) => void
+  onProgress?: (stage: string, progress: number) => void,
+  extra?: { recoveryKeys?: BackupPayload['recoveryKeys'] }
 ): Promise<Blob> {
   const session = useAuthStore.getState().session;
   if (!session?.accessToken || !session?.user) {
@@ -78,6 +79,10 @@ export async function exportToBackupVault(
       conversations: [],
       exportedAt: Date.now(),
     };
+
+    if (extra?.recoveryKeys) {
+      payload.recoveryKeys = extra.recoveryKeys;
+    }
 
     if (options.includeIdentityKeys && isE2EEInitialized()) {
       payload.identityKeys = {

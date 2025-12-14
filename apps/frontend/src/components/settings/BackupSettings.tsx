@@ -7,7 +7,8 @@ import { exportUserData, importUserData, validateExportFile } from "../../lib/da
 import { 
     exportToBackupVault, 
     importFromBackupVault, 
-    validateBackupFile 
+    validateBackupFile,
+    type BackupPayload,
 } from "../../lib/backup";
 
 // File System Access API Types
@@ -354,12 +355,75 @@ export function BackupSettings() {
             let blob: Blob;
             let filename: string;
 
+            // Include account recovery material (mnemonic / DiceKey checksums) inside the encrypted backup.
+            // This allows DiceKey users to export their security keys in a password-protected file.
+            let recoveryKeysForBackup: BackupPayload['recoveryKeys'] | undefined;
+            const username = session?.user?.username;
+            if (!username) {
+                throw new Error('Invalid session');
+            }
+
+            // Prefer already-unlocked vault; otherwise try unlocking with the export password.
+            const existingVault = getExistingKeyVault();
+            const vault = existingVault ?? await getKeyVault(exportPassword);
+            const masterKey = await vault.getData(`masterKey:${username}`);
+
+            if (!masterKey) {
+                throw new Error(
+                    "Impossible d'accéder aux clés de récupération. Utilisez le mot de passe du coffre (Quick Unlock) puis relancez l'export."
+                );
+            }
+
+            const recoveryData = await getRecoveryKeys();
+            if (!recoveryData?.success) {
+                throw new Error('Failed to retrieve recovery keys');
+            }
+
+            // Decrypt recovery material locally
+            let mnemonic: string[] | null = null;
+            let checksums: string[] | null = null;
+
+            if (recoveryData.encryptedMnemonic) {
+                const decryptedMnemonic = await decryptWithMasterKey(recoveryData.encryptedMnemonic, masterKey);
+                if (decryptedMnemonic) {
+                    try {
+                        mnemonic = JSON.parse(decryptedMnemonic);
+                    } catch {
+                        // ignore
+                    }
+                }
+            }
+
+            if (recoveryData.encryptedChecksums) {
+                const decryptedChecksums = await decryptWithMasterKey(recoveryData.encryptedChecksums, masterKey);
+                if (decryptedChecksums) {
+                    try {
+                        checksums = JSON.parse(decryptedChecksums);
+                    } catch {
+                        // ignore
+                    }
+                }
+            }
+
+            if (recoveryData.securityTier === 'dice-key') {
+                if (!checksums || checksums.length === 0) {
+                    throw new Error('Impossible de déchiffrer les checksums DiceKey.');
+                }
+                recoveryKeysForBackup = { securityTier: 'dice-key', checksums };
+            } else {
+                if (!mnemonic || mnemonic.length === 0) {
+                    throw new Error('Impossible de déchiffrer la phrase mnémonique.');
+                }
+                recoveryKeysForBackup = { securityTier: 'standard', mnemonic };
+            }
+
             if (useVaultV2) {
                 // Use new Backup Vault v2 (Argon2id + XChaCha20-Poly1305)
                 blob = await exportToBackupVault(
                     exportPassword,
                     { includeMessages, includeContacts: true, includeIdentityKeys: false },
-                    (stage, progress) => setExportProgress({ stage, progress })
+                    (stage, progress) => setExportProgress({ stage, progress }),
+                    { recoveryKeys: recoveryKeysForBackup }
                 );
                 filename = `cipher-pulse-backup-v2-${Date.now()}.json`;
             } else {
