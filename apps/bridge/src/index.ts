@@ -63,11 +63,19 @@ await app.register(rateLimit, {
     retryAfter: Math.ceil(context.ttl / 1000),
   }),
 });
-await app.register(fastifyStatic, {
-    root: join(process.cwd(), 'public'),
-    prefix: '/', // Serve files at root (e.g. /avatars/foo.png)
-    index: false,
-});
+
+// Static public files (e.g. generated avatars)
+// NOTE: We do not mount this at '/' to avoid route conflicts with the SPA static handler.
+const bridgePublicDir = resolve(__dirname, '..', 'public');
+const avatarsDir = resolve(bridgePublicDir, 'avatars');
+if (existsSync(avatarsDir)) {
+    await app.register(fastifyStatic, {
+        root: avatarsDir,
+        prefix: '/avatars/',
+        decorateReply: false,
+        index: false,
+    });
+}
 
 // Serve the built frontend (SPA) when present (e.g. Render production deploy)
 const frontendDist = resolve(__dirname, '..', '..', 'frontend', 'dist');
