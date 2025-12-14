@@ -393,10 +393,11 @@ Si vous trouvez Cipher Pulse utile, soutenez son développement :
 
 | Devise | Adresse |
 |--------|---------|
-| **Bitcoin (BTC)** | `[VOTRE_ADRESSE_BTC]` |
-| **Ethereum (ETH)** | `[VOTRE_ADRESSE_ETH]` |
-| **Monero (XMR)** | `[VOTRE_ADRESSE_XMR]` |
-| **Solana (SOL)** | `[VOTRE_ADRESSE_SOL]` |
+| **Bitcoin (BTC)** | `bc1pqu5zya672tma8q36ww9c6mzk7uryq6cuavqn04jqka43qjm6nxtqs8am6t` |
+| **EVM (0x)** | `0x979a6093d3a1662054b89667e6dbfac001fa2617` |
+| **Solana (SOL)** | `HshrizaXzs6i6yse3YjkpDsQ4S7WjRoDALeVr6tN1yM8` |
+| **XRP (XRP)** | `rspbrWJkPr8jSyz9wVVLwpxuSfosBM8ocM` |
+| **Pi** | `GCUGVJDK4TY6KTVWFYXTDH2OXRSTTFQUYPLU2CH523AHCZOPWUVEVDC6` |
 
 ### Autres façons de soutenir
 
