@@ -4,7 +4,7 @@ import { useAuthStore } from "../../store/auth";
 import { getRecoveryKeys } from "../../services/api-interceptor";
 import { getExistingKeyVault, getKeyVault } from "../../lib/keyVault";
 import { exportUserData, importUserData, validateExportFile } from "../../lib/dataExport";
-import _sodium from "libsodium-wrappers";
+import { scryptAsync } from "@noble/hashes/scrypt";
 import { 
     exportToBackupVault, 
     importFromBackupVault, 
@@ -111,7 +111,6 @@ export function BackupSettings() {
             }
 
             // Backend uses: scryptSync(Buffer.from(masterKeyHex, 'hex'), salt, 32) + AES-256-GCM
-            await _sodium.ready;
 
             const salt = Uint8Array.from(atob(data.s), (c) => c.charCodeAt(0));
             const iv = Uint8Array.from(atob(data.iv), (c) => c.charCodeAt(0));
@@ -124,15 +123,7 @@ export function BackupSettings() {
             combined.set(tag, ciphertext.length);
 
             const masterKeyBytes = Uint8Array.from(masterKeyHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-            // libsodium typings don't expose this low-level scrypt function, but it's available at runtime.
-            const keyBytes: Uint8Array = (_sodium as any).crypto_pwhash_scryptsalsa208sha256_ll(
-                masterKeyBytes,
-                salt,
-                16384,
-                8,
-                1,
-                32
-            );
+            const keyBytes = await scryptAsync(masterKeyBytes, salt, { N: 16384, r: 8, p: 1, dkLen: 32 });
 
             // Import raw key bytes into WebCrypto (ensure we have a plain ArrayBuffer-backed Uint8Array)
             const rawKeyBytes = new Uint8Array(keyBytes);
@@ -140,9 +131,9 @@ export function BackupSettings() {
 
             const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, combined);
 
-            _sodium.memzero(keyBytes);
-            _sodium.memzero(rawKeyBytes);
-            _sodium.memzero(masterKeyBytes);
+            keyBytes.fill(0);
+            rawKeyBytes.fill(0);
+            masterKeyBytes.fill(0);
 
             return new TextDecoder().decode(decrypted);
         } catch (error) {
