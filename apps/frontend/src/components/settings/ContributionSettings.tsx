@@ -1,22 +1,36 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+type CryptoAddress = {
+    name: string;
+    symbol: string;
+    address: string;
+    icon: string;
+    color: string;
+    note?: string;
+    tag?: string;
+};
+
+type ContributionTargetsResponse = {
+    targets: Record<string, { symbol: string; address: string; tag?: string }>;
+    fingerprint: string;
+};
+
+async function sha256Hex(value: string): Promise<string> {
+    const bytes = new TextEncoder().encode(value);
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+}
 
 export function ContributionSettings() {
     const { t } = useTranslation();
     const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+    const [integrityOk, setIntegrityOk] = useState(true);
 
     // Crypto addresses
-    type CryptoAddress = {
-        name: string;
-        symbol: string;
-        address: string;
-        icon: string;
-        color: string;
-        note?: string;
-        tag?: string;
-    };
-
-    const cryptoAddresses: Record<string, CryptoAddress> = {
+    const cryptoAddresses: Record<string, CryptoAddress> = useMemo(() => ({
         btc: {
             name: "Bitcoin",
             symbol: "BTC",
@@ -54,9 +68,37 @@ export function ContributionSettings() {
             icon: "/crypto-logos/pi-network.svg?v=2",
             color: "from-violet-700 to-yellow-500",
         },
-    };
+    }), [t]);
+
+    useEffect(() => {
+        const run = async () => {
+            try {
+                const res = await fetch('/api/public/contribution-targets', {
+                    method: 'GET',
+                    headers: { Accept: 'application/json' },
+                    cache: 'no-store',
+                });
+                if (!res.ok) return;
+
+                const data = (await res.json()) as ContributionTargetsResponse;
+                if (!data?.targets || typeof data.fingerprint !== 'string') return;
+
+                const localTargets = Object.fromEntries(
+                    Object.entries(cryptoAddresses).map(([key, c]) => [key, { symbol: c.symbol, address: c.address, tag: c.tag }])
+                );
+                const localFingerprint = await sha256Hex(JSON.stringify(localTargets));
+                setIntegrityOk(localFingerprint === data.fingerprint);
+            } catch {
+                // If we cannot verify, we keep UI functional (best effort).
+                setIntegrityOk(true);
+            }
+        };
+
+        void run();
+    }, [cryptoAddresses]);
 
     const copyToClipboard = (address: string, symbol: string) => {
+        if (!integrityOk) return;
         navigator.clipboard.writeText(address);
         setCopiedAddress(symbol);
         setTimeout(() => setCopiedAddress(null), 2000);
@@ -90,7 +132,7 @@ export function ContributionSettings() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div
-                                        className={`w-14 h-14 flex items-center justify-center rounded-full bg-white p-2`}
+                                        className={`w-14 h-14 shrink-0 aspect-square flex items-center justify-center rounded-full bg-white p-2`}
                                     >
                                         <img
                                             src={crypto.icon}
@@ -126,7 +168,12 @@ export function ContributionSettings() {
                                     </div>
                                     <button
                                         onClick={() => copyToClipboard(crypto.address, crypto.symbol)}
-                                        className="px-4 bg-brand-500 hover:bg-brand-600 text-white rounded-lg transition-colors"
+                                        disabled={!integrityOk}
+                                        className={`px-4 text-white rounded-lg transition-colors ${
+                                            integrityOk
+                                                ? 'bg-brand-500 hover:bg-brand-600'
+                                                : 'bg-slate-700 cursor-not-allowed opacity-60'
+                                        }`}
                                         title={t('settings.contribution_settings.copy_address')}
                                     >
                                         📋
@@ -146,7 +193,12 @@ export function ContributionSettings() {
                                         </div>
                                         <button
                                             onClick={() => copyToClipboard(crypto.tag!, "TAG")}
-                                            className="px-4 bg-brand-500 hover:bg-brand-600 text-white rounded-lg transition-colors"
+                                            disabled={!integrityOk}
+                                            className={`px-4 text-white rounded-lg transition-colors ${
+                                                integrityOk
+                                                    ? 'bg-brand-500 hover:bg-brand-600'
+                                                    : 'bg-slate-700 cursor-not-allowed opacity-60'
+                                            }`}
                                             title={t('settings.contribution_settings.copy_tag')}
                                         >
                                             📋
@@ -158,6 +210,17 @@ export function ContributionSettings() {
                     </div>
                 ))}
             </div>
+
+            {!integrityOk && (
+                <div className="mt-4 p-4 bg-red-500/10 rounded-lg border border-red-500/30">
+                    <p className="text-sm text-red-200">
+                        {t(
+                            'settings.contribution_settings.integrity_warning',
+                            "Integrity check failed: contribution addresses could not be verified. Copy is disabled."
+                        )}
+                    </p>
+                </div>
+            )}
 
             {/* Thank You Message */}
             <div className="mt-8 p-6 bg-gradient-to-r from-brand-500/10 to-purple-500/10 rounded-xl border border-brand-400/20">
