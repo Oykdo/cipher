@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { randomUUID } from 'crypto';
+import { fileURLToPath } from 'url';
 
 const execAsync = promisify(exec);
 
@@ -34,9 +35,15 @@ export class AvatarService {
     private scriptPath: string;
 
     constructor() {
-        // Ensure these paths are correct relative to your project structure
-        this.outputDir = path.join(process.cwd(), 'public', 'avatars');
-        this.scriptPath = path.join(process.cwd(), 'scripts', 'generate_avatar.py');
+        // Use paths relative to the bridge package root rather than process.cwd().
+        // In production (e.g. Render), the process may be started from the repo root,
+        // which would otherwise write avatars to the wrong directory and make /avatars/* 404.
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+        const bridgeRoot = path.resolve(__dirname, '..', '..');
+
+        this.outputDir = path.join(bridgeRoot, 'public', 'avatars');
+        this.scriptPath = path.join(bridgeRoot, 'scripts', 'generate_avatar.py');
 
         if (!fs.existsSync(this.outputDir)) {
             fs.mkdirSync(this.outputDir, { recursive: true });
