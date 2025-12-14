@@ -4,11 +4,11 @@ import { useAuthStore } from "../../store/auth";
 import { getRecoveryKeys } from "../../services/api-interceptor";
 import { getExistingKeyVault, getKeyVault } from "../../lib/keyVault";
 import { exportUserData, importUserData, validateExportFile } from "../../lib/dataExport";
+import _sodium from "libsodium-wrappers";
 import { 
     exportToBackupVault, 
     importFromBackupVault, 
     validateBackupFile,
-    type BackupPayload,
 } from "../../lib/backup";
 
 // File System Access API Types
@@ -94,56 +94,88 @@ export function BackupSettings() {
     };
 
     // Helper function to decrypt data with masterKey (matching backend encryption)
-    const decryptWithMasterKey = async (encryptedJson: string, masterKeyHex: string): Promise<string | null> => {
+    const decryptWithMasterKey = async (encryptedJson: unknown, masterKeyHex: string): Promise<string | null> => {
         try {
             if (!encryptedJson || !masterKeyHex) return null;
             
             // Check if it's encrypted format
-            const data = JSON.parse(encryptedJson);
-            if (!data.v || !data.alg || !data.s || !data.iv || !data.ct || !data.tag) {
-                // Plain text, not encrypted
+            if (typeof encryptedJson === 'string' && !encryptedJson.trim().startsWith('{')) {
+                // Plain text
                 return encryptedJson;
             }
 
-            // Decrypt using Web Crypto API
-            const salt = Uint8Array.from(atob(data.s), c => c.charCodeAt(0));
-            const iv = Uint8Array.from(atob(data.iv), c => c.charCodeAt(0));
-            const ciphertext = Uint8Array.from(atob(data.ct), c => c.charCodeAt(0));
-            const tag = Uint8Array.from(atob(data.tag), c => c.charCodeAt(0));
+            const data: any = typeof encryptedJson === 'string' ? JSON.parse(encryptedJson) : encryptedJson;
+            if (!data?.v || !data?.alg || !data?.s || !data?.iv || !data?.ct || !data?.tag) {
+                // Plain text or unknown format
+                return typeof encryptedJson === 'string' ? encryptedJson : JSON.stringify(encryptedJson);
+            }
 
-            // Combine ciphertext and tag for AES-GCM
+            // Backend uses: scryptSync(Buffer.from(masterKeyHex, 'hex'), salt, 32) + AES-256-GCM
+            await _sodium.ready;
+
+            const salt = Uint8Array.from(atob(data.s), (c) => c.charCodeAt(0));
+            const iv = Uint8Array.from(atob(data.iv), (c) => c.charCodeAt(0));
+            const ciphertext = Uint8Array.from(atob(data.ct), (c) => c.charCodeAt(0));
+            const tag = Uint8Array.from(atob(data.tag), (c) => c.charCodeAt(0));
+
+            // Combine ciphertext and tag for WebCrypto AES-GCM (expects tag appended)
             const combined = new Uint8Array(ciphertext.length + tag.length);
             combined.set(ciphertext);
             combined.set(tag, ciphertext.length);
 
-            // Derive key using PBKDF2 (similar to scrypt but web-compatible)
-            const keyMaterial = await crypto.subtle.importKey(
-                'raw',
-                Uint8Array.from(masterKeyHex.match(/.{2}/g)!.map(b => parseInt(b, 16))),
-                'PBKDF2',
-                false,
-                ['deriveKey']
+            const masterKeyBytes = Uint8Array.from(masterKeyHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+            // libsodium typings don't expose this low-level scrypt function, but it's available at runtime.
+            const keyBytes: Uint8Array = (_sodium as any).crypto_pwhash_scryptsalsa208sha256_ll(
+                masterKeyBytes,
+                salt,
+                16384,
+                8,
+                1,
+                32
             );
 
-            const key = await crypto.subtle.deriveKey(
-                { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
-                keyMaterial,
-                { name: 'AES-GCM', length: 256 },
-                false,
-                ['decrypt']
-            );
+            // Import raw key bytes into WebCrypto (ensure we have a plain ArrayBuffer-backed Uint8Array)
+            const rawKeyBytes = new Uint8Array(keyBytes);
+            const key = await crypto.subtle.importKey('raw', rawKeyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
 
-            const decrypted = await crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv },
-                key,
-                combined
-            );
+            const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, combined);
+
+            _sodium.memzero(keyBytes);
+            _sodium.memzero(rawKeyBytes);
+            _sodium.memzero(masterKeyBytes);
 
             return new TextDecoder().decode(decrypted);
         } catch (error) {
             console.error('[BackupSettings] Decryption failed:', error);
             return null;
         }
+    };
+
+    const parseDecryptedStringArray = (value: string): string[] | null => {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+
+        // JSON array or JSON object
+        if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) {
+                    return parsed.filter(Boolean).map(String);
+                }
+                if (parsed && typeof parsed === 'object') {
+                    const maybeMnemonic = (parsed as any).mnemonic;
+                    const maybeChecksums = (parsed as any).checksums;
+                    if (Array.isArray(maybeMnemonic)) return maybeMnemonic.filter(Boolean).map(String);
+                    if (Array.isArray(maybeChecksums)) return maybeChecksums.filter(Boolean).map(String);
+                }
+            } catch {
+                // fallthrough
+            }
+        }
+
+        // Plaintext list (space/newline separated)
+        const parts = trimmed.split(/\s+/g).filter(Boolean);
+        return parts.length ? parts : null;
     };
 
     // Perform the actual export
@@ -169,22 +201,16 @@ export function BackupSettings() {
             if (recoveryData.encryptedMnemonic) {
                 const decryptedMnemonic = await decryptWithMasterKey(recoveryData.encryptedMnemonic, masterKey);
                 if (decryptedMnemonic) {
-                    try {
-                        mnemonic = JSON.parse(decryptedMnemonic);
-                    } catch {
-                        console.warn('[BackupSettings] Failed to parse decrypted mnemonic');
-                    }
+                    mnemonic = parseDecryptedStringArray(decryptedMnemonic);
+                    if (!mnemonic) console.warn('[BackupSettings] Failed to parse decrypted mnemonic');
                 }
             }
 
             if (recoveryData.encryptedChecksums) {
                 const decryptedChecksums = await decryptWithMasterKey(recoveryData.encryptedChecksums, masterKey);
                 if (decryptedChecksums) {
-                    try {
-                        checksums = JSON.parse(decryptedChecksums);
-                    } catch {
-                        console.warn('[BackupSettings] Failed to parse decrypted checksums');
-                    }
+                    checksums = parseDecryptedStringArray(decryptedChecksums);
+                    if (!checksums) console.warn('[BackupSettings] Failed to parse decrypted checksums');
                 }
             }
 
@@ -200,7 +226,10 @@ export function BackupSettings() {
             content += `Export Date: ${new Date().toLocaleString('en-US')}\n\n`;
             content += `───────────────────────────────────────────────────────\n\n`;
 
-            if (recoveryData.securityTier === 'standard' && mnemonic) {
+            if (recoveryData.securityTier === 'standard') {
+                if (!mnemonic || (mnemonic.length !== 12 && mnemonic.length !== 24)) {
+                    throw new Error('Impossible de récupérer la passphrase (mnemonic) - vérifiez votre mot de passe/Quick Unlock.');
+                }
                 content += `📝 MNEMONIC PHRASE (BIP-39)\n\n`;
                 content += `Keep this phrase in a safe place. It is the ONLY\n`;
                 content += `way to recover your account.\n\n`;
@@ -208,17 +237,18 @@ export function BackupSettings() {
                 content += `⚠️  WARNING: This phrase is unique and irreplaceable.\n`;
                 content += `    If you lose it, access to your account will be PERMANENTLY lost.\n\n`;
             } else if (recoveryData.securityTier === 'dice-key') {
+                if (!checksums || checksums.length === 0) {
+                    throw new Error('Impossible de récupérer les checksums DiceKey - vérifiez votre mot de passe/Quick Unlock.');
+                }
                 content += `🎲 DICEKEY ACCOUNT (775 bits)\n\n`;
                 content += `Your account uses the ultra-secure DiceKey method.\n\n`;
 
                 // Display checksums if available
-                if (checksums && checksums.length > 0) {
-                    content += `📝 YOUR VERIFICATION CHECKSUMS (${checksums.length} series):\n\n`;
-                    checksums.forEach((checksum: string, i: number) => {
-                        content += `  Series ${String(i + 1).padStart(2, ' ')}: ${checksum}\n`;
-                    });
-                    content += `\n`;
-                }
+                content += `📝 YOUR VERIFICATION CHECKSUMS (${checksums.length} series):\n\n`;
+                checksums.forEach((checksum: string, i: number) => {
+                    content += `  Series ${String(i + 1).padStart(2, ' ')}: ${checksum}\n`;
+                });
+                content += `\n`;
 
                 content += `🔐 HOW TO LOG IN:\n\n`;
                 content += `   Method 1: User ID + Checksums\n`;
@@ -355,75 +385,12 @@ export function BackupSettings() {
             let blob: Blob;
             let filename: string;
 
-            // Include account recovery material (mnemonic / DiceKey checksums) inside the encrypted backup.
-            // This allows DiceKey users to export their security keys in a password-protected file.
-            let recoveryKeysForBackup: BackupPayload['recoveryKeys'] | undefined;
-            const username = session?.user?.username;
-            if (!username) {
-                throw new Error('Invalid session');
-            }
-
-            // Prefer already-unlocked vault; otherwise try unlocking with the export password.
-            const existingVault = getExistingKeyVault();
-            const vault = existingVault ?? await getKeyVault(exportPassword);
-            const masterKey = await vault.getData(`masterKey:${username}`);
-
-            if (!masterKey) {
-                throw new Error(
-                    "Impossible d'accéder aux clés de récupération. Utilisez le mot de passe du coffre (Quick Unlock) puis relancez l'export."
-                );
-            }
-
-            const recoveryData = await getRecoveryKeys();
-            if (!recoveryData?.success) {
-                throw new Error('Failed to retrieve recovery keys');
-            }
-
-            // Decrypt recovery material locally
-            let mnemonic: string[] | null = null;
-            let checksums: string[] | null = null;
-
-            if (recoveryData.encryptedMnemonic) {
-                const decryptedMnemonic = await decryptWithMasterKey(recoveryData.encryptedMnemonic, masterKey);
-                if (decryptedMnemonic) {
-                    try {
-                        mnemonic = JSON.parse(decryptedMnemonic);
-                    } catch {
-                        // ignore
-                    }
-                }
-            }
-
-            if (recoveryData.encryptedChecksums) {
-                const decryptedChecksums = await decryptWithMasterKey(recoveryData.encryptedChecksums, masterKey);
-                if (decryptedChecksums) {
-                    try {
-                        checksums = JSON.parse(decryptedChecksums);
-                    } catch {
-                        // ignore
-                    }
-                }
-            }
-
-            if (recoveryData.securityTier === 'dice-key') {
-                if (!checksums || checksums.length === 0) {
-                    throw new Error('Impossible de déchiffrer les checksums DiceKey.');
-                }
-                recoveryKeysForBackup = { securityTier: 'dice-key', checksums };
-            } else {
-                if (!mnemonic || mnemonic.length === 0) {
-                    throw new Error('Impossible de déchiffrer la phrase mnémonique.');
-                }
-                recoveryKeysForBackup = { securityTier: 'standard', mnemonic };
-            }
-
             if (useVaultV2) {
                 // Use new Backup Vault v2 (Argon2id + XChaCha20-Poly1305)
                 blob = await exportToBackupVault(
                     exportPassword,
                     { includeMessages, includeContacts: true, includeIdentityKeys: false },
-                    (stage, progress) => setExportProgress({ stage, progress }),
-                    { recoveryKeys: recoveryKeysForBackup }
+                    (stage, progress) => setExportProgress({ stage, progress })
                 );
                 filename = `cipher-pulse-backup-v2-${Date.now()}.json`;
             } else {
