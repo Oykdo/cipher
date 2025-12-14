@@ -50,7 +50,8 @@ export function ContributionSettings() {
             name: "Pi Network",
             symbol: "PI",
             address: "GCUGVJDK4TY6KTVWFYXTDH2OXRSTTFQUYPLU2CH523AHCZOPWUVEVDC6",
-            icon: "/crypto-logos/pi-network.svg",
+            // Cache-bust to ensure updated logo is picked up quickly after deploy
+            icon: "/crypto-logos/pi-network.svg?v=2",
             color: "from-violet-700 to-yellow-500",
         },
     };
