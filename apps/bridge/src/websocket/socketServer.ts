@@ -16,7 +16,7 @@ import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { setUserOnline, setUserOffline } from '../routes/users.js';
+import { setUserOnline, setUserOffline, getAllOnlineUsers } from '../routes/users.js';
 import { getDatabase } from '../db/database.js';
 import { config } from '../config.js';
 
@@ -224,6 +224,11 @@ export function setupSocketServer(httpServer: HTTPServer, fastify: FastifyInstan
     if (socket.userId && socket.username) {
       setUserOnline(socket.userId, socket.username, socket.id);
 
+      // Send a snapshot to the connecting client so presence is not asymmetric
+      // (otherwise they only see presence changes after they connect)
+      const onlineUserIds = getAllOnlineUsers().filter(id => id !== socket.userId);
+      socket.emit('presence_snapshot', { onlineUserIds });
+
       // Broadcast user online status to all connected clients
       io.emit('user_status_changed', {
         userId: socket.userId,
@@ -380,26 +385,16 @@ export function setupSocketServer(httpServer: HTTPServer, fastify: FastifyInstan
         return;
       }
 
-      // Find connected sockets for the target user
-      const sockets = await io.fetchSockets();
-      const targetSocket = sockets.find(s => (s as any).userId === targetUser.id);
-
-      if (!targetSocket) {
-        // User is offline, cannot deliver handshake
-        // In production, you might want to store this for later delivery
-        fastify.log.warn({
-          from: socket.username,
-          to: targetUsername,
-        }, 'X3DH handshake target user offline');
-
-        if (callback) {
-          callback({ success: false, error: 'Target user is offline' });
-        }
+      // Deliver via the user's private room (supports multi-device)
+      const targetRoom = `user:${targetUser.id}`;
+      const room = io.sockets.adapter.rooms.get(targetRoom);
+      if (!room || room.size === 0) {
+        fastify.log.warn({ from: socket.username, to: targetUsername }, 'X3DH handshake target user offline');
+        if (callback) callback({ success: false, error: 'Target user is offline' });
         return;
       }
 
-      // Forward the handshake to the target user
-      targetSocket.emit('x3dh_handshake', {
+      io.to(targetRoom).emit('x3dh_handshake', {
         senderUsername: socket.username,
         handshakeData,
         timestamp: timestamp || Date.now(),

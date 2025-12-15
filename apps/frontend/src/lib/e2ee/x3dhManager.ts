@@ -76,6 +76,57 @@ const pendingHandshakes = new Map<string, PendingHandshake>();
 let sendHandshakeMessage: ((peerUsername: string, message: string) => Promise<void>) | null = null;
 
 // ============================================================================
+// DEBUG / VALIDATION
+// ============================================================================
+
+/**
+ * Validate that the local X3DH key bundle is present and structurally sane.
+ * This is a safe diagnostic helper (does NOT expose key material).
+ */
+export function validateLocalX3DHKeyBundle(): {
+  ok: boolean;
+  errors: string[];
+  opkCount: number;
+  hasSignedPreKey: boolean;
+  hasSigningKey: boolean;
+} {
+  const errors: string[] = [];
+
+  if (!localKeyBundle) {
+    errors.push('localKeyBundle is null (X3DH manager not initialized)');
+    return {
+      ok: false,
+      errors,
+      opkCount: 0,
+      hasSignedPreKey: false,
+      hasSigningKey: false,
+    };
+  }
+
+  const hasSigningKey = !!localKeyBundle.signingKeyPair?.publicKey && !!localKeyBundle.signingKeyPair?.privateKey;
+  const hasSignedPreKey = !!localKeyBundle.signedPreKey?.publicKey && !!localKeyBundle.signedPreKey?.signature;
+  const opkCount = localKeyBundle.oneTimePreKeys?.length ?? 0;
+
+  if (!hasSigningKey) {
+    errors.push('Missing Ed25519 signing key pair');
+  }
+  if (!hasSignedPreKey) {
+    errors.push('Missing signedPreKey');
+  }
+  if (opkCount <= 0) {
+    errors.push('No one-time pre-keys available (OPK count = 0)');
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    opkCount,
+    hasSignedPreKey,
+    hasSigningKey,
+  };
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 

@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
 import { type ConversationSummaryV2, type MessageV2, apiv2 } from '../services/api-v2';
 import { useSocketWithRefresh } from '../hooks/useSocketWithRefresh';
+import { useX3DHHandshake } from '../hooks/useX3DHHandshake';
 import { useSocketEvent, useConversationRoom, useTypingIndicator } from '../hooks/useSocket';
 import UserSearch, { type UserSearchResult } from '../components/UserSearch';
 import { ConversationList } from '../components/conversations/ConversationList';
@@ -45,6 +46,9 @@ export default function Conversations() {
 
   // WebSocket connection with auto-refresh
   const { socket, connected } = useSocketWithRefresh();
+
+  // Configure X3DH handshake transport over Socket.IO (required for Double Ratchet / PFS)
+  useX3DHHandshake({ socket, connected });
 
   // Conversations state
   const [conversations, setConversations] = useState<ConversationSummaryV2[]>([]);
@@ -199,6 +203,35 @@ export default function Conversations() {
 
     // SECURITY: Check if message is time-locked BEFORE decryption
     const isTimeLocked = data.message.unlockBlockHeight && Date.now() < data.message.unlockBlockHeight;
+
+    // If this message is for a different conversation than the one currently open,
+    // don't append it into the current message list (would mix conversations).
+    if (!selectedConvId || data.conversationId !== selectedConvId) {
+      const preview = isTimeLocked ? '[Time Capsule]' : '[Nouveau message]';
+      setConversations(prev => {
+        const exists = prev.some(c => c.id === data.conversationId);
+        if (!exists) return prev;
+        return prev.map(c => c.id === data.conversationId
+          ? {
+            ...c,
+            lastMessageAt: data.message.createdAt,
+            lastMessagePreview: preview,
+          }
+          : c
+        );
+      });
+
+      // If it's a brand new conversation (e.g., request just accepted), refresh the list.
+      if (!conversations.some(c => c.id === data.conversationId)) {
+        void loadConversations();
+      }
+
+      if (data.message.senderId !== session.user.id) {
+        setSrAnnouncement('Nouveau message reçu');
+      }
+
+      return;
+    }
     
     // Don't decrypt locked messages - show placeholder instead
     let plaintext: string;
@@ -356,6 +389,12 @@ export default function Conversations() {
       }
       return newSet;
     });
+  });
+
+  // Presence snapshot on connect so presence is symmetric even if some users were online before we connected
+  useSocketEvent(socket, 'presence_snapshot', (data: { onlineUserIds?: string[] }) => {
+    const ids = Array.isArray(data?.onlineUserIds) ? data.onlineUserIds : [];
+    setOnlineUsers(new Set(ids));
   });
 
   // Realtime: when a sent contact request is accepted, refresh conversations list for requester

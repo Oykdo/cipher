@@ -302,7 +302,7 @@ export async function messageRoutes(fastify: FastifyInstance) {
       fastify.broadcast(members, payload);
 
       // Socket.IO emit for real-time updates
-      fastify.io.emitNewMessage({
+      const realtimePayload = {
         conversationId,
         message: {
           id: message.id,
@@ -314,7 +314,16 @@ export async function messageRoutes(fastify: FastifyInstance) {
           burnDelay: burnDelay,
           isLocked: isLocked,
         },
-      });
+      };
+
+      // Emit to conversation room (when client joined)
+      fastify.io.emitNewMessage(realtimePayload);
+
+      // Also emit to each participant's private room so messages are received even
+      // when they are not currently joined to the conversation room.
+      for (const memberId of members) {
+        fastify.io.to(`user:${memberId}`).emit('new_message', realtimePayload);
+      }
 
       return responseMessage;
     }

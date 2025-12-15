@@ -17,6 +17,7 @@ import {
   getPeerFingerprint,
   getPeerComputedFingerprint,
   getPeerKeyInfo,
+  ensureDoubleRatchetSession,
   ensureE2EEInitializedForSession,
   getCurrentUsername,
 } from './e2eeService';
@@ -153,6 +154,17 @@ export async function encryptMessageForSending(
   if (!hasPeerKey) {
     console.error(`[E2EE] No public key for ${recipientUsername} - recipient needs to publish their keys`);
     throw new Error(`Cannot send encrypted message: ${recipientUsername} has not published their encryption keys. They need to log in first.`);
+  }
+
+  // If user prefers Double Ratchet, attempt to establish X3DH/DR session before encrypting.
+  // IMPORTANT: still signaling only; message payload remains E2EE.
+  try {
+    const { getEncryptionModePreference } = await import('./sessionManager');
+    if (getEncryptionModePreference(recipientUsername) === 'double-ratchet') {
+      await ensureDoubleRatchetSession(recipientUsername, true);
+    }
+  } catch {
+    // Best-effort only; we can still send with NaCl Box fallback.
   }
 
   // Encrypt with E2EE

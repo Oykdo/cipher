@@ -523,7 +523,7 @@ export async function ensureDoubleRatchetSession(
   
   // Check if DR session already exists
   if (await hasActiveDoubleRatchetSession(peerUsername)) {
-    debugLogger.info('✅ [E2EE Service] DR session already active with ${peerUsername}');
+    debugLogger.info(`✅ [E2EE Service] DR session already active with ${peerUsername}`);
     return true;
   }
   
@@ -542,9 +542,14 @@ export async function ensureDoubleRatchetSession(
   try {
     await ensureX3DHInitialized();
     await initiateX3DHSession(peerUsername);
-    // Handshake initiated but not yet complete
-    debugLogger.debug(`🤝 [E2EE Service] Handshake initiated with ${peerUsername}, waiting for completion...`);
-    return false; // DR not ready yet
+
+    // initiateX3DHSession awaits handshake completion and creates the DR session.
+    // Verify and report readiness.
+    const ready = await hasActiveDoubleRatchetSession(peerUsername);
+    if (ready) {
+      debugLogger.info(`✅ [E2EE Service] DR session established with ${peerUsername}`);
+    }
+    return ready;
   } catch (error: any) {
     console.warn(`⚠️ [E2EE Service] Could not initiate handshake with ${peerUsername}: ${error.message}`);
     return false; // Fallback to NaCl Box

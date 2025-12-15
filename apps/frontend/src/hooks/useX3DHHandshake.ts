@@ -83,7 +83,17 @@ export function useX3DHHandshake({ socket, connected }: UseX3DHHandshakeOptions)
       handshakeData: string;
       timestamp: number;
     }) => {
-      debugLogger.debug(`📨 [X3DH Hook] Received handshake from ${data.senderUsername}`);
+      let handshakeType: string | undefined;
+      let sessionId: string | undefined;
+      try {
+        const parsed = JSON.parse(data.handshakeData);
+        handshakeType = parsed?.type;
+        sessionId = parsed?.sessionId;
+      } catch {
+        // Ignore
+      }
+
+      debugLogger.debug(`📨 [X3DH Hook] Received handshake from ${data.senderUsername} (${handshakeType || 'unknown'}${sessionId ? `:${sessionId}` : ''})`);
 
       try {
         // Process the handshake message
