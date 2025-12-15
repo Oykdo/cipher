@@ -14,6 +14,7 @@ import { TFunction } from 'i18next';
 import { useAuthStore } from '../store/auth';
 import { API_BASE_URL } from '../config';
 import { getKeyVault } from '../lib/keyVault';
+import { loadMasterKeyFallback, storeMasterKeyFallback } from '../lib/masterKeyFallback';
 import { saveKnownAccount } from '../lib/localStorage';
 import { setTemporaryMasterKey } from '../lib/secureKeyAccess';
 import { setSessionMasterKey } from '../lib/masterKeyResolver';
@@ -237,6 +238,8 @@ export default function LoginNew() {
         throw new Error(t('auth.error_username_length'));
       }
 
+      const normalizedUsername = username.trim().toLowerCase();
+
       if (password.length < 6) {
         throw new Error(t('auth.error_password_length'));
       }
@@ -259,7 +262,7 @@ export default function LoginNew() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            username,
+            username: normalizedUsername,
             A: ephemeral.public,
           }),
         });
@@ -269,15 +272,15 @@ export default function LoginNew() {
           const { salt, B, sessionId } = initData;
 
           // 2. Derive
-          const privateKey = srp.derivePrivateKey(salt, username, password);
-          const session = srp.deriveSession(ephemeral.secret, B, salt, username, privateKey);
+          const privateKey = srp.derivePrivateKey(salt, normalizedUsername, password);
+          const session = srp.deriveSession(ephemeral.secret, B, salt, normalizedUsername, privateKey);
 
           // 3. Verify
           const verifyResponse = await fetch(`${API_BASE_URL}/api/v2/auth/srp/login/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              username,
+              username: normalizedUsername,
               M1: session.proof,
               sessionId,
             }),
@@ -306,8 +309,30 @@ export default function LoginNew() {
 
           // Retrieve masterKey from KeyVault (needed for encryption)
           try {
-            const vault = await getKeyVault(password);
-            const masterKeyHex = await vault.getData(`masterKey:${username}`);
+            const normalizedUsername = username.toLowerCase();
+            let vault: any = null;
+            let masterKeyHex: string | null = null;
+
+            try {
+              vault = await getKeyVault(password);
+              masterKeyHex =
+                (await vault.getData(`masterKey:${normalizedUsername}`)) ||
+                (await vault.getData(`masterKey:${username}`)); // backward compatibility
+            } catch (vaultOpenError) {
+              console.warn('[LoginNew] Failed to open KeyVault, will try fallback:', vaultOpenError);
+            }
+
+            if (!masterKeyHex) {
+              masterKeyHex = await loadMasterKeyFallback(normalizedUsername, password);
+              if (masterKeyHex && vault) {
+                try {
+                  await vault.storeData(`masterKey:${normalizedUsername}`, masterKeyHex);
+                } catch {
+                  // Ignore
+                }
+              }
+            }
+
             if (masterKeyHex) {
               await setSessionMasterKey(masterKeyHex);
               // SECURITY: MasterKey loaded (not logging for security)
@@ -676,7 +701,15 @@ export default function LoginNew() {
           setLoaderProgress(70);
 
           // SECURITY: Check if SRP is configured for this user
-          const storedPasswordHash = localStorage.getItem(`pwd_${usernameToUse.toLowerCase()}`);
+          const normalizedUsername = usernameToUse.toLowerCase();
+          let storedPasswordHash = localStorage.getItem(`pwd_${normalizedUsername}`);
+          if (!storedPasswordHash) {
+            storedPasswordHash = localStorage.getItem(`pwd_${usernameToUse}`);
+            // Best-effort migration to normalized key
+            if (storedPasswordHash) {
+              localStorage.setItem(`pwd_${normalizedUsername}`, storedPasswordHash);
+            }
+          }
           
           if (!storedPasswordHash) {
             // No local password - DiceKey users need to set up SRP via recovery
@@ -884,7 +917,7 @@ export default function LoginNew() {
       if (tempAccessToken && username) {
         try {
           const srpSalt = srp.generateSalt();
-          const privateKey = srp.derivePrivateKey(srpSalt, username, newPassword);
+          const privateKey = srp.derivePrivateKey(srpSalt, normalizedUsername, newPassword);
           const srpVerifier = srp.deriveVerifier(privateKey);
 
           const srpResponse = await fetch(`${API_BASE_URL}/api/v2/auth/srp/setup`, {
@@ -916,11 +949,15 @@ export default function LoginNew() {
             masterKeyHex = signupData.masterKeyHex;
             try {
               const vault = await getKeyVault(newPassword);
-              await vault.storeData(`masterKey:${username}`, masterKeyHex);
+              await vault.storeData(`masterKey:${username.toLowerCase()}`, masterKeyHex);
               // Clean up any legacy clear-text storage if it exists
-              localStorage.removeItem(`master_${username}`);
+              localStorage.removeItem(`master_${username.toLowerCase()}`);
             } catch (vaultError) {
               console.error('[LoginNew] Failed to store masterKey in KeyVault:', vaultError);
+              const ok = await storeMasterKeyFallback(username, masterKeyHex, newPassword);
+              if (!ok) {
+                console.error('[LoginNew] Failed to store masterKey fallback in localStorage');
+              }
             }
           } else {
             console.warn('[LoginNew] ⚠️ No masterKeyHex in pendingSignup:', signupData);
@@ -1030,7 +1067,21 @@ export default function LoginNew() {
           let storedMasterKey: string | null = null;
           try {
             const vault = await getKeyVault(newPassword);
-            storedMasterKey = await vault.getData(`masterKey:${username}`);
+            const normalizedUsername = username.toLowerCase();
+            storedMasterKey =
+              (await vault.getData(`masterKey:${normalizedUsername}`)) ||
+              (await vault.getData(`masterKey:${username}`));
+
+            if (!storedMasterKey) {
+              storedMasterKey = await loadMasterKeyFallback(normalizedUsername, newPassword);
+              if (storedMasterKey) {
+                try {
+                  await vault.storeData(`masterKey:${normalizedUsername}`, storedMasterKey);
+                } catch {
+                  // Ignore
+                }
+              }
+            }
           } catch (vaultError) {
             console.error('Failed to open KeyVault for auto-login:', vaultError);
           }
@@ -1071,15 +1122,16 @@ export default function LoginNew() {
             const { salt, B, sessionId } = initData;
 
             // Derive SRP session
-            const privateKey = srp.derivePrivateKey(salt, username, newPassword);
-            const session = srp.deriveSession(ephemeral.secret, B, salt, username, privateKey);
+            const normalizedForSrp = username.toLowerCase();
+            const privateKey = srp.derivePrivateKey(salt, normalizedForSrp, newPassword);
+            const session = srp.deriveSession(ephemeral.secret, B, salt, normalizedForSrp, privateKey);
 
             // Verify
             const verifyResponse = await fetch(`${API_BASE_URL}/api/v2/auth/srp/login/verify`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                username,
+                username: normalizedForSrp,
                 M1: session.proof,
                 sessionId,
               }),

@@ -13,6 +13,7 @@ import { useAuthStore } from '../store/auth';
 import { type LocalAccount, hasLocalPassword, clearLocalAccount } from '../lib/localStorage';
 import { API_BASE_URL } from '../config';
 import { getE2EEVault, getKeyVault } from '../lib/keyVault';
+import { loadMasterKeyFallback } from '../lib/masterKeyFallback';
 import { initializeE2EE } from '../lib/e2ee/e2eeService';
 import { setSessionMasterKey } from '../lib/masterKeyResolver';
 import { setTemporaryMasterKey } from '../lib/secureKeyAccess';
@@ -83,7 +84,14 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
     try {
       // Verify password locally
       const normalizedUsername = account.username.toLowerCase();
-      const storedHash = localStorage.getItem(`pwd_${normalizedUsername}`);
+      let storedHash = localStorage.getItem(`pwd_${normalizedUsername}`);
+      if (!storedHash) {
+        storedHash = localStorage.getItem(`pwd_${account.username}`);
+        if (storedHash) {
+          // Best-effort migration to normalized key
+          localStorage.setItem(`pwd_${normalizedUsername}`, storedHash);
+        }
+      }
       if (!storedHash) {
         // Should not happen if hasPassword check works, but handle gracefully
         setHasPassword(false);
@@ -98,8 +106,22 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
       // Get masterKey from KeyVault for this device
       let masterKey: string | null = null;
       try {
+        const normalizedUsername = account.username.toLowerCase();
         const vault = await getKeyVault(password);
-        masterKey = await vault.getData(`masterKey:${account.username}`);
+        masterKey =
+          (await vault.getData(`masterKey:${normalizedUsername}`)) ||
+          (await vault.getData(`masterKey:${account.username}`));
+
+        if (!masterKey) {
+          masterKey = await loadMasterKeyFallback(normalizedUsername, password);
+          if (masterKey) {
+            try {
+              await vault.storeData(`masterKey:${normalizedUsername}`, masterKey);
+            } catch {
+              // Ignore
+            }
+          }
+        }
       } catch (vaultError) {
         console.error('[QuickUnlock] Failed to open KeyVault:', vaultError);
       }
@@ -130,7 +152,7 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: account.username,
+          username: normalizedUsername,
           A: ephemeral.public,
         }),
       });
@@ -148,15 +170,15 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
       const { salt, B, sessionId } = initData;
 
       // Derive SRP session
-      const privateKey = srp.derivePrivateKey(salt, account.username, password);
-      const session = srp.deriveSession(ephemeral.secret, B, salt, account.username, privateKey);
+      const privateKey = srp.derivePrivateKey(salt, normalizedUsername, password);
+      const session = srp.deriveSession(ephemeral.secret, B, salt, normalizedUsername, privateKey);
 
       // Verify
       const verifyResponse = await fetch(`${API_BASE_URL}/api/v2/auth/srp/login/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: account.username,
+          username: normalizedUsername,
           M1: session.proof,
           sessionId,
         }),

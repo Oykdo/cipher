@@ -20,6 +20,7 @@ import { deriveAllKeysFromDice } from '../lib/kdfSimple';
 import { generateCompleteKeySet, generateUserId, serializeKeySet } from '../lib/keyGeneration';
 import { calculateSeriesChecksum, splitIntoSeries } from '../lib/diceKey';
 import { getKeyVault } from '../lib/keyVault';
+import { storeMasterKeyFallback } from '../lib/masterKeyFallback';
 import { API_BASE_URL } from '../config';
 import { createSafeHTML } from '../lib/sanitize';
 import { initializeE2EE } from '../lib/e2ee/e2eeService';
@@ -205,6 +206,7 @@ export default function SignupFluid() {
       const accessToken = sessionStorage.getItem('accessToken');
       const refreshToken = sessionStorage.getItem('refreshToken');
       const userId = sessionStorage.getItem('userId');
+      const canonicalUsername = (sessionStorage.getItem('username') || username).trim().toLowerCase();
 
       if (!masterKeyHex || !accessToken || !refreshToken || !userId) {
         throw new Error(t('signup.error_session_missing'));
@@ -213,7 +215,7 @@ export default function SignupFluid() {
       // --- SRP SETUP ---
       // Generate SRP credentials
       const srpSalt = srp.generateSalt();
-      const privateKey = srp.derivePrivateKey(srpSalt, username, standardPassword);
+      const privateKey = srp.derivePrivateKey(srpSalt, canonicalUsername, standardPassword);
       const srpVerifier = srp.deriveVerifier(privateKey);
 
       // Send SRP credentials to backend
@@ -238,7 +240,7 @@ export default function SignupFluid() {
 
       // Hash the password locally (PBKDF2)
       const encoder = new TextEncoder();
-      const salt = encoder.encode(username);
+      const salt = encoder.encode(canonicalUsername);
       const passwordKey = await crypto.subtle.importKey(
         'raw',
         encoder.encode(standardPassword),
@@ -262,24 +264,31 @@ export default function SignupFluid() {
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
 
+      const normalizedUsername = canonicalUsername;
+
       // Store password hash locally for this device
-      localStorage.setItem(`pwd_${username}`, hashedPassword);
+      localStorage.setItem(`pwd_${normalizedUsername}`, hashedPassword);
 
       // Store masterKey encrypted in KeyVault instead of localStorage
+      // Mobile/private-mode fallback: if IndexedDB fails, store encrypted blob in localStorage.
       try {
         const vault = await getKeyVault(standardPassword);
-        await vault.storeData(`masterKey:${username}`, masterKeyHex);
+        await vault.storeData(`masterKey:${normalizedUsername}`, masterKeyHex);
         // Clean up any legacy clear-text storage if it exists
-        localStorage.removeItem(`master_${username}`);
+        localStorage.removeItem(`master_${normalizedUsername}`);
       } catch (vaultError) {
         console.error('[SignupFluid] Failed to store masterKey in KeyVault', vaultError);
+        const ok = await storeMasterKeyFallback(normalizedUsername, masterKeyHex, standardPassword);
+        if (!ok) {
+          console.error('[SignupFluid] Failed to store masterKey fallback in localStorage');
+        }
       }
 
       // Create session in auth store
       setSession({
         user: {
           id: userId,
-          username,
+          username: canonicalUsername,
           securityTier: 'standard',
         },
         accessToken,

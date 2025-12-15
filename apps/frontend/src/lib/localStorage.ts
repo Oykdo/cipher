@@ -112,7 +112,11 @@ export function getLastUsedAccount(): LocalAccount | null {
  * Check if a specific account has a local password set
  */
 export function hasLocalPassword(username: string): boolean {
-  return localStorage.getItem(`pwd_${username.toLowerCase()}`) !== null;
+  const normalized = username.toLowerCase();
+  return (
+    localStorage.getItem(`pwd_${normalized}`) !== null ||
+    localStorage.getItem(`pwd_${username}`) !== null
+  );
 }
 
 /**
@@ -126,7 +130,8 @@ export function hasLocalAccount(username: string): boolean {
  * Get stored password hash for an account
  */
 export function getPasswordHash(username: string): string | null {
-  return localStorage.getItem(`pwd_${username.toLowerCase()}`);
+  const normalized = username.toLowerCase();
+  return localStorage.getItem(`pwd_${normalized}`) ?? localStorage.getItem(`pwd_${username}`);
 }
 
 /**
@@ -146,6 +151,7 @@ export function getMasterKey(_username: string): string | null {
 export function clearLocalAccount(username: string): void {
   const normalized = username.toLowerCase();
   localStorage.removeItem(`pwd_${normalized}`);
+  localStorage.removeItem(`pwd_${username}`);
   localStorage.removeItem(`master_${normalized}`);
 
   // Also remove from known accounts? 
@@ -159,6 +165,7 @@ export function clearLocalAccount(username: string): void {
  */
 export function clearPasswordCache(username: string): void {
   localStorage.removeItem(`pwd_${username.toLowerCase()}`);
+  localStorage.removeItem(`pwd_${username}`);
 }
 
 /**
@@ -168,6 +175,7 @@ export function clearAllLocalAccounts(): void {
   const accounts = getLocalAccounts();
   accounts.forEach(account => {
     localStorage.removeItem(`pwd_${account.username}`);
+    localStorage.removeItem(`pwd_${account.username.toLowerCase()}`);
     localStorage.removeItem(`master_${account.username}`);
   });
 
@@ -198,6 +206,7 @@ export function clearQuickConnectCache(): void {
   // Clear password hashes for all accounts
   accounts.forEach(account => {
     localStorage.removeItem(`pwd_${account.username}`);
+    localStorage.removeItem(`pwd_${account.username.toLowerCase()}`);
     debugLogger.debug(`  ✅ Cleared pwd_${account.username}`);
   });
 

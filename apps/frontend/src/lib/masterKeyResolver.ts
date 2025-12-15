@@ -107,7 +107,10 @@ export async function resolveMasterKeyForSession(
   try {
     const vault = getExistingKeyVault();
     if (vault && username) {
-      const stored = await vault.getData(`masterKey:${username}`);
+      const normalizedUsername = username.toLowerCase();
+      const stored =
+        (await vault.getData(`masterKey:${normalizedUsername}`)) ||
+        (await vault.getData(`masterKey:${username}`));
       if (stored) {
         // SECURITY: MasterKey found (not logging for security)
         // SECURITY: Do NOT cache the string - return directly

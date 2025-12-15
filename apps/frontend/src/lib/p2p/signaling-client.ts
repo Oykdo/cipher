@@ -124,6 +124,7 @@ export class SignalingClient {
       }, this.options.connectionTimeout);
 
       this.socket = io(serverUrl, {
+        path: '/signaling',
         auth: {
           userId: this.options.userId,
           token: this.options.authToken,
@@ -135,7 +136,7 @@ export class SignalingClient {
       this.socket.on('connect', () => {
         clearTimeout(timeout);
         const latency = Date.now() - startTime;
-        debugLogger.info('✅ [SIGNALING] Connected to ${serverUrl} (${latency}ms)');
+        debugLogger.info(`✅ [SIGNALING] Connected to ${serverUrl} (${latency}ms)`);
         
         this.connected = true;
         this.currentServerUrl = serverUrl;

@@ -73,7 +73,9 @@ export function BackupSettings() {
         try {
             // Try to open KeyVault with provided password
             const vault = await getKeyVault(unlockPassword);
-            const masterKey = await vault.getData(`masterKey:${username}`);
+            const masterKey =
+                (await vault.getData(`masterKey:${username.toLowerCase()}`)) ||
+                (await vault.getData(`masterKey:${username}`));
 
             if (!masterKey) {
                 setUnlockError(t('settings.backup_settings.wrong_password'));
@@ -338,7 +340,9 @@ export function BackupSettings() {
             return;
         }
 
-        const masterKey = await vault.getData(`masterKey:${username}`);
+        const masterKey =
+            (await vault.getData(`masterKey:${username.toLowerCase()}`)) ||
+            (await vault.getData(`masterKey:${username}`));
         if (!masterKey) {
             // No masterKey in vault - show password prompt to reinitialize
             setShowPasswordPrompt(true);

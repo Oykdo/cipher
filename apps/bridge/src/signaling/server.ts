@@ -66,8 +66,19 @@ export class SignalingServer {
         socketId: socket.id,
       });
 
+      // Snapshot existing peers to the connecting client (prevents asymmetric peer discovery)
+      const existingPeers = Array.from(this.onlinePeers.keys()).filter((id) => id !== userId);
+
       // Register peer
       this.onlinePeers.set(userId, socket.id);
+
+      // Tell the newcomer about already-online peers
+      for (const peerId of existingPeers) {
+        socket.emit('peer-available', { peerId });
+      }
+
+      // Tell existing peers this user is now available (no need for an explicit client event)
+      socket.broadcast.emit('peer-available', { peerId: userId });
 
       // Notify peer availability
       socket.on('peer-available', () => {
