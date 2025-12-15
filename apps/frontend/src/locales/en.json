@@ -849,7 +849,7 @@
     "entropy_badge": "775 bits of entropy",
     "quantum_badge": "Quantum-resistant",
     "fun_fact": "💡 Did you know? 775 bits of entropy = 10²³³ possible combinations",
-    "fun_fact_2": "(more than atoms in the observable universe)"
+    "fun_fact_2": " (more than atoms in the observable universe)"
   },
   "dicekey_results": {
     "title": "Identity Created!",
