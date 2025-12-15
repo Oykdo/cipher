@@ -28,6 +28,9 @@ export function ContributionSettings() {
     const { t } = useTranslation();
     const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
     const [integrityOk, setIntegrityOk] = useState(true);
+    const [stripeAmount, setStripeAmount] = useState('5');
+    const [stripeRedirecting, setStripeRedirecting] = useState(false);
+    const [stripeError, setStripeError] = useState<string | null>(null);
 
     // Crypto addresses
     const cryptoAddresses: Record<string, CryptoAddress> = useMemo(() => ({
@@ -104,6 +107,43 @@ export function ContributionSettings() {
         setTimeout(() => setCopiedAddress(null), 2000);
     };
 
+    const startStripeCheckout = async () => {
+        try {
+            setStripeError(null);
+            setStripeRedirecting(true);
+
+            const amountNumber = Number(stripeAmount);
+            if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+                setStripeError(t('settings.contribution_settings.card_invalid_amount'));
+                setStripeRedirecting(false);
+                return;
+            }
+
+            const amountCents = Math.round(amountNumber * 100);
+            const res = await fetch('/api/public/stripe/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({ amountCents, currency: 'eur' }),
+                credentials: 'include',
+            });
+
+            const data = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
+            if (!res.ok || !data?.url) {
+                setStripeError(data?.error || t('settings.contribution_settings.card_generic_error'));
+                setStripeRedirecting(false);
+                return;
+            }
+
+            window.location.assign(data.url);
+        } catch {
+            setStripeError(t('settings.contribution_settings.card_generic_error'));
+            setStripeRedirecting(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -112,6 +152,60 @@ export function ContributionSettings() {
                 <p className="text-slate-400">
                     {t('settings.contribution_settings.support_desc')}
                 </p>
+            </div>
+
+            {/* Stripe / Card payment */}
+            <div className="p-6 bg-slate-900/50 rounded-xl border border-slate-800">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 className="text-lg font-semibold text-white">
+                            {t('settings.contribution_settings.card_title')}
+                        </h3>
+                        <p className="text-sm text-slate-400">
+                            {t('settings.contribution_settings.card_desc')}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+                    <div className="flex-1">
+                        <label className="text-xs text-slate-500 uppercase tracking-wide">
+                            {t('settings.contribution_settings.card_amount_label')}
+                        </label>
+                        <div className="mt-2 flex items-center gap-2">
+                            <input
+                                type="number"
+                                min={1}
+                                step={1}
+                                inputMode="numeric"
+                                value={stripeAmount}
+                                onChange={(e) => setStripeAmount(e.target.value)}
+                                className="w-full p-3 bg-slate-950 rounded-lg border border-slate-700 text-white"
+                                placeholder={t('settings.contribution_settings.card_amount_placeholder')}
+                                disabled={stripeRedirecting}
+                            />
+                            <span className="text-slate-300">EUR</span>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => void startStripeCheckout()}
+                        disabled={stripeRedirecting}
+                        className={`px-5 py-3 rounded-lg text-white font-semibold transition-colors ${
+                            stripeRedirecting
+                                ? 'bg-slate-700 cursor-not-allowed opacity-80'
+                                : 'bg-brand-500 hover:bg-brand-600'
+                        }`}
+                    >
+                        {stripeRedirecting
+                            ? t('settings.contribution_settings.card_redirecting')
+                            : t('settings.contribution_settings.card_pay_button')}
+                    </button>
+                </div>
+
+                {stripeError && (
+                    <p className="mt-3 text-sm text-red-300">{stripeError}</p>
+                )}
             </div>
 
             {/* Crypto Cards */}
