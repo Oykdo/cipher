@@ -215,6 +215,11 @@ export function setupSocketServer(httpServer: HTTPServer, fastify: FastifyInstan
       username: socket.username,
     }, 'Client connected');
 
+    // Join a private room for this user so routes can target them reliably
+    if (socket.userId) {
+      socket.join(`user:${socket.userId}`);
+    }
+
     // Set user as online
     if (socket.userId && socket.username) {
       setUserOnline(socket.userId, socket.username, socket.id);

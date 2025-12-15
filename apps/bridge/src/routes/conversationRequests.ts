@@ -180,6 +180,16 @@ export async function conversationRequestRoutes(fastify: FastifyInstance) {
                 },
             });
 
+            // Push a minimal, non-sensitive realtime signal to the requester (A)
+            // IMPORTANT: signaling only - no keys, no message content.
+            if ((fastify as any).io) {
+                (fastify as any).io.to(`user:${req.from_user_id}`).emit('contactRequestAccepted', {
+                    contactId: toUser!.id,
+                    contactUsername: toUser!.username,
+                    timestamp: new Date().toISOString(),
+                });
+            }
+
             fastify.log.info({
                 requestId,
                 conversationId: convoId,

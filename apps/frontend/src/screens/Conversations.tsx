@@ -358,6 +358,11 @@ export default function Conversations() {
     });
   });
 
+  // Realtime: when a sent contact request is accepted, refresh conversations list for requester
+  useSocketEvent(socket, 'contactRequestAccepted', (_data) => {
+    void loadConversations();
+  });
+
   // ============================================================================
   // API CALLS
   // ============================================================================
