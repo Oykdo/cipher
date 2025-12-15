@@ -123,6 +123,47 @@ export async function generateIdentityKeyPair(): Promise<IdentityKeyPair> {
   };
 }
 
+async function derive32ByteSeed(masterKeyHex: string, context: string): Promise<Uint8Array> {
+  await ensureSodiumReady();
+  const clean = masterKeyHex.replace(/[^0-9a-fA-F]/g, '');
+  const key = sodium.from_hex(clean);
+  // Keyed BLAKE2b (generichash) as a deterministic KDF
+  const seed = sodium.crypto_generichash(32, sodium.from_string(context), key);
+  key.fill(0);
+  return seed;
+}
+
+/**
+ * Deterministic identity keypair derived from the account masterKey.
+ * This enables multi-device E2EE (same seed => same identity keys).
+ */
+export async function generateDeterministicIdentityKeyPair(masterKeyHex: string): Promise<IdentityKeyPair> {
+  await ensureSodiumReady();
+  const seed = await derive32ByteSeed(masterKeyHex, 'cipherpulse:e2ee:identity:v1');
+  const keyPair = sodium.crypto_box_seed_keypair(seed);
+  seed.fill(0);
+  const fingerprint = await generateFingerprint(keyPair.publicKey);
+  return {
+    publicKey: keyPair.publicKey,
+    privateKey: keyPair.privateKey,
+    fingerprint,
+  };
+}
+
+/**
+ * Deterministic signing keypair derived from the account masterKey.
+ */
+export async function generateDeterministicSigningKeyPair(masterKeyHex: string): Promise<KeyPair> {
+  await ensureSodiumReady();
+  const seed = await derive32ByteSeed(masterKeyHex, 'cipherpulse:e2ee:signing:v1');
+  const keyPair = sodium.crypto_sign_seed_keypair(seed);
+  seed.fill(0);
+  return {
+    publicKey: keyPair.publicKey,
+    privateKey: keyPair.privateKey,
+  };
+}
+
 /**
  * Generate multiple one-time prekeys
  */
@@ -417,8 +458,8 @@ export async function decryptAuthenticated(
 ): Promise<string> {
   await ensureSodiumReady();
 
-  const ciphertext = sodium.from_base64(encrypted.ciphertext);
-  const nonce = sodium.from_base64(encrypted.nonce);
+  const ciphertext = base64ToBytes(encrypted.ciphertext);
+  const nonce = base64ToBytes(encrypted.nonce);
 
   const plaintext = sodium.crypto_box_open_easy(
     ciphertext,

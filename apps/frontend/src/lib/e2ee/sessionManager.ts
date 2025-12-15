@@ -397,8 +397,18 @@ export async function getOrCreateSession(
   // Check memory cache
   let session = activeSessions.get(sessionId);
   if (session) {
-    // SECURITY: crypto log removed
-    return session;
+    const peerKeyMatch = session.peerPublicKey &&
+      bytesToBase64(session.peerPublicKey.slice(0, 8)) === bytesToBase64(peerPublicKey.slice(0, 8));
+    const myKeyMatch = session.myPrivateKey &&
+      bytesToBase64(session.myPrivateKey.slice(0, 8)) === bytesToBase64(myPrivateKey.slice(0, 8));
+
+    if (peerKeyMatch && myKeyMatch) {
+      return session;
+    }
+
+    // Cached session keys don't match current identity/peer keys => recreate
+    activeSessions.delete(sessionId);
+    session = undefined;
   }
   
   // Check KeyVault
@@ -419,9 +429,15 @@ export async function getOrCreateSession(
     if (session) {
       const peerKeyMatch = session.peerPublicKey && 
         bytesToBase64(session.peerPublicKey.slice(0, 8)) === bytesToBase64(peerPublicKey.slice(0, 8));
+      const myKeyMatch = session.myPrivateKey &&
+        bytesToBase64(session.myPrivateKey.slice(0, 8)) === bytesToBase64(myPrivateKey.slice(0, 8));
       if (!peerKeyMatch && session.peerPublicKey) {
         console.warn(`⚠️ [E2EE] Peer key MISMATCH! Session has different peer key. Recreating session...`);
         // Key mismatch - delete old session and create new
+        await deleteSession(username, peerUsername);
+        session = undefined;
+      } else if (!myKeyMatch && session.myPrivateKey) {
+        console.warn(`⚠️ [E2EE] Identity key changed for ${username}. Recreating session with ${peerUsername}...`);
         await deleteSession(username, peerUsername);
         session = undefined;
       } else {

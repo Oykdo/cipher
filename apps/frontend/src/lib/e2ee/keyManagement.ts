@@ -8,6 +8,8 @@
 import {
   generateIdentityKeyPair,
   generateSigningKeyPair,
+  generateDeterministicIdentityKeyPair,
+  generateDeterministicSigningKeyPair,
   generateOneTimePreKeys,
   bytesToBase64,
   base64ToBytes,
@@ -18,6 +20,7 @@ import {
   signData,
 } from './index';
 import { getExistingE2EEVault } from '../keyVault';
+import { getMasterKeyHex } from '../secureKeyAccess';
 
 import { debugLogger } from "../debugLogger";
 // ============================================================================
@@ -44,6 +47,8 @@ export interface StoredIdentityKeys {
   oneTimePreKeys: Array<{ id: number; publicKey: string; privateKey: string }>;
 }
 
+const LEGACY_IDENTITY_KEY = (username: string) => `e2ee:identity-legacy:${username}`;
+
 // ============================================================================
 // KEY GENERATION
 // ============================================================================
@@ -54,12 +59,19 @@ export interface StoredIdentityKeys {
 export async function generateUserIdentityKeys(): Promise<UserIdentityKeys> {
   // SECURITY: crypto log removed
   
+  const masterKeyHex = await getMasterKeyHex().catch(() => null);
+
   // Generate long-term identity key pair (X25519)
-  const identityKeyPair = await generateIdentityKeyPair();
+  // If we have the account masterKey, derive deterministically so multi-device works.
+  const identityKeyPair = masterKeyHex
+    ? await generateDeterministicIdentityKeyPair(masterKeyHex)
+    : await generateIdentityKeyPair();
   // SECURITY: Sensitive log removed
   
   // Generate signing key pair (Ed25519)
-  const signingKeyPair = await generateSigningKeyPair();
+  const signingKeyPair = masterKeyHex
+    ? await generateDeterministicSigningKeyPair(masterKeyHex)
+    : await generateSigningKeyPair();
   // SECURITY: Sensitive log removed
   
   // Generate one-time prekeys
@@ -124,6 +136,67 @@ export async function storeIdentityKeys(
   debugLogger.info('✅ [E2EE] Identity keys stored for user: ${username}');
 }
 
+async function storeLegacyIdentityKeys(username: string, keys: UserIdentityKeys): Promise<void> {
+  const vault = getExistingE2EEVault();
+  if (!vault) {
+    throw new Error('KeyVault not initialized');
+  }
+
+  const already = await vault.getData(LEGACY_IDENTITY_KEY(username));
+  if (already) return;
+
+  const stored: StoredIdentityKeys = {
+    identityPublicKey: bytesToBase64(keys.identityKeyPair.publicKey),
+    identityPrivateKey: bytesToBase64(keys.identityKeyPair.privateKey),
+    identityFingerprint: keys.identityKeyPair.fingerprint,
+    signingPublicKey: bytesToBase64(keys.signingKeyPair.publicKey),
+    signingPrivateKey: bytesToBase64(keys.signingKeyPair.privateKey),
+    signedPreKeyId: keys.signedPreKey.keyId,
+    signedPreKeyPublic: keys.signedPreKey.publicKey,
+    signedPreKeyPrivate: bytesToBase64(keys.preKeys[0].privateKey),
+    signedPreKeySignature: keys.signedPreKey.signature,
+    oneTimePreKeys: keys.preKeys.map((key, index) => ({
+      id: index,
+      publicKey: bytesToBase64(key.publicKey),
+      privateKey: bytesToBase64(key.privateKey),
+    })),
+  };
+
+  await vault.storeData(LEGACY_IDENTITY_KEY(username), JSON.stringify(stored));
+}
+
+export async function retrieveLegacyIdentityKeys(username: string): Promise<UserIdentityKeys | null> {
+  const vault = getExistingE2EEVault();
+  if (!vault) {
+    throw new Error('KeyVault not initialized');
+  }
+
+  const storedJson = await vault.getData(LEGACY_IDENTITY_KEY(username));
+  if (!storedJson) return null;
+
+  const stored: StoredIdentityKeys = JSON.parse(storedJson);
+  return {
+    identityKeyPair: {
+      publicKey: base64ToBytes(stored.identityPublicKey),
+      privateKey: base64ToBytes(stored.identityPrivateKey),
+      fingerprint: stored.identityFingerprint,
+    },
+    signingKeyPair: {
+      publicKey: base64ToBytes(stored.signingPublicKey),
+      privateKey: base64ToBytes(stored.signingPrivateKey),
+    },
+    preKeys: stored.oneTimePreKeys.map(key => ({
+      publicKey: base64ToBytes(key.publicKey),
+      privateKey: base64ToBytes(key.privateKey),
+    })),
+    signedPreKey: {
+      keyId: stored.signedPreKeyId,
+      publicKey: stored.signedPreKeyPublic,
+      signature: stored.signedPreKeySignature,
+    },
+  };
+}
+
 /**
  * Retrieve user identity keys from KeyVault
  */
@@ -172,6 +245,18 @@ export async function getOrCreateIdentityKeys(
 ): Promise<UserIdentityKeys> {
   // Try to retrieve existing keys
   let keys = await retrieveIdentityKeys(username);
+
+  // If we can derive deterministic keys from masterKey, prefer them for multi-device.
+  // To avoid losing access to older messages, keep previous device-specific keys as "legacy"
+  // and allow decryption fallback.
+  const masterKeyHex = await getMasterKeyHex().catch(() => null);
+  if (masterKeyHex) {
+    const deterministicIdentity = await generateDeterministicIdentityKeyPair(masterKeyHex);
+    if (keys && keys.identityKeyPair.fingerprint !== deterministicIdentity.fingerprint) {
+      await storeLegacyIdentityKeys(username, keys);
+      keys = null;
+    }
+  }
 
   if (!keys) {
     // Generate new keys if none exist

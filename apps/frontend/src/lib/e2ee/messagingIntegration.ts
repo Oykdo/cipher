@@ -16,9 +16,12 @@ import {
   addPeerPublicKey,
   getPeerFingerprint,
   getPeerComputedFingerprint,
+  getPeerKeyInfo,
   ensureE2EEInitializedForSession,
   getCurrentUsername,
 } from './e2eeService';
+import { decryptAuthenticated } from './index';
+import { retrieveLegacyIdentityKeys } from './keyManagement';
 import { debugLogger } from '../debugLogger';
 
 async function requireE2EE(): Promise<void> {
@@ -268,6 +271,27 @@ export async function decryptReceivedMessage(
       const decrypted = await decryptMessageFromPeer(senderUsername, ciphertextToDecrypt);
       return makeResult(decrypted, encryptionType);
     } catch (error) {
+      if (encryptionType === 'nacl-box-v1') {
+        try {
+          const me = getCurrentUsername();
+          if (me) {
+            const legacy = await retrieveLegacyIdentityKeys(me);
+            const peer = await getPeerKeyInfo(senderUsername);
+
+            if (legacy && peer && ciphertextToDecrypt?.ciphertext && ciphertextToDecrypt?.nonce) {
+              const decrypted = await decryptAuthenticated(
+                { ciphertext: ciphertextToDecrypt.ciphertext, nonce: ciphertextToDecrypt.nonce },
+                peer.publicKey,
+                legacy.identityKeyPair.privateKey
+              );
+              return makeResult(decrypted, 'nacl-box-v1');
+            }
+          }
+        } catch {
+          // Fall through to normal error handling
+        }
+      }
+
       // Double Ratchet messages can't be recovered - they need the exact session state
       // This is EXPECTED behavior when session state is lost, not an error
       if (encryptionType === 'double-ratchet-v1') {

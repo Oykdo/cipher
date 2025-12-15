@@ -211,9 +211,29 @@ export default function Conversations() {
       if (peerUsername) {
         try {
           const result = await decryptReceivedMessage(peerUsername, data.message.body, undefined, true);
-          plaintext = result.text && !result.text.startsWith('[') ? result.text : await decryptIncomingMessage(data.conversationId, data.message);
+          if (result.text && !result.text.startsWith('[')) {
+            plaintext = result.text;
+          } else {
+            let parsed: any = null;
+            try {
+              parsed = JSON.parse(data.message.body);
+            } catch {
+              parsed = null;
+            }
+            plaintext = parsed?.version === 'e2ee-v1'
+              ? '[Erreur de déchiffrement]'
+              : await decryptIncomingMessage(data.conversationId, data.message);
+          }
         } catch {
-          plaintext = await decryptIncomingMessage(data.conversationId, data.message);
+          let parsed: any = null;
+          try {
+            parsed = JSON.parse(data.message.body);
+          } catch {
+            parsed = null;
+          }
+          plaintext = parsed?.version === 'e2ee-v1'
+            ? '[Erreur de déchiffrement]'
+            : await decryptIncomingMessage(data.conversationId, data.message);
         }
       } else {
         plaintext = await decryptIncomingMessage(data.conversationId, data.message);
@@ -531,16 +551,31 @@ export default function Conversations() {
                 (msg as any).encryptionType = result.encryptionType;
                 cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
               } else {
-                // E2EE failed (old message), fallback to legacy
-                // debugLogger.debug(`[DECRYPT] E2EE failed for message ${msg.id}, trying legacy`);
-                decryptedBody = await decryptIncomingMessage(conversationId, msg);
+                // E2EE failed: if it's an E2EE envelope, do NOT show raw JSON by falling back.
+                let parsed: any = null;
+                try {
+                  parsed = JSON.parse(msg.body);
+                } catch {
+                  parsed = null;
+                }
+                decryptedBody = parsed?.version === 'e2ee-v1'
+                  ? '[Erreur de déchiffrement]'
+                  : await decryptIncomingMessage(conversationId, msg);
                 cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
               }
             } catch (e2eeError) {
               // E2EE decryption threw error, fallback to legacy
               // debugLogger.debug(`[DECRYPT] E2EE error for message ${msg.id}, trying legacy:`, e2eeError);
               try {
-                decryptedBody = await decryptIncomingMessage(conversationId, msg);
+                let parsed: any = null;
+                try {
+                  parsed = JSON.parse(msg.body);
+                } catch {
+                  parsed = null;
+                }
+                decryptedBody = parsed?.version === 'e2ee-v1'
+                  ? '[Erreur de déchiffrement]'
+                  : await decryptIncomingMessage(conversationId, msg);
                 cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
               } catch (legacyError) {
                 // Both failed
