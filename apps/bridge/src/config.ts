@@ -7,7 +7,27 @@ dotenv.config();
 const isProd = process.env.NODE_ENV === 'production';
 const dataDir = process.env.BRIDGE_DATA_DIR || './data';
 
-const DEFAULT_PROD_ORIGINS = ['https://cipher.onrender.com', 'https://www.cipher.onrender.com'];
+const isNonEmptyString = (value: unknown): value is string =>
+    typeof value === 'string' && value.trim().length > 0;
+
+const renderHostname = process.env.RENDER_EXTERNAL_HOSTNAME;
+const renderOrigin = renderHostname ? `https://${renderHostname}` : undefined;
+
+// Defaults are only used when ALLOWED_ORIGINS is not set.
+// Include Render's public hostname (when available) to prevent accidental prod lockouts.
+const DEFAULT_PROD_ORIGINS = Array.from(
+    new Set(
+        [
+            renderOrigin,
+            'https://cipher-pulse.onrender.com',
+            'https://www.cipher-pulse.onrender.com',
+            'https://cipher-7d9p.onrender.com',
+            'https://www.cipher-7d9p.onrender.com',
+            'https://cipher.onrender.com',
+            'https://www.cipher.onrender.com',
+        ].filter(isNonEmptyString)
+    )
+);
 
 // Helper to read secret from file or env
 function getSecret(key: string): string | undefined {
@@ -45,7 +65,7 @@ export const config = {
         dbKey: getSecret('BRIDGE_DB_KEY'),
         allowedOrigins: (process.env.ALLOWED_ORIGINS?.split(',')
             ?.map((s) => s.trim())
-            .filter(Boolean)) || (isProd ? DEFAULT_PROD_ORIGINS : ['http://localhost:5173']),
+            .filter(isNonEmptyString)) || (isProd ? DEFAULT_PROD_ORIGINS : ['http://localhost:5173']),
         maxActiveUploadsPerUser: Number(process.env.MAX_ACTIVE_UPLOADS_PER_USER || 3),
     },
 
