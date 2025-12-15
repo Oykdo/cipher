@@ -27,7 +27,7 @@ import {
   resetSessionToNaClBox,
   getEncryptionModePreference,
 } from './sessionManager';
-import { base64ToBytes, bytesToBase64 } from './index';
+import { base64ToBytes, bytesToBase64, generateFingerprint } from './index';
 import { useAuthStore } from '../../store/auth';
 import {
   initializeX3DHManager,
@@ -280,6 +280,26 @@ export async function getPeerFingerprint(peerUsername: string): Promise<string |
 
   const peerKey = await retrievePeerPublicKey(currentUsername, peerUsername);
   return peerKey?.fingerprint || null;
+}
+
+/**
+ * Return cached peer key info (if present).
+ * Used to detect/repair corrupted caches (e.g., base64url decoding mismatch).
+ */
+export async function getPeerKeyInfo(peerUsername: string): Promise<{ publicKey: Uint8Array; fingerprint: string; verifiedAt: number | null } | null> {
+  if (!currentUsername) {
+    throw new Error('E2EE not initialized');
+  }
+  return await retrievePeerPublicKey(currentUsername, peerUsername);
+}
+
+/**
+ * Compute a fingerprint from the locally cached peer key bytes.
+ */
+export async function getPeerComputedFingerprint(peerUsername: string): Promise<string | null> {
+  const info = await getPeerKeyInfo(peerUsername);
+  if (!info) return null;
+  return await generateFingerprint(info.publicKey);
 }
 
 /**

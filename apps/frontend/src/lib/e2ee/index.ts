@@ -449,7 +449,21 @@ export function bytesToBase64(bytes: Uint8Array): string {
  * Convert Base64 to Uint8Array
  */
 export function base64ToBytes(base64: string): Uint8Array {
-  return sodium.from_base64(base64);
+  const trimmed = base64.trim();
+
+  // libsodium-wrappers defaults to URLSAFE_NO_PADDING.
+  // Backend may return either urlsafe or standard base64, with/without padding.
+  // Try urlsafe-no-padding first, then fall back to ORIGINAL.
+  try {
+    return sodium.from_base64(trimmed.replace(/=+$/g, ''));
+  } catch {
+    // Fall through
+  }
+
+  const standard = trimmed.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = standard.length % 4;
+  const padded = pad === 0 ? standard : `${standard}${'='.repeat(4 - pad)}`;
+  return sodium.from_base64(padded, sodium.base64_variants.ORIGINAL);
 }
 
 /**

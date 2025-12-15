@@ -15,6 +15,7 @@ import {
   isE2EEInitialized,
   addPeerPublicKey,
   getPeerFingerprint,
+  getPeerComputedFingerprint,
   ensureE2EEInitializedForSession,
   getCurrentUsername,
 } from './e2eeService';
@@ -67,13 +68,25 @@ export async function ensurePeerKey(peerUsername: string): Promise<boolean> {
       return false;
     }
 
-    // Check if we have a cached key and if it matches
+    // Check if we have a cached key and if it matches.
+    // IMPORTANT: Also verify the cached key bytes actually correspond to the fingerprint.
+    // Otherwise a previous base64/base64url decoding bug can leave corrupted bytes while the
+    // stored fingerprint string still matches the server.
     const existingFingerprint = await getPeerFingerprint(peerUsername);
-    
     if (existingFingerprint && existingFingerprint === keyBundle.fingerprint) {
-      // Key hasn't changed, we're good
-      // SECURITY: Sensitive log removed`);
-      return true;
+      const computed = await getPeerComputedFingerprint(peerUsername);
+      if (computed && computed === keyBundle.fingerprint) {
+        return true;
+      }
+      console.warn(`⚠️ [E2EE] Cached key bytes for ${peerUsername} do not match fingerprint; repairing cache`);
+
+      // Clear any persisted session that may contain the corrupted peer public key
+      try {
+        const { deletePeerSession } = await import('./e2eeService');
+        await deletePeerSession(peerUsername);
+      } catch (e) {
+        console.warn('[E2EE] Failed to delete corrupted session during repair:', e);
+      }
     }
     
     if (existingFingerprint && existingFingerprint !== keyBundle.fingerprint) {

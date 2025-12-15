@@ -34,6 +34,22 @@ export interface SerializedPublicKeyInfo {
   fetchedAt: number;
 }
 
+function decodeKeyBase64(input: string): Uint8Array {
+  const trimmed = input.trim();
+
+  try {
+    // Default variant is URLSAFE_NO_PADDING
+    return _sodium.from_base64(trimmed.replace(/=+$/g, ''));
+  } catch {
+    // Fall through
+  }
+
+  const standard = trimmed.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = standard.length % 4;
+  const padded = pad === 0 ? standard : `${standard}${'='.repeat(4 - pad)}`;
+  return _sodium.from_base64(padded, _sodium.base64_variants.ORIGINAL);
+}
+
 // ============================================================================
 // CACHE
 // ============================================================================
@@ -84,8 +100,8 @@ function loadFromPersistentCache(userId: string): PublicKeyInfo | null {
     return {
       userId: serialized.userId,
       username: serialized.username,
-      publicKey: _sodium.from_base64(serialized.publicKey),
-      signPublicKey: _sodium.from_base64(serialized.signPublicKey),
+      publicKey: decodeKeyBase64(serialized.publicKey),
+      signPublicKey: decodeKeyBase64(serialized.signPublicKey),
       fetchedAt: serialized.fetchedAt,
     };
   } catch (error) {
@@ -148,8 +164,8 @@ async function fetchPublicKeysFromAPI(userIds: string[]): Promise<PublicKeyInfo[
       const keyInfo: PublicKeyInfo = {
         userId: key.userId,
         username: key.username,
-        publicKey: _sodium.from_base64(key.publicKey),
-        signPublicKey: _sodium.from_base64(key.signPublicKey),
+        publicKey: decodeKeyBase64(key.publicKey),
+        signPublicKey: decodeKeyBase64(key.signPublicKey),
         fetchedAt: Date.now(),
       };
       
