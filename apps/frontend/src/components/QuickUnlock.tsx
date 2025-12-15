@@ -12,9 +12,10 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
 import { type LocalAccount, hasLocalPassword, clearLocalAccount } from '../lib/localStorage';
 import { API_BASE_URL } from '../config';
-import { getKeyVault } from '../lib/keyVault';
+import { getE2EEVault, getKeyVault } from '../lib/keyVault';
 import { initializeE2EE } from '../lib/e2ee/e2eeService';
 import { setSessionMasterKey } from '../lib/masterKeyResolver';
+import { setTemporaryMasterKey } from '../lib/secureKeyAccess';
 import * as srp from 'secure-remote-password/client';
 import { debugLogger } from "../lib/debugLogger";
 import '../styles/fluidCrypto.css';
@@ -109,6 +110,19 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
 
       // SECURITY: Store masterKey in memory for encryption only (never sent to server)
       await setSessionMasterKey(masterKey);
+
+      // Persist for the session + initialize E2EE vault (keyed by masterKey)
+      try {
+        await setTemporaryMasterKey(masterKey);
+      } catch (mkErr) {
+        console.warn('[QuickUnlock] Failed to persist masterKey:', mkErr);
+      }
+
+      try {
+        await getE2EEVault(masterKey);
+      } catch (vaultInitErr) {
+        console.warn('[QuickUnlock] Failed to init E2EE vault:', vaultInitErr);
+      }
 
       // SECURITY: Use SRP for authentication (zero-knowledge)
       const ephemeral = srp.generateEphemeral();
