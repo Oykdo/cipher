@@ -887,7 +887,7 @@
     "important_info": "重要信息",
     "info_check_address": "发送前请务必检查地址",
     "info_irreversible": "区块链交易是不可逆的",
-    "info_xrp_tag": "对于 XRP，请不要忘记目标标签",
+    "info_xrp_tag": "XRP：此地址不需要目标标签",
     "info_eth_network": "ETH 地址适用于所有 EVM 网络（Ethereum, Polygon, BSC 等）",
     "why_contribute": "为什么要贡献？",
     "why_contribute_desc": "Cipher Pulse 是一个免费的开源项目。您的贡献有助于我们维护和改进应用程序。",

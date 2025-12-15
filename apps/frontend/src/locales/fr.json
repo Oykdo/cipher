@@ -316,7 +316,7 @@
       "important_info": "Informations importantes",
       "info_check_address": "Vérifiez toujours l'adresse avant d'envoyer",
       "info_irreversible": "Les transactions blockchain sont irréversibles",
-      "info_xrp_tag": "Pour XRP, n'oubliez pas le Destination Tag",
+      "info_xrp_tag": "XRP : aucun Destination Tag n'est requis pour cette adresse",
       "info_eth_network": "L'adresse ETH fonctionne sur tous les réseaux EVM (Ethereum, Polygon, BSC, etc.)",
       "why_contribute": "Pourquoi contribuer ?",
       "why_contribute_desc": "Cipher Pulse est un projet open-source gratuit. Vos contributions nous aident à maintenir et améliorer l'application.",

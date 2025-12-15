@@ -204,6 +204,13 @@ export function AttachmentMessage({
         </div>
       </div>
 
+      {/* Optional caption / message */}
+      {attachment.payload.caption && (
+        <p className="mt-3 text-sm text-pure-white whitespace-pre-wrap break-words">
+          {attachment.payload.caption}
+        </p>
+      )}
+
       {/* Security mode indicator */}
       {attachment.payload.securityMode !== 'none' && (
         <div className="mt-3 text-xs">

@@ -35,6 +35,8 @@ export interface EncryptedAttachment {
   id: string;
   type: 'attachment';
   payload: {
+    /** Optional text sent along with the attachment (caption/message). */
+    caption?: string;
     fileName: string;
     fileSize: number;
     fileMimeType: string;

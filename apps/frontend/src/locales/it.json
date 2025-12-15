@@ -887,7 +887,7 @@
     "important_info": "Informazioni importanti",
     "info_check_address": "Controlla sempre l'indirizzo prima di inviare",
     "info_irreversible": "Le transazioni blockchain sono irreversibili",
-    "info_xrp_tag": "Per XRP, non dimenticare il Tag di Destinazione",
+    "info_xrp_tag": "XRP: nessun Tag di destinazione è richiesto per questo indirizzo",
     "info_eth_network": "L'indirizzo ETH funziona su tutte le reti EVM (Ethereum, Polygon, BSC, ecc.)",
     "why_contribute": "Perché contribuire?",
     "why_contribute_desc": "Cipher Pulse è un progetto open source gratuito. I tuoi contributi ci aiutano a mantenere e migliorare l'applicazione.",

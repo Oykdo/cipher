@@ -765,11 +765,15 @@ export default function Conversations() {
     const peerUsername = selectedConv?.otherParticipant?.username;
 
     // Optimistic add with temp ID (shows immediately)
+    const optimisticBody = attachmentFile
+      ? (plaintextBody.trim() ? `${plaintextBody}\n📎 ${attachmentFile.name}` : `📎 ${attachmentFile.name}`)
+      : plaintextBody;
+
     const optimisticMessage = {
       id: tempId,
       conversationId: selectedConvId,
       senderId: session.user.id,
-      body: attachmentFile ? `📎 ${attachmentFile.name}` : plaintextBody,
+      body: optimisticBody,
       createdAt: Date.now(),
       isPending: true,
       hasAttachment: !!attachmentFile,
@@ -808,6 +812,18 @@ export default function Conversations() {
           securityMode,
           timeLockEpoch
         );
+
+        // Include optional caption text so we can display it together with the attachment.
+        const caption = plaintextBody.trim();
+        if (caption) {
+          encryptedAttachment = {
+            ...encryptedAttachment,
+            payload: {
+              ...encryptedAttachment.payload,
+              caption,
+            },
+          };
+        }
 
         // Upload encrypted attachment data to the server (store ciphertext out-of-band)
         // Then send only a small attachment envelope inside the message.
