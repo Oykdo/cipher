@@ -1038,6 +1038,16 @@ export default function LoginNew() {
         sessionStorage.removeItem('tempUsername');
         sessionStorage.removeItem('verifiedChecksums');
 
+        // Ensure legacy code that still needs hex can access it during this session.
+        // Without this, we may have a non-extractable CryptoKey in IndexedDB but no hex in the in-memory cache,
+        // causing a "need re-authentication" warning right after DiceKey signup.
+        try {
+          await setSessionMasterKey(masterKeyHex);
+          await setTemporaryMasterKey(masterKeyHex);
+        } catch (mkErr) {
+          console.warn('[LoginNew] Failed to persist masterKey for new account session:', mkErr);
+        }
+
         // Initialize E2EE immediately after account creation
         try {
           try {
