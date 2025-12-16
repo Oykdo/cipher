@@ -80,6 +80,43 @@ export class P2PConnection {
     // Stocker la référence au socket pour le nettoyage
     this.signalingSocket = signalingSocket;
 
+    // CORRECTION: Enregistrer le handler AVANT de créer le peer
+    // pour pouvoir recevoir les signaux même si le peer n'est pas encore créé
+    this.signalHandler = (data: any) => {
+      if (data.from === this.options.peerId) {
+        debugLogger.debug('📡 [P2P] Received signal from peer', this.options.peerId, {
+          type: data.signal?.type || 'unknown',
+          isInitiator: this.options.initiator,
+        });
+        
+        // Si le peer n'existe pas encore, attendre un peu
+        if (!this.peer) {
+          console.warn('⚠️ [P2P] Received signal but peer not initialized yet, will process when ready', this.options.peerId);
+          // Stocker le signal pour le traiter plus tard
+          setTimeout(() => {
+            if (this.peer && data.signal) {
+              try {
+                this.peer.signal(data.signal);
+              } catch (error) {
+                console.error('❌ [P2P] Error processing delayed signal', error);
+              }
+            }
+          }, 100);
+          return;
+        }
+        
+        try {
+          this.peer.signal(data.signal);
+        } catch (error) {
+          console.error('❌ [P2P] Error processing signal', error);
+          this.options.onError?.(error as Error);
+        }
+      }
+    };
+
+    // Listen for signals from peer (register BEFORE creating peer)
+    signalingSocket.on('p2p-signal', this.signalHandler);
+
     this.peer = new SimplePeer({
       initiator: this.options.initiator,
       trickle: true,
@@ -258,22 +295,10 @@ export class P2PConnection {
       console.error('❌ [P2P] Connection error', {
         peerId: this.options.peerId,
         error: error.message || error,
+        isInitiator: this.options.initiator,
       });
       this.options.onError?.(error);
     });
-
-    // CORRECTION: Créer un handler nommé et le stocker pour pouvoir le retirer
-    this.signalHandler = (data: any) => {
-      if (data.from === this.options.peerId) {
-        debugLogger.debug('📡 [P2P] Received signal from peer', this.options.peerId, {
-          type: data.signal?.type || 'unknown',
-        });
-        this.peer?.signal(data.signal);
-      }
-    };
-
-    // Listen for signals from peer
-    signalingSocket.on('p2p-signal', this.signalHandler);
 
     // Timeout de connexion (30 secondes)
     this.connectionTimeout = setTimeout(() => {

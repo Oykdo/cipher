@@ -235,38 +235,63 @@ export class P2PManager {
   }
 
   /**
+   * Determine if we should be the initiator based on deterministic comparison
+   * This ensures both peers agree on who initiates the connection
+   */
+  private shouldBeInitiator(myUserId: string, peerId: string): boolean {
+    // Deterministic comparison: user with "lower" ID becomes initiator
+    // This ensures both peers make the same decision
+    return myUserId.localeCompare(peerId) < 0;
+  }
+
+  /**
    * Connect to a peer for a conversation
    * 
    * ARCHITECTURE FIX: Now requires peerUsername for unified E2EE
    * @param peerId - The peer's user ID
    * @param peerUsername - The peer's username (required for E2EE session)
    * @param conversationId - The conversation ID
-   * @param initiator - Whether we're initiating the connection
+   * @param initiator - Whether we're initiating the connection (if not provided, determined automatically)
    */
   async connectToPeer(
     peerId: string,
     peerUsername: string,
     conversationId: string,
-    initiator: boolean
+    initiator?: boolean
   ): Promise<void> {
     const connectionKey = this.getConnectionKey(peerId, conversationId);
     
     // Check if already connected
-    if (this.connections.has(connectionKey)) {
-      debugLogger.debug('⚠️ [P2P MANAGER] Already connected to peer', peerId);
-      return;
+    const existingConnection = this.connections.get(connectionKey);
+    if (existingConnection) {
+      if (existingConnection.isConnected()) {
+        debugLogger.debug('⚠️ [P2P MANAGER] Already connected to peer', peerId);
+        return;
+      } else {
+        // Connection exists but not connected - destroy it and create a new one
+        debugLogger.debug('⚠️ [P2P MANAGER] Existing connection not connected, recreating', peerId);
+        existingConnection.destroy();
+        this.connections.delete(connectionKey);
+      }
     }
 
-    debugLogger.websocket('[P2P MANAGER]...', {
+    // Determine initiator role if not provided
+    // Use deterministic comparison to ensure both peers agree
+    const shouldInitiate = initiator !== undefined 
+      ? initiator 
+      : this.shouldBeInitiator(this.options.userId, peerId);
+
+    debugLogger.websocket('[P2P MANAGER] Connecting to peer', {
       peerId,
       peerUsername,
       conversationId,
-      initiator,
+      initiator: shouldInitiate,
+      myUserId: this.options.userId,
     });
 
     // Create P2P connection with unified E2EE
     const connection = new P2PConnection({
-      initiator,
+      initiator: shouldInitiate,
       peerId,
       peerUsername, // ARCHITECTURE FIX: Use peerUsername for E2EE instead of masterKey
       conversationId,
@@ -326,12 +351,14 @@ export class P2PManager {
     const { queueIfOffline = true } = options;
     const connectionKey = this.getConnectionKey(peerId, conversationId);
     let connection = this.connections.get(connectionKey);
+    const peerOnline = this.isPeerOnline(peerId);
 
     // Try to establish connection if not exists
-    if (!connection && this.isPeerOnline(peerId)) {
+    if (!connection && peerOnline) {
       debugLogger.debug('⚠️ [P2P MANAGER] No connection to peer, initiating...');
       try {
-        await this.connectToPeer(peerId, peerUsername, conversationId, true);
+        // Let connectToPeer determine initiator role automatically
+        await this.connectToPeer(peerId, peerUsername, conversationId);
         connection = this.connections.get(connectionKey);
       } catch (error) {
         console.warn('⚠️ [P2P MANAGER] Failed to connect to peer:', error);
@@ -344,18 +371,20 @@ export class P2PManager {
         await connection.sendText(text);
         return { sent: true, queued: false };
       } catch (error) {
+        // IMPORTANT: Do not silently queue when the peer is online; caller should fall back to server relay.
         console.warn('⚠️ [P2P MANAGER] Direct send failed:', error);
+        throw error;
       }
     }
 
-    // Queue message for later delivery if peer is offline
-    if (queueIfOffline) {
+    // Queue only when the peer is offline (store & forward)
+    if (!peerOnline && queueIfOffline) {
       debugLogger.debug('📦 [P2P MANAGER] Peer offline, queueing message');
       const messageId = await this.messageQueue.queueMessage(peerId, conversationId, text);
       return { sent: false, queued: true, messageId };
     }
 
-    throw new Error('Peer is offline and queueing is disabled');
+    throw new Error(peerOnline ? 'Peer online but not reachable via P2P' : 'Peer is offline and queueing is disabled');
   }
 
   /**

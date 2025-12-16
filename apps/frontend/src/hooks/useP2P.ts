@@ -107,7 +107,7 @@ export function useP2P(options: UseP2POptions = {}) {
         throw new Error('P2P manager not initialized');
       }
 
-      await manager.sendMessage(peerId, peerUsername, conversationId, text);
+      return await manager.sendMessage(peerId, peerUsername, conversationId, text);
     },
     [manager]
   );
@@ -127,9 +127,10 @@ export function useP2P(options: UseP2POptions = {}) {
    * Connect to peer
    * 
    * ARCHITECTURE FIX: Now requires peerUsername for unified E2EE
+   * Initiator role is determined automatically if not provided
    */
   const connectToPeer = useCallback(
-    async (peerId: string, peerUsername: string, conversationId: string, initiator: boolean) => {
+    async (peerId: string, peerUsername: string, conversationId: string, initiator?: boolean) => {
       if (!manager) {
         throw new Error('P2P manager not initialized');
       }

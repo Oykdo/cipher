@@ -759,10 +759,16 @@ export default function Conversations() {
 
       // Try to establish P2P connection if not already connected
       // ARCHITECTURE FIX: Pass peerUsername for unified E2EE
-      await connectToPeer(peerId, peerUsername, conversationId, true);
+      // Let connectToPeer determine initiator role automatically (deterministic)
+      await connectToPeer(peerId, peerUsername, conversationId);
 
       // Send via P2P with unified E2EE
-      await sendP2PMessage(peerId, peerUsername, conversationId, text);
+      const result = await sendP2PMessage(peerId, peerUsername, conversationId, text);
+      if (!result?.sent) {
+        // If P2P couldn't actually deliver (e.g., missing keys), fall back to server relay.
+        updateConnectionMode(conversationId, 'relayed');
+        return false;
+      }
 
       updateConnectionMode(conversationId, 'p2p');
       debugLogger.info('✅ [P2P] Message sent via P2P (unified E2EE)');

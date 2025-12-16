@@ -50,10 +50,9 @@ export default function P2PChat() {
       // DEMO: Using peerId as username - in production, resolve from user data
       setTargetPeerUsername(firstPeer);
       
-      // Connect as initiator if we're the "higher" user ID
-      const shouldInitiate = !!(session?.user?.id && session.user.id > firstPeer);
       // ARCHITECTURE FIX: Pass peerUsername for unified E2EE
-      connectToPeer(firstPeer, firstPeer, conversationId, shouldInitiate);
+      // Initiator role is determined automatically (deterministic based on user IDs)
+      connectToPeer(firstPeer, firstPeer, conversationId);
     }
   }, [onlinePeers, targetPeerId, session?.user?.id]);
 
