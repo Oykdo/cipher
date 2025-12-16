@@ -63,7 +63,9 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
         auth: {
           token,
         },
-        transports: ['websocket', 'polling'],
+        // Prefer polling first, then upgrade to websocket.
+        // This avoids noisy console errors on hosts/proxies that occasionally reject the initial WS handshake.
+        transports: ['polling', 'websocket'],
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
