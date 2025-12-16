@@ -81,6 +81,7 @@ export function csrfProtection() {
             '/api/v2/auth/srp-seed/login/verify',
             '/api/v2/auth/refresh',
             '/api/public/stripe/create-checkout-session',
+            '/api/public/stripe/webhook',
             '/api/generate-dicekey-avatar' // Part of signup flow, no JWT yet
         ];
 

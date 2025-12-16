@@ -86,4 +86,72 @@ export async function stripeRoutes(app: FastifyInstance) {
 
     return { url: session.url };
   });
+
+  // Stripe Webhook (production-grade signature verification)
+  // Note: Stripe requires the raw request body for signature verification.
+  // We register this route in an encapsulated scope with a Buffer parser.
+  await app.register(
+    async (webhookApp) => {
+      webhookApp.addContentTypeParser(
+        'application/json',
+        { parseAs: 'buffer' },
+        (_req, body, done) => {
+          done(null, body);
+        }
+      );
+
+      webhookApp.post('/webhook', async (request, reply) => {
+        const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+        const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
+        if (!secretKey || !webhookSecret) {
+          reply.code(503);
+          return {
+            error: 'Stripe webhook is not configured',
+            code: 'STRIPE_WEBHOOK_NOT_CONFIGURED',
+          };
+        }
+
+        const signature = request.headers['stripe-signature'];
+        if (typeof signature !== 'string' || signature.length === 0) {
+          reply.code(400);
+          return { error: 'Missing Stripe signature', code: 'STRIPE_SIGNATURE_MISSING' };
+        }
+
+        const stripe = new Stripe(secretKey);
+        const rawBody = request.body as Buffer;
+
+        let event: Stripe.Event;
+        try {
+          event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+        } catch (err: any) {
+          reply.code(400);
+          return { error: `Webhook signature verification failed: ${err?.message || 'unknown'}` };
+        }
+
+        // Minimal handling: log useful events. Extend later to record contributions.
+        webhookApp.log.info(
+          {
+            stripeEventId: event.id,
+            type: event.type,
+          },
+          'Stripe webhook received'
+        );
+
+        switch (event.type) {
+          case 'checkout.session.completed':
+          case 'checkout.session.async_payment_succeeded':
+          case 'payment_intent.succeeded': {
+            // For contributions, you can read metadata here.
+            // const obj = event.data.object as any;
+            break;
+          }
+          default:
+            break;
+        }
+
+        return { received: true };
+      });
+    },
+    { prefix: '/api/public/stripe' }
+  );
 }
