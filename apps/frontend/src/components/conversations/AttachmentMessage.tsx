@@ -13,6 +13,8 @@ import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { BurnCountdown } from '../BurnCountdown';
 import { apiv2 } from '../../services/api-v2';
+import { useAuthStore } from '../../store/auth';
+import { removePendingBurnAck, upsertPendingBurnAck } from '../../lib/burn/pendingBurnAcks';
 import {
   decryptAttachment,
   isAttachmentLocked,
@@ -40,6 +42,7 @@ export function AttachmentMessage({
   formatTime,
 }: AttachmentMessageProps) {
   const { t } = useTranslation();
+  const session = useAuthStore((s) => s.session);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -113,11 +116,20 @@ export function AttachmentMessage({
         const opened = Date.now();
         setOpenedAt(opened);
 
+        const userId = session?.user?.id;
+        if (userId) {
+          // Persist immediately so closing the app mid-request can't extend the timer.
+          upsertPendingBurnAck(userId, { messageId, conversationId, revealedAt: opened });
+        }
+
         try {
           // Start server-side countdown (persists even if the client closes)
           const resp = await apiv2.acknowledgeMessage(messageId, conversationId, opened);
           if (resp?.scheduledBurnAt) {
             setScheduledBurnAt(resp.scheduledBurnAt);
+            if (userId) {
+              removePendingBurnAck(userId, messageId);
+            }
           } else {
             // Fallback: local timer display only
             const delaySeconds = typeof burnDelay === 'number' && burnDelay > 0 ? burnDelay : 0;
@@ -136,7 +148,7 @@ export function AttachmentMessage({
       setDownloading(false);
       setDownloadProgress(0);
     }
-  }, [isLocked, burned, attachment, isBurnMode, isOwn, openedAt, burnDelay, messageId, conversationId, t]);
+  }, [isLocked, burned, attachment, isBurnMode, isOwn, openedAt, burnDelay, messageId, conversationId, t, session?.user?.id]);
 
   // Render burned state
   if (burned) {

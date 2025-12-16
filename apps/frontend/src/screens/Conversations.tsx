@@ -34,6 +34,7 @@ import { P2P_CONFIG, SIGNALING_SERVERS } from '../config';
 import { debugLogger } from "../lib/debugLogger";
 import { encryptAttachment, type EncryptedAttachment, type SecurityMode } from '../lib/attachment';
 import { base64ToBytes } from '../shared/crypto';
+import { loadPendingBurnAcks, removePendingBurnAck, upsertPendingBurnAck } from '../lib/burn/pendingBurnAcks';
 import '../styles/fluidCrypto.css';
 
 type ViewMode = 'list' | 'chat';
@@ -49,6 +50,19 @@ export default function Conversations() {
 
   // If an acknowledge fails due to connectivity, keep a record and retry on reconnect.
   const pendingBurnAcksRef = useRef(new Map<string, { conversationId: string; revealedAt: number }>());
+
+  const pendingAckUserId = session?.user?.id;
+
+  // Load persisted pending acks when the session user changes (survives full app close)
+  useEffect(() => {
+    if (!pendingAckUserId) return;
+    const persisted = loadPendingBurnAcks(pendingAckUserId);
+    const next = new Map<string, { conversationId: string; revealedAt: number }>();
+    for (const e of persisted) {
+      next.set(e.messageId, { conversationId: e.conversationId, revealedAt: e.revealedAt });
+    }
+    pendingBurnAcksRef.current = next;
+  }, [pendingAckUserId]);
 
   // Configure X3DH handshake transport over Socket.IO (required for Double Ratchet / PFS)
   useX3DHHandshake({ socket, connected });
@@ -315,6 +329,12 @@ export default function Conversations() {
       // Ignore import errors
     }
 
+    // If we had a pending acknowledge for this message, clear it.
+    if (pendingAckUserId) {
+      pendingBurnAcksRef.current.delete(data.messageId);
+      removePendingBurnAck(pendingAckUserId, data.messageId);
+    }
+
     // Find the message to check if it's a BurnMessage (recipient) or normal (sender)
     const message = messages.find(m => m.id === data.messageId);
     const isOwnMessage = message?.senderId === session?.user?.id;
@@ -454,6 +474,18 @@ export default function Conversations() {
       for (const msg of sortedMessages) {
         try {
           console.log(`[LOAD] Processing message ${msg.id} from sender ${msg.senderId}`);
+
+          // If this BAR message was already revealed on this device but the ack didn't reach the server
+          // (e.g., full app close), enforce the original reveal deadline locally to avoid timer extension.
+          const pending = pendingBurnAcksRef.current.get(msg.id);
+          if (
+            pending &&
+            typeof msg.burnDelay === 'number' &&
+            msg.burnDelay > 0 &&
+            typeof msg.scheduledBurnAt !== 'number'
+          ) {
+            (msg as any).scheduledBurnAt = pending.revealedAt + msg.burnDelay * 1000;
+          }
           
           // Skip decryption for locked or burned messages
           if (msg.isLocked || msg.isBurned) {
@@ -1126,12 +1158,21 @@ export default function Conversations() {
 
     const revealedAt = Date.now();
 
+    // Persist immediately so a full app close during the request can't “pause” the burn.
+    if (pendingAckUserId) {
+      pendingBurnAcksRef.current.set(messageId, { conversationId: selectedConvId, revealedAt });
+      upsertPendingBurnAck(pendingAckUserId, { messageId, conversationId: selectedConvId, revealedAt });
+    }
+
     // Start server-side countdown immediately so BAR persists across reconnect.
     try {
       const resp = await apiv2.acknowledgeMessage(messageId, selectedConvId, revealedAt);
 
       // Ack succeeded, ensure we don't retry it.
       pendingBurnAcksRef.current.delete(messageId);
+      if (pendingAckUserId) {
+        removePendingBurnAck(pendingAckUserId, messageId);
+      }
 
       if (resp?.scheduledBurnAt) {
         setMessages((prev) =>
@@ -1147,14 +1188,15 @@ export default function Conversations() {
       }
     } catch (err: any) {
       console.error('Failed to acknowledge burn-after-reading message:', err);
-      pendingBurnAcksRef.current.set(messageId, { conversationId: selectedConvId, revealedAt });
+      // Keep pending entry; it will be retried on reconnect/login.
       // Keep local countdown; if the socket burn succeeds later, server will still burn.
     }
-  }, [selectedConvId]);
+  }, [selectedConvId, pendingAckUserId]);
 
   // Retry pending acknowledgements on reconnect.
   useEffect(() => {
     if (!connected) return;
+    if (!pendingAckUserId) return;
     if (pendingBurnAcksRef.current.size === 0) return;
 
     const entries = Array.from(pendingBurnAcksRef.current.entries());
@@ -1163,6 +1205,7 @@ export default function Conversations() {
         .acknowledgeMessage(messageId, entry.conversationId, entry.revealedAt)
         .then((resp) => {
           pendingBurnAcksRef.current.delete(messageId);
+          removePendingBurnAck(pendingAckUserId, messageId);
 
           if (resp?.scheduledBurnAt) {
             setMessages((prev) =>
@@ -1181,7 +1224,7 @@ export default function Conversations() {
           // Keep pending; we'll retry on next reconnect.
         });
     }
-  }, [connected]);
+  }, [connected, pendingAckUserId]);
 
   // Handle burn complete - send burn event via WebSocket after animation
   const handleBurnComplete = useCallback(async (messageId: string) => {
@@ -1222,7 +1265,31 @@ export default function Conversations() {
     }
   }, [selectedConvId, socket, session?.user?.username]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Best-effort: flush any pending BAR acknowledges before wiping session.
+    // This reduces the chance that a user can extend the burn window by logging out.
+    try {
+      if (pendingAckUserId && pendingBurnAcksRef.current.size > 0) {
+        const entries = Array.from(pendingBurnAcksRef.current.entries());
+
+        await Promise.race([
+          Promise.allSettled(
+            entries.map(([messageId, entry]) =>
+              apiv2
+                .acknowledgeMessage(messageId, entry.conversationId, entry.revealedAt)
+                .then(() => {
+                  pendingBurnAcksRef.current.delete(messageId);
+                  removePendingBurnAck(pendingAckUserId, messageId);
+                })
+            )
+          ),
+          new Promise((resolve) => setTimeout(resolve, 1200)),
+        ]);
+      }
+    } catch {
+      // Ignore logout flush errors.
+    }
+
     // Clear E2EE decrypted message cache
     clearAllDecryptedCache();
     clearSession();
