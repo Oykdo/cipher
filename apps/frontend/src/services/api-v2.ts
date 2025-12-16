@@ -260,11 +260,12 @@ export const apiv2 = {
    */
   acknowledgeMessage: async (
     messageId: string,
-    conversationId: string
+    conversationId: string,
+    revealedAt?: number
   ): Promise<{ success: boolean; scheduledBurnAt?: number }> => {
     return authFetchV2WithRefresh(`/messages/${messageId}/acknowledge`, {
       method: "POST",
-      body: JSON.stringify({ conversationId }),
+      body: JSON.stringify({ conversationId, revealedAt }),
     });
   },
 

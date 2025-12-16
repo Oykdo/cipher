@@ -18,6 +18,7 @@ interface BurnMessageProps {
   isOwn: boolean;
   timestamp: number;
   burnDelay?: number;          // Delay in seconds before burn after reveal
+  burnAt?: number;             // Absolute burn deadline (ms since epoch) once acknowledged
   isBurnedFromServer?: boolean; // Whether server has confirmed burn
   onReveal?: () => void;       // Called when message is revealed
   onBurn?: () => void;         // Called when burn animation completes
@@ -35,6 +36,7 @@ export function BurnMessage({
   isOwn,
   timestamp,
   burnDelay = 5,
+  burnAt,
   isBurnedFromServer = false,
   onReveal,
   onBurn,
@@ -61,29 +63,72 @@ export function BurnMessage({
   }, [isBurnedFromServer, revealed, burning, burned]);
   const [countdown, setCountdown] = useState<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const burnDeadlineRef = useRef<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // If we learn the authoritative burn deadline after reveal (e.g., ack response arrived),
+  // sync countdown to it so disconnects/background throttling can't extend the timer.
+  useEffect(() => {
+    if (!revealed || burning || burned) return;
+    if (typeof burnAt !== 'number' || !Number.isFinite(burnAt) || burnAt <= 0) return;
+
+    burnDeadlineRef.current = burnAt;
+    const remaining = Math.ceil((burnAt - Date.now()) / 1000);
+
+    if (remaining <= 0) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setCountdown(null);
+      setBurning(true);
+      return;
+    }
+
+    setCountdown(remaining);
+  }, [burnAt, revealed, burning, burned]);
 
   // Handle reveal - show content and start burn countdown
   const handleReveal = useCallback(() => {
     if (revealed || burning || burned || isOwn) return;
 
     setRevealed(true);
-    setCountdown(burnDelay);
+    const now = Date.now();
+    const deadline = typeof burnAt === 'number' && Number.isFinite(burnAt) && burnAt > 0
+      ? burnAt
+      : now + burnDelay * 1000;
+    burnDeadlineRef.current = deadline;
+
     onReveal?.();
 
-    // Start countdown
+    const initialRemaining = Math.ceil((deadline - now) / 1000);
+    if (initialRemaining <= 0) {
+      setCountdown(null);
+      setBurning(true);
+      return;
+    }
+
+    setCountdown(initialRemaining);
+
+    // Start countdown (based on absolute deadline to avoid timer pauses extending the burn window)
     timerRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev === null || prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          // Start burn animation
-          setBurning(true);
-          return null;
+      const deadlineNow = burnDeadlineRef.current;
+      if (!deadlineNow) return;
+
+      const remaining = Math.ceil((deadlineNow - Date.now()) / 1000);
+      if (remaining <= 0) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
         }
-        return prev - 1;
-      });
+        setCountdown(null);
+        setBurning(true);
+        return;
+      }
+
+      setCountdown(remaining);
     }, 1000);
-  }, [revealed, burning, burned, isOwn, burnDelay, onReveal]);
+  }, [revealed, burning, burned, isOwn, burnDelay, burnAt, onReveal]);
 
   // Cleanup timer on unmount
   useEffect(() => {

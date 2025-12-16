@@ -22,7 +22,7 @@ export async function acknowledgeRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const userId = (request.user as any).sub as string;
       const { messageId } = request.params as { messageId: string };
-      const { conversationId } = request.body as { conversationId?: string };
+      const { conversationId, revealedAt } = request.body as { conversationId?: string; revealedAt?: number };
 
       if (!conversationId) {
         reply.code(400);
@@ -75,7 +75,16 @@ export async function acknowledgeRoutes(fastify: FastifyInstance) {
       if (scheduledBurnValue < 0) {
         // Negative value = delay in seconds after reading
         const delaySeconds = Math.abs(scheduledBurnValue);
-        actualBurnTime = Date.now() + (delaySeconds * 1000);
+
+        // Use client-provided reveal timestamp to avoid extending the timer
+        // if the acknowledge request arrives late (e.g., network disconnect).
+        const now = Date.now();
+        const clientRevealAt = typeof revealedAt === 'number' && Number.isFinite(revealedAt) && revealedAt > 0
+          ? revealedAt
+          : now;
+        const effectiveRevealAt = Math.min(now, clientRevealAt);
+
+        actualBurnTime = effectiveRevealAt + (delaySeconds * 1000);
         
         // Update the message with the actual burn time
         await db.scheduleBurn(messageId, actualBurnTime);
@@ -83,6 +92,7 @@ export async function acknowledgeRoutes(fastify: FastifyInstance) {
         fastify.log.info({
           messageId,
           delaySeconds,
+          revealedAt: new Date(effectiveRevealAt).toISOString(),
           actualBurnTime: new Date(actualBurnTime).toISOString(),
         }, 'Calculated burn time from delay');
       } else {

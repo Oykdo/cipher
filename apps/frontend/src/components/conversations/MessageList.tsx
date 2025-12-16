@@ -154,6 +154,7 @@ export function MessageList({
                 isOwn={false}
                 timestamp={message.createdAt}
                 burnDelay={originalDelay}
+                burnAt={message.scheduledBurnAt}
                 isBurnedFromServer={burned}
                 onReveal={() => handleBurnReveal(message.id)}
                 onBurn={() => handleBurnComplete(message.id)}

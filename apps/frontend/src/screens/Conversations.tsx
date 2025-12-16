@@ -47,6 +47,9 @@ export default function Conversations() {
   // WebSocket connection with auto-refresh
   const { socket, connected } = useSocketWithRefresh();
 
+  // If an acknowledge fails due to connectivity, keep a record and retry on reconnect.
+  const pendingBurnAcksRef = useRef(new Map<string, { conversationId: string; revealedAt: number }>());
+
   // Configure X3DH handshake transport over Socket.IO (required for Double Ratchet / PFS)
   useX3DHHandshake({ socket, connected });
 
@@ -1108,7 +1111,7 @@ export default function Conversations() {
     if (!selectedConvId) return;
 
     try {
-      await apiv2.acknowledgeMessage(messageId, selectedConvId);
+      await apiv2.acknowledgeMessage(messageId, selectedConvId, Date.now());
 
       // Reload messages to see burn effect
       await loadMessages(selectedConvId);
@@ -1121,9 +1124,14 @@ export default function Conversations() {
   const handleBurnReveal = useCallback(async (messageId: string) => {
     if (!selectedConvId) return;
 
+    const revealedAt = Date.now();
+
     // Start server-side countdown immediately so BAR persists across reconnect.
     try {
-      const resp = await apiv2.acknowledgeMessage(messageId, selectedConvId);
+      const resp = await apiv2.acknowledgeMessage(messageId, selectedConvId, revealedAt);
+
+      // Ack succeeded, ensure we don't retry it.
+      pendingBurnAcksRef.current.delete(messageId);
 
       if (resp?.scheduledBurnAt) {
         setMessages((prev) =>
@@ -1139,9 +1147,41 @@ export default function Conversations() {
       }
     } catch (err: any) {
       console.error('Failed to acknowledge burn-after-reading message:', err);
+      pendingBurnAcksRef.current.set(messageId, { conversationId: selectedConvId, revealedAt });
       // Keep local countdown; if the socket burn succeeds later, server will still burn.
     }
   }, [selectedConvId]);
+
+  // Retry pending acknowledgements on reconnect.
+  useEffect(() => {
+    if (!connected) return;
+    if (pendingBurnAcksRef.current.size === 0) return;
+
+    const entries = Array.from(pendingBurnAcksRef.current.entries());
+    for (const [messageId, entry] of entries) {
+      apiv2
+        .acknowledgeMessage(messageId, entry.conversationId, entry.revealedAt)
+        .then((resp) => {
+          pendingBurnAcksRef.current.delete(messageId);
+
+          if (resp?.scheduledBurnAt) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === messageId
+                  ? {
+                    ...m,
+                    scheduledBurnAt: resp.scheduledBurnAt,
+                  }
+                  : m
+              )
+            );
+          }
+        })
+        .catch(() => {
+          // Keep pending; we'll retry on next reconnect.
+        });
+    }
+  }, [connected]);
 
   // Handle burn complete - send burn event via WebSocket after animation
   const handleBurnComplete = useCallback(async (messageId: string) => {

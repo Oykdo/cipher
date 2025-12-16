@@ -115,7 +115,7 @@ export function AttachmentMessage({
 
         try {
           // Start server-side countdown (persists even if the client closes)
-          const resp = await apiv2.acknowledgeMessage(messageId, conversationId);
+          const resp = await apiv2.acknowledgeMessage(messageId, conversationId, opened);
           if (resp?.scheduledBurnAt) {
             setScheduledBurnAt(resp.scheduledBurnAt);
           } else {
