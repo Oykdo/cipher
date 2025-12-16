@@ -1,8 +1,9 @@
 import electron from 'electron';
-const { app, BrowserWindow, ipcMain } = electron;
+const { app, BrowserWindow, ipcMain, safeStorage } = electron;
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fork } from 'node:child_process';
+import fs from 'node:fs/promises';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -161,3 +162,92 @@ app.on('activate', () => {
 
 // Handle IPC if needed
 ipcMain.handle('get-app-path', () => app.getPath('userData'));
+
+// Secure per-device storage for the RGPD backup export password (encrypted via Electron safeStorage).
+const BACKUP_PASSWORD_STORE_FILE = 'backup-passwords.json';
+
+function normalizeUsername(username) {
+  return String(username || '').trim().toLowerCase();
+}
+
+function getBackupPasswordStorePath() {
+  return path.join(app.getPath('userData'), BACKUP_PASSWORD_STORE_FILE);
+}
+
+async function readBackupPasswordStore() {
+  try {
+    const raw = await fs.readFile(getBackupPasswordStorePath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (err) {
+    if (err && typeof err === 'object' && err.code === 'ENOENT') return {};
+    return {};
+  }
+}
+
+async function writeBackupPasswordStore(store) {
+  const filePath = getBackupPasswordStorePath();
+  const json = JSON.stringify(store ?? {}, null, 2);
+  await fs.writeFile(filePath, json, 'utf8');
+}
+
+ipcMain.handle('backup-password:has', async (_event, username) => {
+  const key = normalizeUsername(username);
+  if (!key) return false;
+  const store = await readBackupPasswordStore();
+  return Boolean(store[key]);
+});
+
+ipcMain.handle('backup-password:get', async (_event, username) => {
+  const key = normalizeUsername(username);
+  if (!key) return { exists: false };
+  const store = await readBackupPasswordStore();
+  const encryptedB64 = store[key];
+  if (!encryptedB64 || typeof encryptedB64 !== 'string') return { exists: false };
+
+  if (!safeStorage.isEncryptionAvailable()) {
+    return { exists: false, error: 'Secure storage is not available on this device.' };
+  }
+
+  try {
+    const decrypted = safeStorage.decryptString(Buffer.from(encryptedB64, 'base64'));
+    return { exists: true, password: decrypted };
+  } catch {
+    // If decryption fails (e.g. OS key changed), treat as missing and clear entry.
+    delete store[key];
+    try {
+      await writeBackupPasswordStore(store);
+    } catch {
+      // ignore
+    }
+    return { exists: false };
+  }
+});
+
+ipcMain.handle('backup-password:set', async (_event, payload) => {
+  const key = normalizeUsername(payload?.username);
+  const password = typeof payload?.password === 'string' ? payload.password : '';
+  if (!key) throw new Error('Missing username');
+  if (!password) throw new Error('Missing password');
+
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('Secure storage is not available on this device.');
+  }
+
+  const encrypted = safeStorage.encryptString(password);
+  const encryptedB64 = encrypted.toString('base64');
+
+  const store = await readBackupPasswordStore();
+  store[key] = encryptedB64;
+  await writeBackupPasswordStore(store);
+  return { ok: true };
+});
+
+ipcMain.handle('backup-password:clear', async (_event, username) => {
+  const key = normalizeUsername(username);
+  if (!key) return { ok: true };
+  const store = await readBackupPasswordStore();
+  delete store[key];
+  await writeBackupPasswordStore(store);
+  return { ok: true };
+});

@@ -4,6 +4,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 // ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electron', {
   getAppPath: () => ipcRenderer.invoke('get-app-path'),
+
+  backupPassword: {
+    has: (username) => ipcRenderer.invoke('backup-password:has', username),
+    get: (username) => ipcRenderer.invoke('backup-password:get', username),
+    set: (username, password) => ipcRenderer.invoke('backup-password:set', { username, password }),
+    clear: (username) => ipcRenderer.invoke('backup-password:clear', username)
+  },
   
   // Add more APIs as needed
   platform: process.platform,

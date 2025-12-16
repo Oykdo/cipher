@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth";
 import { getRecoveryKeys } from "../../services/api-interceptor";
 import { getExistingKeyVault, getKeyVault } from "../../lib/keyVault";
 import { exportUserData, importUserData, validateExportFile } from "../../lib/dataExport";
+import { getBackupExportPassword, hasBackupExportPassword, setBackupExportPassword } from "../../lib/backupPassword";
 import { scryptAsync } from "@noble/hashes/scrypt";
 import { 
     exportToBackupVault, 
@@ -51,6 +52,9 @@ export function BackupSettings() {
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportPassword, setExportPassword] = useState("");
     const [exportPasswordConfirm, setExportPasswordConfirm] = useState("");
+    const [checkingSavedExportPassword, setCheckingSavedExportPassword] = useState(false);
+    const [hasSavedExportPassword, setHasSavedExportPassword] = useState(false);
+    const [changeExportPassword, setChangeExportPassword] = useState(true);
     const [includeMessages, setIncludeMessages] = useState(true);
     const [showImportModal, setShowImportModal] = useState(false);
     const [importPassword, setImportPassword] = useState("");
@@ -61,6 +65,37 @@ export function BackupSettings() {
     const [exportProgress, setExportProgress] = useState<{ stage: string; progress: number } | null>(null);
     const useVaultV2 = true; // Always use new secure format (Argon2id + XChaCha20-Poly1305)
     const [backupValidation, setBackupValidation] = useState<{ valid: boolean; version: number; encrypted: boolean; createdAt?: string } | null>(null);
+
+    useEffect(() => {
+        if (!showExportModal) return;
+
+        const username = session?.user?.username;
+        let cancelled = false;
+
+        setCheckingSavedExportPassword(true);
+        setHasSavedExportPassword(false);
+        setChangeExportPassword(true);
+        setExportPassword('');
+        setExportPasswordConfirm('');
+
+        (async () => {
+            if (!username) {
+                if (!cancelled) setCheckingSavedExportPassword(false);
+                return;
+            }
+
+            const hasSaved = await hasBackupExportPassword(username);
+            if (cancelled) return;
+
+            setHasSavedExportPassword(hasSaved);
+            setChangeExportPassword(!hasSaved);
+            setCheckingSavedExportPassword(false);
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [showExportModal, session?.user?.username]);
 
     // Unlock KeyVault with password
     const handleUnlockVault = async () => {
@@ -357,20 +392,50 @@ export function BackupSettings() {
     const handleRgpdExport = async () => {
         if (!token) return;
 
-        if (!exportPassword) {
-            setMessage({ type: 'error', text: t('settings.backup_settings.password_required', 'Password is required for secure backup') });
-            return;
+        if (checkingSavedExportPassword) return;
+
+        const username = session?.user?.username;
+        let passwordToUse: string | null = null;
+        let shouldPersistPassword = false;
+
+        if (hasSavedExportPassword && !changeExportPassword) {
+            if (!username) {
+                setMessage({ type: 'error', text: t('settings.backup_settings.invalid_session', 'Invalid session. Please log in again.') });
+                return;
+            }
+
+            passwordToUse = await getBackupExportPassword(username);
+            if (!passwordToUse) {
+                setHasSavedExportPassword(false);
+                setChangeExportPassword(true);
+                setMessage({
+                    type: 'error',
+                    text: t('settings.backup_settings.saved_password_missing', 'Saved backup password not found on this device. Please set it again.'),
+                });
+                return;
+            }
+        } else {
+            if (!exportPassword) {
+                setMessage({ type: 'error', text: t('settings.backup_settings.password_required', 'Password is required for secure backup') });
+                return;
+            }
+
+            if (exportPassword !== exportPasswordConfirm) {
+                setMessage({ type: 'error', text: t('settings.backup_settings.password_mismatch', 'Passwords do not match') });
+                return;
+            }
+
+            if (exportPassword.length < 8) {
+                setMessage({ type: 'error', text: t('settings.backup_settings.password_too_short', 'Password must be at least 8 characters') });
+                return;
+            }
+
+            passwordToUse = exportPassword;
+            shouldPersistPassword = Boolean(username);
         }
 
-        if (exportPassword !== exportPasswordConfirm) {
-            setMessage({ type: 'error', text: t('settings.backup_settings.password_mismatch', 'Passwords do not match') });
-            return;
-        }
-
-        if (exportPassword.length < 8) {
-            setMessage({ type: 'error', text: t('settings.backup_settings.password_too_short', 'Password must be at least 8 characters') });
-            return;
-        }
+        if (!passwordToUse) return;
+        const password = passwordToUse;
 
         setLoading(true);
         setMessage(null);
@@ -383,7 +448,7 @@ export function BackupSettings() {
             if (useVaultV2) {
                 // Use new Backup Vault v2 (Argon2id + XChaCha20-Poly1305)
                 blob = await exportToBackupVault(
-                    exportPassword,
+                    password,
                     { includeMessages, includeContacts: true, includeIdentityKeys: false },
                     (stage, progress) => setExportProgress({ stage, progress })
                 );
@@ -392,7 +457,7 @@ export function BackupSettings() {
                 // Fallback to legacy export (PBKDF2 + AES-GCM)
                 const result = await exportUserData(
                     token,
-                    exportPassword,
+                    password,
                     { includeMessages }
                 );
                 blob = result.blob;
@@ -412,6 +477,13 @@ export function BackupSettings() {
                     const writable = await handle.createWritable();
                     await writable.write(blob);
                     await writable.close();
+
+                    if (shouldPersistPassword && username) {
+                        await setBackupExportPassword(username, password);
+                        setHasSavedExportPassword(true);
+                        setChangeExportPassword(false);
+                    }
+
                     setMessage({ type: 'success', text: t('settings.backup_settings.rgpd_export_success', 'Backup created successfully') });
                     setShowExportModal(false);
                     setExportPassword('');
@@ -435,6 +507,12 @@ export function BackupSettings() {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+
+            if (shouldPersistPassword && username) {
+                await setBackupExportPassword(username, password);
+                setHasSavedExportPassword(true);
+                setChangeExportPassword(false);
+            }
 
             setMessage({ type: 'success', text: t('settings.backup_settings.rgpd_export_success', 'Backup created successfully') });
             setShowExportModal(false);
@@ -475,7 +553,7 @@ export function BackupSettings() {
             if (validation.encrypted && !importPassword) {
                 setMessage({ type: 'error', text: t('settings.backup_settings.file_encrypted', 'This file is encrypted. Please enter the password.') });
             }
-        } catch (error) {
+        } catch {
             setMessage({ type: 'error', text: t('settings.backup_settings.invalid_file', 'Invalid backup file') });
         }
     };
@@ -732,29 +810,57 @@ export function BackupSettings() {
                             </label>
 
                             <div className="border-t border-slate-700 pt-4">
-                                <p className="text-slate-400 text-sm mb-3">
-                                    {t('settings.backup_settings.backup_password_required', 'Create a strong password to protect your backup:')}
-                                </p>
-                                <input
-                                    type="password"
-                                    value={exportPassword}
-                                    onChange={(e) => setExportPassword(e.target.value)}
-                                    placeholder={t('settings.backup_settings.export_password_placeholder', 'Backup password (min. 8 characters)')}
-                                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white mb-2"
-                                    disabled={loading}
-                                />
-                                <input
-                                    type="password"
-                                    value={exportPasswordConfirm}
-                                    onChange={(e) => setExportPasswordConfirm(e.target.value)}
-                                    placeholder={t('settings.backup_settings.confirm_password', 'Confirm password')}
-                                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
-                                    disabled={loading}
-                                />
-                                {exportPassword && exportPassword.length < 8 && (
-                                    <p className="text-amber-400 text-xs mt-1">
-                                        {t('settings.backup_settings.password_min_length', 'Password must be at least 8 characters')}
+                                {checkingSavedExportPassword ? (
+                                    <p className="text-slate-400 text-sm">
+                                        {t('settings.backup_settings.checking_saved_password', 'Checking saved backup password for this device...')}
                                     </p>
+                                ) : hasSavedExportPassword && !changeExportPassword ? (
+                                    <div className="p-3 bg-slate-800/40 border border-slate-700 rounded-lg">
+                                        <p className="text-slate-300 text-sm">
+                                            {t('settings.backup_settings.saved_password_in_use', 'A backup password is already set for this device. Future exports will reuse it automatically.')}
+                                        </p>
+                                        <div className="mt-3 flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setChangeExportPassword(true);
+                                                    setExportPassword('');
+                                                    setExportPasswordConfirm('');
+                                                }}
+                                                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm"
+                                                disabled={loading}
+                                            >
+                                                {t('settings.backup_settings.change_backup_password', 'Change password')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p className="text-slate-400 text-sm mb-3">
+                                            {t('settings.backup_settings.backup_password_required', 'Create a strong password to protect your backup:')}
+                                        </p>
+                                        <input
+                                            type="password"
+                                            value={exportPassword}
+                                            onChange={(e) => setExportPassword(e.target.value)}
+                                            placeholder={t('settings.backup_settings.export_password_placeholder', 'Backup password (min. 8 characters)')}
+                                            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white mb-2"
+                                            disabled={loading}
+                                        />
+                                        <input
+                                            type="password"
+                                            value={exportPasswordConfirm}
+                                            onChange={(e) => setExportPasswordConfirm(e.target.value)}
+                                            placeholder={t('settings.backup_settings.confirm_password', 'Confirm password')}
+                                            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
+                                            disabled={loading}
+                                        />
+                                        {exportPassword && exportPassword.length < 8 && (
+                                            <p className="text-amber-400 text-xs mt-1">
+                                                {t('settings.backup_settings.password_min_length', 'Password must be at least 8 characters')}
+                                            </p>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -774,7 +880,13 @@ export function BackupSettings() {
                             </button>
                             <button
                                 onClick={handleRgpdExport}
-                                disabled={loading || !exportPassword || exportPassword.length < 8 || exportPassword !== exportPasswordConfirm}
+                                disabled={
+                                    loading ||
+                                    checkingSavedExportPassword ||
+                                    (!hasSavedExportPassword || changeExportPassword
+                                        ? !exportPassword || exportPassword.length < 8 || exportPassword !== exportPasswordConfirm
+                                        : false)
+                                }
                                 className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {loading && (

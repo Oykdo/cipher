@@ -190,7 +190,7 @@
     "feature_e2e_desc": "使用 Signal 协议的端到端加密",
     "feature_offline_keys_title": "离线密钥",
     "feature_offline_keys_desc": "您保存在云端之外的秘密",
-    "footer_tech_stack": "Open Source • Zero-Knowledge • Post-Quantum Resistant",
+    "footer_tech_stack": "Open Source • Zero-Knowledge • Quantum resistant",
     "footer_built_with": "Built with ❤️ by Project Chimera",
     "back_to_quick_unlock": "← 返回快速解锁"
   },
