@@ -60,6 +60,9 @@ export class P2PConnection {
   private options: P2PConnectionOptions;
   private connected = false;
   private messageQueue: P2PMessage[] = [];
+  private signalHandler: ((data: any) => void) | null = null;
+  private signalingSocket: any = null; // Stocker la référence au socket pour nettoyage
+  private connectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: P2PConnectionOptions) {
     this.options = options;
@@ -69,28 +72,105 @@ export class P2PConnection {
    * Initialize WebRTC connection
    */
   async initialize(signalingSocket: any): Promise<void> {
-    debugLogger.websocket('[P2P]...', {
+    debugLogger.websocket('[P2P] Initializing connection', {
       initiator: this.options.initiator,
       peerId: this.options.peerId,
     });
 
+    // Stocker la référence au socket pour le nettoyage
+    this.signalingSocket = signalingSocket;
+
     this.peer = new SimplePeer({
       initiator: this.options.initiator,
-      trickle: true, // Send ICE candidates as they arrive
+      trickle: true,
       config: {
         iceServers: [
-          // Public STUN servers for NAT traversal
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
-          // TODO: Add TURN servers for strict NAT
         ],
       },
     });
 
+    // Setup WebRTC logging - SimplePeer crée _pc de manière asynchrone
+    const setupWebRTCLogging = () => {
+      const checkInterval = setInterval(() => {
+        const pc = (this.peer as any)?._pc as RTCPeerConnection | undefined;
+        if (pc) {
+          clearInterval(checkInterval);
+      
+      // Log ICE connection state
+      pc.addEventListener('iceconnectionstatechange', () => {
+        debugLogger.p2p(`[P2P] ICE connection state: ${pc.iceConnectionState}`, {
+          peerId: this.options.peerId,
+          state: pc.iceConnectionState,
+        });
+        
+        if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+          console.error('❌ [P2P] ICE connection failed', {
+            peerId: this.options.peerId,
+            state: pc.iceConnectionState,
+          });
+          this.options.onError?.(new Error(`ICE connection ${pc.iceConnectionState}`));
+        }
+      });
+
+      // Log ICE gathering state
+      pc.addEventListener('icegatheringstatechange', () => {
+        debugLogger.p2p(`[P2P] ICE gathering state: ${pc.iceGatheringState}`, {
+          peerId: this.options.peerId,
+          state: pc.iceGatheringState,
+        });
+      });
+
+      // Log connection state
+      pc.addEventListener('connectionstatechange', () => {
+        debugLogger.p2p(`[P2P] Connection state: ${pc.connectionState}`, {
+          peerId: this.options.peerId,
+          state: pc.connectionState,
+        });
+        
+        if (pc.connectionState === 'failed') {
+          console.error('❌ [P2P] Peer connection failed', {
+            peerId: this.options.peerId,
+          });
+          this.options.onError?.(new Error('Peer connection failed'));
+        }
+      });
+
+          // Log ICE candidates
+          pc.addEventListener('icecandidate', (event) => {
+            if (event.candidate) {
+              debugLogger.p2p(`[P2P] ICE candidate received`, {
+                peerId: this.options.peerId,
+                type: event.candidate.type,
+                protocol: event.candidate.protocol,
+              });
+            } else {
+              debugLogger.p2p(`[P2P] ICE gathering complete`, {
+                peerId: this.options.peerId,
+              });
+            }
+          });
+        }
+      }, 100);
+      
+      // Timeout après 5 secondes si _pc n'est pas créé
+      setTimeout(() => clearInterval(checkInterval), 5000);
+    };
+
+    setupWebRTCLogging();
+
     // Handle signaling
     this.peer.on('signal', (signal) => {
-      debugLogger.debug('📡 [P2P] Sending signal to peer', this.options.peerId);
+      const signalInfo: any = {
+        type: signal.type || 'unknown',
+      };
+      // SDP n'existe que pour les signaux de type 'offer' ou 'answer'
+      if ('sdp' in signal && signal.sdp) {
+        signalInfo.sdp = signal.sdp.substring(0, 100) + '...';
+      }
+      debugLogger.debug('📡 [P2P] Sending signal to peer', this.options.peerId, signalInfo);
       signalingSocket.emit('p2p-signal', {
         to: this.options.peerId,
         signal,
@@ -99,6 +179,11 @@ export class P2PConnection {
 
     // Handle connection established
     this.peer.on('connect', () => {
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+      
       debugLogger.info('✅ [P2P] Connected to peer', this.options.peerId);
       this.connected = true;
       this.options.onConnect?.();
@@ -153,24 +238,51 @@ export class P2PConnection {
 
     // Handle disconnection
     this.peer.on('close', () => {
-      debugLogger.websocket('[P2P]...', this.options.peerId);
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+      
+      debugLogger.websocket('[P2P] Connection closed', this.options.peerId);
       this.connected = false;
       this.options.onDisconnect?.();
     });
 
     // Handle errors
     this.peer.on('error', (error) => {
-      console.error('❌ [P2P] Connection error', error);
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+      
+      console.error('❌ [P2P] Connection error', {
+        peerId: this.options.peerId,
+        error: error.message || error,
+      });
       this.options.onError?.(error);
     });
 
-    // Listen for signals from peer
-    signalingSocket.on('p2p-signal', (data: any) => {
+    // CORRECTION: Créer un handler nommé et le stocker pour pouvoir le retirer
+    this.signalHandler = (data: any) => {
       if (data.from === this.options.peerId) {
-        debugLogger.debug('📡 [P2P] Received signal from peer', this.options.peerId);
+        debugLogger.debug('📡 [P2P] Received signal from peer', this.options.peerId, {
+          type: data.signal?.type || 'unknown',
+        });
         this.peer?.signal(data.signal);
       }
-    });
+    };
+
+    // Listen for signals from peer
+    signalingSocket.on('p2p-signal', this.signalHandler);
+
+    // Timeout de connexion (30 secondes)
+    this.connectionTimeout = setTimeout(() => {
+      if (!this.connected) {
+        console.error('❌ [P2P] Connection timeout', this.options.peerId);
+        this.options.onError?.(new Error('Connection timeout after 30 seconds'));
+        this.destroy();
+      }
+    }, 30000);
   }
 
   /**
@@ -185,7 +297,20 @@ export class P2PConnection {
     const messageId = this.generateMessageId();
 
     if (!this.connected) {
-      debugLogger.debug('⏳ [P2P] Queueing message (not connected yet);');
+      debugLogger.debug('⏳ [P2P] Queueing message (not connected yet)');
+      this.messageQueue.push({
+        ...message,
+        timestamp,
+        messageId,
+      });
+      return;
+    }
+
+    // Vérifier l'état de connexion (SimplePeer gère le canal de données en interne)
+    if (!this.peer || !this.connected) {
+      debugLogger.warn('⚠️ [P2P] Peer not connected, queueing message', {
+        peerId: this.options.peerId,
+      });
       this.messageQueue.push({
         ...message,
         timestamp,
@@ -209,7 +334,6 @@ export class P2PConnection {
         };
       } else {
         // Control messages (typing, presence, ack, key_exchange) - send without E2EE
-        // These don't contain sensitive data and shouldn't advance the ratchet
         envelope = {
           version: 'p2p-e2ee-v1',
           type: message.type,
@@ -219,8 +343,8 @@ export class P2PConnection {
         };
       }
       
-      // Send via WebRTC Data Channel
-      this.peer?.send(JSON.stringify(envelope));
+      // Send via WebRTC Data Channel (SimplePeer gère le canal de données)
+      this.peer.send(JSON.stringify(envelope));
       
       debugLogger.debug('📤 [P2P] Sent message', {
         type: message.type,
@@ -228,6 +352,14 @@ export class P2PConnection {
       });
     } catch (error) {
       console.error('❌ [P2P] Failed to send message', error);
+      // Si l'envoi échoue mais qu'on est connecté, remettre en queue
+      if (this.connected) {
+        this.messageQueue.push({
+          ...message,
+          timestamp,
+          messageId,
+        });
+      }
       throw error;
     }
   }
@@ -286,11 +418,26 @@ export class P2PConnection {
    * Close connection
    */
   destroy(): void {
-    debugLogger.websocket('[P2P]...', this.options.peerId);
+    debugLogger.websocket('[P2P] Destroying connection', this.options.peerId);
+    
+    // Nettoyer le timeout
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+    
+    // Retirer le listener de signalisation
+    if (this.signalHandler && this.signalingSocket) {
+      this.signalingSocket.off('p2p-signal', this.signalHandler);
+      debugLogger.debug('🧹 [P2P] Removed signal listener', this.options.peerId);
+    }
+    
     this.peer?.destroy();
     this.peer = null;
     this.connected = false;
     this.messageQueue = [];
+    this.signalHandler = null;
+    this.signalingSocket = null;
   }
 
   /**
