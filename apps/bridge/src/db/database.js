@@ -581,19 +581,9 @@ class DatabaseService {
             // Never block burning on attachment cleanup.
         }
 
-        // Convert timestamp (milliseconds) to PostgreSQL timestamp
-        // PostgreSQL expects Date object or to_timestamp with seconds
-        const timestamp = burnedAt instanceof Date ? burnedAt : new Date(burnedAt);
-        
-        await run(this.pool, `
-            UPDATE messages 
-            SET is_burned = true,
-                burned_at = $1,
-                body = '[Message détruit]',
-                sender_plaintext = NULL,
-                scheduled_burn_at = NULL
-            WHERE id = $2
-        `, [timestamp, messageId]);
+        // Burn After Reading: physical deletion.
+        // Once burned, the ciphertext/record should not be recoverable by reconnecting.
+        await run(this.pool, `DELETE FROM messages WHERE id = $1`, [messageId]);
     }
 
     async deleteMessage(messageId) {

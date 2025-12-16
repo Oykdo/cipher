@@ -124,15 +124,12 @@ export function MessageList({
               originalDelay = message.burnDelay;
               // debugLogger.debug('Using burnDelay from message:', originalDelay);
             } else if (message.scheduledBurnAt) {
-              // Old format or already acknowledged: calculate from scheduledBurnAt
-              const createdAtMs = typeof message.createdAt === 'number' 
-                ? message.createdAt 
-                : new Date(message.createdAt).getTime();
-              originalDelay = Math.ceil((message.scheduledBurnAt - createdAtMs) / 1000);
+              // Already acknowledged: compute remaining seconds until burn.
+              // (scheduledBurnAt is based on the acknowledge time, not createdAt.)
+              originalDelay = Math.ceil((message.scheduledBurnAt - Date.now()) / 1000);
               
               /*
               debugLogger.debug('Calculated delay from scheduledBurnAt:', {
-                createdAtMs,
                 scheduledBurnAt: message.scheduledBurnAt,
                 originalDelay,
               });

@@ -1117,13 +1117,31 @@ export default function Conversations() {
     }
   };
 
-  // Handle burn message reveal - just start countdown, don't send to server yet
+  // Handle burn message reveal - start countdown AND persist it server-side (survives reconnect)
   const handleBurnReveal = useCallback(async (messageId: string) => {
-    void messageId;
-    // debugLogger.debug('🔓 Message revealed, starting countdown:', messageId);
-    // Countdown and animation handled by BurnMessage component
-    // Server notification happens in handleBurnComplete after animation
-  }, []);
+    if (!selectedConvId) return;
+
+    // Start server-side countdown immediately so BAR persists across reconnect.
+    try {
+      const resp = await apiv2.acknowledgeMessage(messageId, selectedConvId);
+
+      if (resp?.scheduledBurnAt) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                ...m,
+                scheduledBurnAt: resp.scheduledBurnAt,
+              }
+              : m
+          )
+        );
+      }
+    } catch (err: any) {
+      console.error('Failed to acknowledge burn-after-reading message:', err);
+      // Keep local countdown; if the socket burn succeeds later, server will still burn.
+    }
+  }, [selectedConvId]);
 
   // Handle burn complete - send burn event via WebSocket after animation
   const handleBurnComplete = useCallback(async (messageId: string) => {

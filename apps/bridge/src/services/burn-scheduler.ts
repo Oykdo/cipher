@@ -94,8 +94,7 @@ class BurnScheduler {
     try {
       const burnedAt = Date.now();
 
-      // Mark message as burned in database (instead of permanent deletion)
-      // This preserves the record for audit purposes while preventing display
+      // Burn After Reading: permanently delete from database
       await db.burnMessage(messageId, burnedAt);
 
       // Remove from scheduled burns

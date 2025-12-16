@@ -440,10 +440,11 @@ export function setupSocketServer(httpServer: HTTPServer, fastify: FastifyInstan
           return;
         }
 
-        // Get message to verify it exists and user can burn it
+        // Get message to verify it exists and user can burn it.
+        // If it's already deleted (burned), treat as idempotent success.
         const message = await db.getMessageById(messageId);
         if (!message) {
-          if (callback) callback({ success: false, error: 'Message not found' });
+          if (callback) callback({ success: true });
           return;
         }
 
