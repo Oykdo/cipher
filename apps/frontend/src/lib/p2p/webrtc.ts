@@ -72,9 +72,9 @@ export class P2PConnection {
    * Initialize WebRTC connection
    */
   async initialize(signalingSocket: any): Promise<void> {
-    debugLogger.websocket('[P2P] Initializing connection', {
+      // SECURITY: Do not log peer IDs
+      debugLogger.websocket('[P2P] Initializing connection', {
       initiator: this.options.initiator,
-      peerId: this.options.peerId,
     });
 
     // Stocker la référence au socket pour le nettoyage
@@ -84,14 +84,16 @@ export class P2PConnection {
     // pour pouvoir recevoir les signaux même si le peer n'est pas encore créé
     this.signalHandler = (data: any) => {
       if (data.from === this.options.peerId) {
-        debugLogger.debug('📡 [P2P] Received signal from peer', this.options.peerId, {
+        // SECURITY: Do not log peer IDs or signal content
+        debugLogger.debug('📡 [P2P] Received signal', {
           type: data.signal?.type || 'unknown',
           isInitiator: this.options.initiator,
         });
         
         // Si le peer n'existe pas encore, attendre un peu
         if (!this.peer) {
-          console.warn('⚠️ [P2P] Received signal but peer not initialized yet, will process when ready', this.options.peerId);
+          // SECURITY: Do not log peer IDs
+          console.warn('⚠️ [P2P] Received signal but peer not initialized yet, will process when ready');
           // Stocker le signal pour le traiter plus tard
           setTimeout(() => {
             if (this.peer && data.signal) {
@@ -138,14 +140,13 @@ export class P2PConnection {
       
       // Log ICE connection state
       pc.addEventListener('iceconnectionstatechange', () => {
+        // SECURITY: Do not log peer IDs
         debugLogger.p2p(`[P2P] ICE connection state: ${pc.iceConnectionState}`, {
-          peerId: this.options.peerId,
           state: pc.iceConnectionState,
         });
         
         if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
           console.error('❌ [P2P] ICE connection failed', {
-            peerId: this.options.peerId,
             state: pc.iceConnectionState,
           });
           this.options.onError?.(new Error(`ICE connection ${pc.iceConnectionState}`));
@@ -154,23 +155,21 @@ export class P2PConnection {
 
       // Log ICE gathering state
       pc.addEventListener('icegatheringstatechange', () => {
+        // SECURITY: Do not log peer IDs
         debugLogger.p2p(`[P2P] ICE gathering state: ${pc.iceGatheringState}`, {
-          peerId: this.options.peerId,
           state: pc.iceGatheringState,
         });
       });
 
       // Log connection state
       pc.addEventListener('connectionstatechange', () => {
+        // SECURITY: Do not log peer IDs
         debugLogger.p2p(`[P2P] Connection state: ${pc.connectionState}`, {
-          peerId: this.options.peerId,
           state: pc.connectionState,
         });
         
         if (pc.connectionState === 'failed') {
-          console.error('❌ [P2P] Peer connection failed', {
-            peerId: this.options.peerId,
-          });
+          console.error('❌ [P2P] Peer connection failed');
           this.options.onError?.(new Error('Peer connection failed'));
         }
       });
@@ -178,15 +177,13 @@ export class P2PConnection {
           // Log ICE candidates
           pc.addEventListener('icecandidate', (event) => {
             if (event.candidate) {
+              // SECURITY: Do not log candidate details or peer IDs - they contain network information
               debugLogger.p2p(`[P2P] ICE candidate received`, {
-                peerId: this.options.peerId,
                 type: event.candidate.type,
-                protocol: event.candidate.protocol,
               });
             } else {
-              debugLogger.p2p(`[P2P] ICE gathering complete`, {
-                peerId: this.options.peerId,
-              });
+              // SECURITY: Do not log peer IDs
+              debugLogger.p2p(`[P2P] ICE gathering complete`);
             }
           });
         }
@@ -200,14 +197,11 @@ export class P2PConnection {
 
     // Handle signaling
     this.peer.on('signal', (signal) => {
-      const signalInfo: any = {
+      // SECURITY: Do not log SDP content - it may contain sensitive network information
+      debugLogger.debug('📡 [P2P] Sending signal', {
         type: signal.type || 'unknown',
-      };
-      // SDP n'existe que pour les signaux de type 'offer' ou 'answer'
-      if ('sdp' in signal && signal.sdp) {
-        signalInfo.sdp = signal.sdp.substring(0, 100) + '...';
-      }
-      debugLogger.debug('📡 [P2P] Sending signal to peer', this.options.peerId, signalInfo);
+        isInitiator: this.options.initiator,
+      });
       signalingSocket.emit('p2p-signal', {
         to: this.options.peerId,
         signal,
@@ -221,7 +215,8 @@ export class P2PConnection {
         this.connectionTimeout = null;
       }
       
-      debugLogger.info('✅ [P2P] Connected to peer', this.options.peerId);
+      // SECURITY: Do not log peer IDs
+      debugLogger.info('✅ [P2P] Connected to peer');
       this.connected = true;
       this.options.onConnect?.();
       
@@ -261,9 +256,9 @@ export class P2PConnection {
           };
         }
         
+        // SECURITY: Do not log message IDs - they could be used for tracking
         debugLogger.debug('📨 [P2P] Received message', {
           type: message.type,
-          messageId: message.messageId,
         });
         
         this.options.onMessage?.(message);
@@ -280,7 +275,8 @@ export class P2PConnection {
         this.connectionTimeout = null;
       }
       
-      debugLogger.websocket('[P2P] Connection closed', this.options.peerId);
+      // SECURITY: Do not log peer IDs
+      debugLogger.websocket('[P2P] Connection closed');
       this.connected = false;
       this.options.onDisconnect?.();
     });
@@ -292,9 +288,9 @@ export class P2PConnection {
         this.connectionTimeout = null;
       }
       
+      // SECURITY: Do not log peer IDs
       console.error('❌ [P2P] Connection error', {
-        peerId: this.options.peerId,
-        error: error.message || error,
+        error: error.message || 'Unknown error',
         isInitiator: this.options.initiator,
       });
       this.options.onError?.(error);
@@ -303,7 +299,8 @@ export class P2PConnection {
     // Timeout de connexion (30 secondes)
     this.connectionTimeout = setTimeout(() => {
       if (!this.connected) {
-        console.error('❌ [P2P] Connection timeout', this.options.peerId);
+        // SECURITY: Do not log peer IDs
+        console.error('❌ [P2P] Connection timeout');
         this.options.onError?.(new Error('Connection timeout after 30 seconds'));
         this.destroy();
       }
@@ -333,9 +330,8 @@ export class P2PConnection {
 
     // Vérifier l'état de connexion (SimplePeer gère le canal de données en interne)
     if (!this.peer || !this.connected) {
-      debugLogger.warn('⚠️ [P2P] Peer not connected, queueing message', {
-        peerId: this.options.peerId,
-      });
+      // SECURITY: Do not log peer IDs
+      debugLogger.warn('⚠️ [P2P] Peer not connected, queueing message');
       this.messageQueue.push({
         ...message,
         timestamp,
@@ -371,9 +367,9 @@ export class P2PConnection {
       // Send via WebRTC Data Channel (SimplePeer gère le canal de données)
       this.peer.send(JSON.stringify(envelope));
       
+      // SECURITY: Do not log message IDs
       debugLogger.debug('📤 [P2P] Sent message', {
         type: message.type,
-        messageId,
       });
     } catch (error) {
       console.error('❌ [P2P] Failed to send message', error);
@@ -443,7 +439,8 @@ export class P2PConnection {
    * Close connection
    */
   destroy(): void {
-    debugLogger.websocket('[P2P] Destroying connection', this.options.peerId);
+    // SECURITY: Do not log peer IDs
+    debugLogger.websocket('[P2P] Destroying connection');
     
     // Nettoyer le timeout
     if (this.connectionTimeout) {
@@ -454,7 +451,8 @@ export class P2PConnection {
     // Retirer le listener de signalisation
     if (this.signalHandler && this.signalingSocket) {
       this.signalingSocket.off('p2p-signal', this.signalHandler);
-      debugLogger.debug('🧹 [P2P] Removed signal listener', this.options.peerId);
+      // SECURITY: Do not log peer IDs
+      debugLogger.debug('🧹 [P2P] Removed signal listener');
     }
     
     this.peer?.destroy();

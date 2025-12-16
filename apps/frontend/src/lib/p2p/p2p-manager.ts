@@ -265,11 +265,13 @@ export class P2PManager {
     const existingConnection = this.connections.get(connectionKey);
     if (existingConnection) {
       if (existingConnection.isConnected()) {
-        debugLogger.debug('⚠️ [P2P MANAGER] Already connected to peer', peerId);
+        // SECURITY: Do not log peer IDs
+        debugLogger.debug('⚠️ [P2P MANAGER] Already connected to peer');
         return;
       } else {
         // Connection exists but not connected - destroy it and create a new one
-        debugLogger.debug('⚠️ [P2P MANAGER] Existing connection not connected, recreating', peerId);
+        // SECURITY: Do not log peer IDs
+        debugLogger.debug('⚠️ [P2P MANAGER] Existing connection not connected, recreating');
         existingConnection.destroy();
         this.connections.delete(connectionKey);
       }
@@ -281,12 +283,9 @@ export class P2PManager {
       ? initiator 
       : this.shouldBeInitiator(this.options.userId, peerId);
 
+    // SECURITY: Do not log user IDs, peer IDs, or usernames
     debugLogger.websocket('[P2P MANAGER] Connecting to peer', {
-      peerId,
-      peerUsername,
-      conversationId,
       initiator: shouldInitiate,
-      myUserId: this.options.userId,
     });
 
     // Create P2P connection with unified E2EE
@@ -309,13 +308,15 @@ export class P2PManager {
         this.options.onMessage?.(conversationId, message);
       },
       onConnect: () => {
-        debugLogger.info('✅ [P2P MANAGER] Connected to peer', peerId);
+        // SECURITY: Do not log peer IDs
+        debugLogger.info('✅ [P2P MANAGER] Connected to peer');
         this.onlinePeers.add(peerId);
         this.presenceManager.addConnectedPeer(peerId);
         this.options.onPeerStatusChange?.(peerId, true);
       },
       onDisconnect: () => {
-        debugLogger.websocket('[P2P MANAGER]...', peerId);
+        // SECURITY: Do not log peer IDs
+        debugLogger.websocket('[P2P MANAGER] Disconnected from peer');
         this.onlinePeers.delete(peerId);
         this.presenceManager.removeConnectedPeer(peerId);
         this.options.onPeerStatusChange?.(peerId, false);
