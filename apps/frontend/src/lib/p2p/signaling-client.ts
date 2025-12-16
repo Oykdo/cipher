@@ -171,12 +171,14 @@ export class SignalingClient {
 
       // Peer presence events
       this.socket.on('peer-available', (data: { peerId: string }) => {
-        debugLogger.debug('👤 [SIGNALING] Peer available', data.peerId);
+        // SECURITY: Do not log peer IDs
+        debugLogger.debug('👤 [SIGNALING] Peer available');
         this.options.onPeerAvailable?.(data.peerId);
       });
 
       this.socket.on('peer-unavailable', (data: { peerId: string }) => {
-        debugLogger.debug('👤 [SIGNALING] Peer unavailable', data.peerId);
+        // SECURITY: Do not log peer IDs
+        debugLogger.debug('👤 [SIGNALING] Peer unavailable');
         this.options.onPeerUnavailable?.(data.peerId);
       });
 
@@ -330,7 +332,8 @@ export class SignalingClient {
    * Request connection to peer
    */
   requestConnection(peerId: string): void {
-    debugLogger.debug('📡 [SIGNALING] Requesting connection to peer', peerId);
+    // SECURITY: Do not log peer IDs
+    debugLogger.debug('📡 [SIGNALING] Requesting connection to peer');
     this.socket?.emit('request-connection', { peerId });
   }
 

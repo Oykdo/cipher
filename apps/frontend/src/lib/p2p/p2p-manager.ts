@@ -482,7 +482,8 @@ export class P2PManager {
    * Handle peer becoming available
    */
   private async handlePeerAvailable(peerId: string): Promise<void> {
-    debugLogger.debug('👤 [P2P MANAGER] Peer available', peerId);
+    // SECURITY: Do not log peer IDs
+    debugLogger.debug('👤 [P2P MANAGER] Peer available');
     this.onlinePeers.add(peerId);
     this.options.onPeerStatusChange?.(peerId, true);
 
@@ -490,7 +491,8 @@ export class P2PManager {
     try {
       const sentCount = await this.messageQueue.processPeerOnline(peerId);
       if (sentCount > 0) {
-        debugLogger.debug(`📤 [P2P MANAGER] Sent ${sentCount} queued messages to peer ${peerId}`);
+        // SECURITY: Do not log peer IDs
+        debugLogger.debug(`📤 [P2P MANAGER] Sent ${sentCount} queued messages`);
       }
     } catch (error) {
       console.error('❌ [P2P MANAGER] Failed to process queued messages:', error);
@@ -501,7 +503,8 @@ export class P2PManager {
    * Handle peer becoming unavailable
    */
   private handlePeerUnavailable(peerId: string): void {
-    debugLogger.debug('👤 [P2P MANAGER] Peer unavailable', peerId);
+    // SECURITY: Do not log peer IDs
+    debugLogger.debug('👤 [P2P MANAGER] Peer unavailable');
     this.onlinePeers.delete(peerId);
     this.options.onPeerStatusChange?.(peerId, false);
   }
