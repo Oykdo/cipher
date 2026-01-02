@@ -49,7 +49,7 @@ async function startBackend() {
       env: {
         ...process.env,
         NODE_ENV: app.isPackaged ? 'production' : 'development',
-        PORT: '4001'
+        PORT: '4000'
       }
     };
 
@@ -84,7 +84,7 @@ async function startBackend() {
         const http = await import('http');
         const req = http.request({
           hostname: 'localhost',
-          port: 4001,
+          port: 4000,
           path: '/health',
           method: 'GET',
           timeout: 1000

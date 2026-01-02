@@ -10,6 +10,8 @@
     "dev:frontend": "cd apps/frontend && npm run dev",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
 
+    "type-check": "cd apps/frontend && npm run type-check",
+
     "render:build": "npm run build:frontend && npm run build:bridge",
     "render:start": "node apps/bridge/dist/index.js",
 

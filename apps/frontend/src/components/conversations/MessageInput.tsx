@@ -1,7 +1,10 @@
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { BurnDelaySelector } from '../BurnDelaySelector';
 import { AttachmentInput } from './AttachmentInput';
+import { GasPreview } from './GasPreview';
+import { calculateMessageGas, type MessagePayload } from '../../services/PrivacyGasEngine';
 
 interface MessageInputProps {
   messageBody: string;
@@ -22,6 +25,12 @@ interface MessageInputProps {
   selectedFile: File | null;
   onAttachmentSelect: (file: File) => void;
   onAttachmentClear: () => void;
+  /** Optional keystroke callback (used by Resonance cognitive checks). */
+  onKeystroke?: () => void;
+  /** Current user Rho for gas discount calculation. */
+  userRho?: number;
+  /** Currently available liquid Aether for gas payment. */
+  availableAether?: number;
 }
 
 export function MessageInput({
@@ -43,11 +52,54 @@ export function MessageInput({
   selectedFile,
   onAttachmentSelect,
   onAttachmentClear,
+  onKeystroke,
+  userRho = 0,
+  availableAether = 0,
 }: MessageInputProps) {
   const { t } = useTranslation();
 
+  // Calculate estimated Privacy Gas cost
+  const gasCost = useMemo(() => {
+    // Construct hypothetical payload
+    const payload: MessagePayload = {
+      type: 'standard',
+    };
+
+    if (burnAfterReading) {
+      payload.type = 'burn_after_reading';
+    } else if (timeLockEnabled) {
+      payload.type = 'timelock';
+
+      // Calculate generic duration if dates are valid, else default to 1h for estimate
+      // In a real app we'd parse exact dates here, but for preview 24h is fine if empty
+      // or we can try to parse. 
+      // Let's keep it simple: if enabled, assume at least 1 hour or the set date.
+      if (timeLockDate && timeLockTime) {
+        const target = new Date(`${timeLockDate}T${timeLockTime}`);
+        if (!isNaN(target.getTime())) {
+          const durationSec = Math.max(0, (target.getTime() - Date.now()) / 1000);
+          payload.lockDuration = durationSec;
+        }
+      } else {
+        payload.lockDuration = 3600; // 1h default estimate
+      }
+    } else if (selectedFile) {
+      payload.type = 'attachment';
+    }
+
+    if (selectedFile) {
+      payload.contentSize = selectedFile.size;
+    }
+
+    return calculateMessageGas(payload, userRho);
+  }, [messageBody, selectedFile, burnAfterReading, timeLockEnabled, timeLockDate, timeLockTime, userRho]);
+
+  const canAfford = availableAether >= gasCost;
+
   return (
     <div className="p-4 border-t border-quantum-cyan/20 bg-dark-matter-lighter">
+      <GasPreview cost={gasCost} available={availableAether} isFree={false} />
+
       {/* Options */}
       <div className="mb-3 flex flex-wrap gap-2">
         {/* Burn After Reading */}
@@ -101,7 +153,7 @@ export function MessageInput({
               value={timeLockDate}
               onChange={(e) => setTimeLockDate(e.target.value)}
               className="input flex-1 text-sm"
-              min={new Date().toISOString().split('T')[0]}
+              min={new Date().toISOString().split('T')[0]} // Quick fix for "today"
             />
             <input
               type="time"
@@ -136,7 +188,7 @@ export function MessageInput({
             disabled={sendingMessage}
           />
         )}
-        
+
         <textarea
           value={messageBody}
           onChange={(e) => {
@@ -146,9 +198,18 @@ export function MessageInput({
             }
           }}
           onKeyDown={(e) => {
+            const key = e.key;
+            const isMeaningfulKey =
+              key.length === 1 || key === 'Backspace' || key === 'Delete' || key === 'Enter';
+            if (onKeystroke && isMeaningfulKey) {
+              onKeystroke();
+            }
+
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
-              onSend();
+              if (canAfford) {
+                onSend();
+              }
             }
           }}
           placeholder={t('messages.type_message_placeholder')}
@@ -158,10 +219,14 @@ export function MessageInput({
         />
         <button
           onClick={onSend}
-          disabled={(!messageBody.trim() && !selectedFile) || sendingMessage}
-          className="btn btn-primary px-4 md:px-6"
+          disabled={(!messageBody.trim() && !selectedFile) || sendingMessage || !canAfford}
+          className={`
+            btn px-4 md:px-6
+            ${canAfford ? 'btn-primary' : 'bg-muted-grey cursor-not-allowed opacity-50'}
+          `}
+          title={!canAfford ? t('messages.insufficient_funds_tooltip', 'Fonds insuffisants pour envoyer ce type de message') : ''}
         >
-          {sendingMessage ? '⏳' : '📤'}
+          {sendingMessage ? '⏳' : canAfford ? '📤' : '🚫'}
         </button>
       </div>
 

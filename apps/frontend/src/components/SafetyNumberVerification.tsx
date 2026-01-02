@@ -17,7 +17,7 @@ import {
   generateVoiceVerificationCode,
 } from '../shared/identity';
 import { Button } from './ui/Button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/Dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/Dialog';
 import { logger } from '../lib/logger';
 
 interface SafetyNumberVerificationProps {
@@ -223,16 +223,16 @@ export function SafetyNumberVerification({
             <DialogTitle>Scanner le QR Code</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
               Demandez à {remoteIdentifier} d'afficher son QR Code et scannez-le avec votre caméra.
-            </p>
-            
+            </DialogDescription>
+
             <video
               ref={videoRef}
               className="w-full rounded border-2 border-gray-300 dark:border-gray-700"
               style={{ maxHeight: '400px' }}
             />
-            
+
             <Button onClick={stopQRScanner} variant="outline" className="w-full">
               Annuler
             </Button>
@@ -247,20 +247,20 @@ export function SafetyNumberVerification({
             <DialogTitle>Mon QR Code</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
               Montrez ce QR Code à {remoteIdentifier} pour qu'ils puissent vérifier votre identité.
-            </p>
-            
+            </DialogDescription>
+
             {qrCodeDataURL && (
               <div className="flex justify-center bg-white p-4 rounded">
                 <img src={qrCodeDataURL} alt="Mon QR Code" className="max-w-full" />
               </div>
             )}
-            
+
             <div className="text-center text-xs text-gray-500 dark:text-gray-400">
               {localIdentifier}
             </div>
-            
+
             <Button onClick={() => setShowMyQRCode(false)} variant="outline" className="w-full">
               Fermer
             </Button>
@@ -269,15 +269,17 @@ export function SafetyNumberVerification({
       </Dialog>
 
       {/* Security Warning */}
-      {!verified && (
-        <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded">
-          <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            ⚠️ <strong>Contact non vérifié</strong>
-            <br />
-            Vérifiez l'identité de ce contact avant de partager des informations sensibles.
-          </p>
-        </div>
-      )}
-    </div>
+      {
+        !verified && (
+          <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              ⚠️ <strong>Contact non vérifié</strong>
+              <br />
+              Vérifiez l'identité de ce contact avant de partager des informations sensibles.
+            </p>
+          </div>
+        )
+      }
+    </div >
   );
 }

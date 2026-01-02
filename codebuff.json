@@ -1,6 +1,0 @@
-{
-  "description": "Template configuration for this project. See https://www.codebuff.com/config for all options.",
-  "startupProcesses": [],
-  "fileChangeHooks": [],
-  "maxAgentSteps": 25
-}
