@@ -2,14 +2,14 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)
 
-**Secure end-to-end encrypted messenger with blockchain-anchored time-lock and advanced privacy features**
+**Secure end-to-end encrypted messenger with blockchain-anchored time-lock, dynamic reputation system, and advanced privacy features**
 
-[Features](#-features) • [Installation](#-installation) • [Architecture](#-architecture) • [Security](#-security) • [Contributing](#-contributing)
+[Features](#-features) • [Aether & Resonance](#-aether--resonance-system-v1) • [Installation](#-installation) • [Architecture](#-architecture) • [Security](#-security) • [Contributing](#-contributing)
 
 </div>
 
@@ -100,6 +100,96 @@ Visual representation of your trust network:
 - 3D interactive graph of connections
 - Trust levels visualization
 - Network analysis for security awareness
+
+---
+
+## ⚡ Aether & Resonance System (V1)
+
+> *"Your reputation is earned through action, not claimed through identity."*
+
+Cipher Pulse introduces a revolutionary **Cognitive Proof-of-Work** economic model that rewards meaningful interactions while protecting against bots and Sybil attacks.
+
+### 🌊 **Resonance (ρ)**
+
+Your **Resonance** is a dynamic reputation score ranging from `0.0` to `1.0`, computed locally from your messaging behavior:
+
+| Factor | Description |
+|--------|-------------|
+| **Message Entropy** | Diversity and complexity of your communications |
+| **Rhythm Analysis** | Consistency of your activity patterns over time |
+| **Peer Validation** | Social proof from other high-ρ users (Lovebombs) |
+
+```
+ρ_new = ρ_old × decay + Δ_message × entropy_weight
+```
+
+**Key Properties:**
+- 🔒 **Locally Computed** — Your ρ never leaves your device unencrypted
+- 📉 **Natural Decay** — Inactivity gradually reduces your score
+- 🛡️ **Anti-Bot** — Low-entropy spam is heavily penalized
+- 🔗 **Verifiable** — ZK-proofs attest your ρ without revealing history
+
+### 💎 **Aether (Æ)**
+
+**Aether** is the internal energy token that powers advanced privacy features:
+
+| Action | Aether Cost |
+|--------|-------------|
+| Standard Message | Free |
+| Time-Lock Encryption | ~0.05 Æ |
+| Burn-After-Reading | ~0.03 Æ |
+| File Attachment (encrypted) | ~0.03 Æ |
+| High-Priority Relay | ~0.10 Æ |
+
+**Earning Aether:**
+- 📨 **Quality Messages** — High-entropy interactions mint new Æ
+- 🎁 **Pioneer Program** — Early adopters receive a 3× multiplier (decays over 90 days)
+- ⚡ **Lovebomb Validation** — Receive Æ when peers validate your messages
+
+**Economic Balance:**
+- Health Ratio target: **1.4–1.5** (slight inflation encourages activity)
+- 20% of Lovebomb Æ is burned (deflationary pressure)
+- Gas fees create natural scarcity
+
+### ⚓ **Staking (Anchoring)**
+
+**Anchor** your identity by staking Aether to gain enhanced capabilities:
+
+| Benefit | Requirement |
+|---------|-------------|
+| Raise ρ_max cap | Stake ≥ 10 Æ |
+| Sybil Protection | Stake ≥ 50 Æ |
+| Priority P2P Routing | Stake ≥ 100 Æ |
+| Governance Weight | Proportional to stake |
+
+Staking creates **economic skin-in-the-game**, making account farming economically irrational.
+
+### 🌌 **The Quantum Node**
+
+A real-time **3D visualization** (Three.js) representing your current state:
+
+- **Core Glow** — Brightness = current Resonance level
+- **Orbital Rings** — Aether balance & vesting schedule
+- **Particle Field** — Recent activity & peer connections
+- **Pulse Animation** — Heartbeat synced to message rhythm
+
+The Quantum Node transforms abstract metrics into an intuitive, cyberpunk-inspired interface.
+
+### 📊 **Social Echo (Lovebombs)**
+
+Peer-to-peer validation system:
+
+1. **Send Lovebomb** — Validate another user's message (costs 0.02 Æ)
+2. **Receive Validation** — Creator gets 80% of the Æ, 20% is burned
+3. **Resonance Boost** — Validated messages increase ρ faster
+4. **Visual Halo** — Validated messages glow with a resonance aura
+
+**Anti-Sybil Rules:**
+- Validator must have higher ρ than creator
+- Minimum diversity requirement (≥2 unique validators)
+- Low-ρ validators (<0.3) are rejected
+
+> 📖 For technical deep-dive, see [**RESONANCE_ARCHITECTURE.md**](./RESONANCE_ARCHITECTURE.md)
 
 ---
 
@@ -306,7 +396,7 @@ A comprehensive security audit report is available in [`SECURITY_AUDIT_REPORT.md
 
 ### Vulnerability Reporting
 
-If you discover a security vulnerability, please email **[security@cipherpulse.io]** (or create a private security advisory on GitHub). Do not create public issues for security vulnerabilities.
+If you discover a security vulnerability, please email **[therealcipherpulse@proton.me](mailto:therealcipherpulse@proton.me)** (or create a private security advisory on GitHub). Do not create public issues for security vulnerabilities.
 
 ---
 
@@ -331,19 +421,28 @@ _Coming soon_
 
 Dates are estimates and may shift as we prioritize security, stability, and shipping.
 
-### Version 1.0 (Dec 2025) — Current baseline
+### Version 1.0 (Dec 2025) — Foundation
 - [x] Web deployment (Bridge + Frontend)
 - [x] E2EE v2 foundation (X3DH + Double Ratchet)
 - [x] E2EE attachments + burn-after-reading lifecycle
 - [x] Blockchain time-lock (block height)
 
-### Version 1.1 (Q1 2026) — Stability & security hardening
+### Version 1.1 (Jan 2026) — Aether & Resonance ✨ **CURRENT**
+- [x] **Resonance (ρ)** — Dynamic reputation system with Cognitive PoW
+- [x] **Aether (Æ)** — Internal token economy (minting, vesting, burning)
+- [x] **Social Echo** — Peer-to-peer Lovebomb validation system
+- [x] **Quantum Node** — Real-time 3D visualization (Three.js)
+- [x] **Pioneer Program** — 3× multiplier for early adopters
+- [x] **Anti-Cheat Layer** — Event Sourcing with Ed25519 signatures
+- [x] **Gas System** — Privacy features cost Aether
+
+### Version 1.2 (Q1 2026) — Stability & security hardening
 - [ ] KeyVault migration to IndexedDB (reduce local storage risk)
 - [ ] WebSocket/Socket.IO hardening (auth + access control + rate limits)
 - [ ] CSP/CORS hardening pass (reduce false positives, keep strict scripts)
 - [ ] Production observability (actionable logs, health, error reporting)
 
-### Version 1.2 (Q2 2026) — UX & collaboration
+### Version 1.3 (Q2 2026) — UX & collaboration
 - [ ] Group conversations (initial implementation; MLS research in parallel)
 - [ ] Read receipts + typing indicators (opt-in)
 - [ ] Better attachment UX (quotas, cleanup, retries)
@@ -433,11 +532,19 @@ This project is licensed under the **MIT License** - see the [LICENSE](./LICENSE
 
 ---
 
-## 📞 Contact
+## 📞 Contact & Support
 
-- **GitHub**: [@Oykdo](https://github.com/Oykdo)
-- **Repository**: [https://github.com/Oykdo/cipher](https://github.com/Oykdo/cipher)
-- **Issues**: [https://github.com/Oykdo/cipher/issues](https://github.com/Oykdo/cipher/issues)
+We'd love to hear from you! Whether you have feedback, feature requests, or want to report a bug:
+
+| Channel | Details |
+|---------|---------|
+| 📧 **Email** | [therealcipherpulse@proton.me](mailto:therealcipherpulse@proton.me) |
+| 🐙 **GitHub** | [@Oykdo](https://github.com/Oykdo) |
+| 📦 **Repository** | [github.com/Oykdo/cipher](https://github.com/Oykdo/cipher) |
+| 🐛 **Issues** | [Report a Bug](https://github.com/Oykdo/cipher/issues) |
+| 🔒 **Security** | [therealcipherpulse@proton.me](mailto:therealcipherpulse@proton.me) (use PGP if possible) |
+
+> **Response Time**: We aim to respond within 48 hours for general inquiries and 24 hours for security-related reports.
 
 ---
 
