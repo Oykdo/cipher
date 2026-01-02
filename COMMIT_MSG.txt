@@ -1,0 +1,4 @@
+security: fix high severity qs vulnerability (CVE DoS)
+
+- Updated qs package to >=6.14.1 in frontend and bridge
+- Fixes GHSA-6rw7-vpxm-498p (arrayLimit bypass DoS via memory exhaustion)
