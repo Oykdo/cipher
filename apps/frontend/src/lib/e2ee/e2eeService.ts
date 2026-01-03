@@ -87,7 +87,10 @@ const MESSAGE_QUEUE_TIMEOUT_MS = 30000;
  * Should be called after login
  */
 export async function initializeE2EE(username: string): Promise<void> {
-  mobileLog('info', `initializeE2EE(${username}) starting...`);
+  // Capture stack trace to identify caller
+  const stack = new Error().stack || '';
+  const caller = stack.split('\n').slice(1, 4).join(' <- ');
+  mobileLog('info', `initializeE2EE(${username}) CALLED FROM: ${caller.substring(0, 200)}`);
   
   if (isE2EEInitialized() && currentUsername === username) {
     mobileLog('info', 'Already initialized, skipping');
