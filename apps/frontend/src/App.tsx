@@ -23,6 +23,15 @@ const MonitoringDashboard = lazy(() => import('./screens/MonitoringDashboard'));
 const NotFound = lazy(() => import('./screens/NotFound'));
 const Recovery = lazy(() => import('./screens/Recovery'));
 
+// Mobile debug helper
+function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
+  try {
+    if (typeof window !== 'undefined' && (window as any).__mobileDebugLog) {
+      (window as any).__mobileDebugLog(level, `[App] ${msg}`);
+    }
+  } catch { /* ignore */ }
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const session = useAuthStore((state) => state.session);
   
@@ -31,17 +40,22 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const hasUser = !!session?.user?.id;
   const hasToken = !!session?.accessToken;
 
+  mobileLog('info', `ProtectedRoute: hasUser=${hasUser}, hasToken=${hasToken}`);
+
   if (!hasUser) {
     // No user at all - redirect to login
+    mobileLog('info', 'No user - redirecting to /login');
     return <Navigate to="/login" replace />;
   }
 
   if (!hasToken) {
     // User exists but no token (page was reloaded) - redirect to landing
     // Landing page will show QuickUnlock for existing local accounts
+    mobileLog('info', 'No token - redirecting to / (QuickUnlock)');
     return <Navigate to="/" replace />;
   }
 
+  mobileLog('info', 'User authenticated, showing protected content');
   return <>{children}</>;
 }
 
