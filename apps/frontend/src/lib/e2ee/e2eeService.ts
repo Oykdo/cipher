@@ -161,12 +161,51 @@ export async function ensureE2EEInitializedForSession(username?: string): Promis
   }
 
   mobileLog('info', 'Checking KeyVault...');
-  const { getExistingE2EEVault } = await import('../keyVault');
-  const vault = getExistingE2EEVault();
+  const { getExistingE2EEVault, getE2EEVault } = await import('../keyVault');
+  let vault = getExistingE2EEVault();
   
   if (!vault) {
-    mobileLog('error', 'KeyVault NOT initialized');
-    throw new Error('KeyVault not initialized - unlock with your password and retry.');
+    mobileLog('warn', 'KeyVault NOT initialized - attempting recovery...');
+    
+    // Try to recover by getting masterKey from legacy storage and initializing vault
+    try {
+      const { getMasterKeyHex } = await import('../secureKeyAccess');
+      mobileLog('info', 'Trying legacy masterKey...');
+      const masterKey = await getMasterKeyHex();
+      
+      if (masterKey) {
+        mobileLog('info', 'Legacy masterKey found, initializing E2EE vault...');
+        vault = await getE2EEVault(masterKey);
+        mobileLog('info', 'E2EE vault recovered from legacy masterKey');
+      } else {
+        mobileLog('warn', 'No legacy masterKey found');
+      }
+    } catch (recoveryErr: any) {
+      mobileLog('error', `Recovery failed: ${recoveryErr?.message || recoveryErr}`);
+    }
+    
+    // Still no vault? Try session storage as last resort
+    if (!vault) {
+      try {
+        const { resolveMasterKeyForSession } = await import('../masterKeyResolver');
+        const session = useAuthStore.getState().session;
+        mobileLog('info', 'Trying resolveMasterKeyForSession...');
+        const masterKey = await resolveMasterKeyForSession(session);
+        
+        if (masterKey) {
+          mobileLog('info', 'MasterKey resolved, initializing E2EE vault...');
+          vault = await getE2EEVault(masterKey);
+          mobileLog('info', 'E2EE vault initialized from resolved masterKey');
+        }
+      } catch (resolveErr: any) {
+        mobileLog('error', `Resolve failed: ${resolveErr?.message || resolveErr}`);
+      }
+    }
+    
+    if (!vault) {
+      mobileLog('error', 'All recovery attempts failed');
+      throw new Error('KeyVault not initialized - unlock with your password and retry.');
+    }
   }
   
   mobileLog('info', 'KeyVault OK, calling initializeE2EE...');
