@@ -109,10 +109,31 @@ export async function initializeE2EE(username: string): Promise<void> {
 
   // Verify E2EE vault is initialized (keyed by masterKey, not the local device password)
   mobileLog('info', 'Checking KeyVault...');
-  const { getExistingE2EEVault } = await import('../keyVault');
-  const vault = getExistingE2EEVault();
+  const { getExistingE2EEVault, getE2EEVault } = await import('../keyVault');
+  let vault = getExistingE2EEVault();
+  
   if (!vault) {
-    mobileLog('error', 'KeyVault not initialized');
+    mobileLog('warn', 'E2EE KeyVault not initialized, attempting auto-init...');
+    
+    // Try to get masterKey from various sources and initialize vault
+    try {
+      const { getMasterKeyHex } = await import('../secureKeyAccess');
+      const masterKey = await getMasterKeyHex();
+      
+      if (masterKey) {
+        mobileLog('info', 'Found masterKey, initializing E2EE vault...');
+        vault = await getE2EEVault(masterKey);
+        mobileLog('info', 'E2EE vault auto-initialized successfully');
+      } else {
+        mobileLog('warn', 'No masterKey found for auto-init');
+      }
+    } catch (autoInitErr: any) {
+      mobileLog('error', `E2EE vault auto-init failed: ${autoInitErr?.message || autoInitErr}`);
+    }
+  }
+  
+  if (!vault) {
+    mobileLog('error', 'KeyVault not initialized and auto-init failed');
     throw new Error('KeyVault not initialized - cannot initialize E2EE. Please re-login.');
   }
   // SECURITY: crypto log removed
