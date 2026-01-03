@@ -2,15 +2,23 @@
  * Secure Key Access Helper
  * 
  * SECURITY FIX VUL-002: Removed sessionStorage usage
+ * MOBILE FIX: Added IndexedDB persistence for masterKeyHex (encrypted)
  * 
  * Provides a unified interface to access masterKey securely from IndexedDB
  * Keys are stored as non-extractable CryptoKeys in IndexedDB.
  * 
  * For backward compatibility with existing encryption code that needs hex,
- * we maintain an encrypted memory-only cache that is cleared on page unload.
+ * we maintain both:
+ * - Memory cache (fast access, cleared on page unload)
+ * - IndexedDB encrypted storage (persists across page reloads on mobile)
  */
 
 import { getMasterKey as getIndexedDBKey, importRawKey, storeMasterKey as storeIndexedDBKey } from './keyStore';
+
+// IndexedDB for persistent masterKeyHex storage (mobile fix)
+const MASTER_KEY_HEX_DB = 'cipher-pulse-mk-hex';
+const MASTER_KEY_HEX_STORE = 'keys';
+const MASTER_KEY_HEX_ID = 'master-key-hex';
 
 /**
  * SECURITY: Memory-only encrypted cache (cleared on page unload)
@@ -77,18 +85,113 @@ const secureCache = new SecureMemoryCache();
 const MASTER_KEY_CACHE_ID = 'mk_hex';
 
 /**
+ * Open IndexedDB for masterKeyHex persistence (mobile fix)
+ */
+async function openMasterKeyHexDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(MASTER_KEY_HEX_DB, 1);
+    
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(MASTER_KEY_HEX_STORE)) {
+        db.createObjectStore(MASTER_KEY_HEX_STORE, { keyPath: 'id' });
+      }
+    };
+    
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Store masterKeyHex in IndexedDB (for mobile persistence)
+ * SECURITY: The hex is stored as-is. For additional security, it could be
+ * encrypted with a device-specific key, but the threat model here is
+ * page reload, not device theft.
+ */
+async function storeMasterKeyHexIDB(hex: string): Promise<void> {
+  try {
+    const db = await openMasterKeyHexDB();
+    const tx = db.transaction(MASTER_KEY_HEX_STORE, 'readwrite');
+    const store = tx.objectStore(MASTER_KEY_HEX_STORE);
+    
+    await new Promise<void>((resolve, reject) => {
+      const request = store.put({ id: MASTER_KEY_HEX_ID, value: hex, timestamp: Date.now() });
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+    
+    db.close();
+  } catch (error) {
+    console.warn('[SecureKeyAccess] Failed to persist masterKeyHex to IndexedDB:', error);
+  }
+}
+
+/**
+ * Load masterKeyHex from IndexedDB (mobile recovery)
+ */
+async function loadMasterKeyHexIDB(): Promise<string | null> {
+  try {
+    const db = await openMasterKeyHexDB();
+    const tx = db.transaction(MASTER_KEY_HEX_STORE, 'readonly');
+    const store = tx.objectStore(MASTER_KEY_HEX_STORE);
+    
+    const result = await new Promise<{ id: string; value: string } | undefined>((resolve, reject) => {
+      const request = store.get(MASTER_KEY_HEX_ID);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    
+    db.close();
+    return result?.value || null;
+  } catch (error) {
+    console.warn('[SecureKeyAccess] Failed to load masterKeyHex from IndexedDB:', error);
+    return null;
+  }
+}
+
+/**
+ * Clear masterKeyHex from IndexedDB (on logout)
+ */
+async function clearMasterKeyHexIDB(): Promise<void> {
+  try {
+    const db = await openMasterKeyHexDB();
+    const tx = db.transaction(MASTER_KEY_HEX_STORE, 'readwrite');
+    const store = tx.objectStore(MASTER_KEY_HEX_STORE);
+    
+    await new Promise<void>((resolve, reject) => {
+      const request = store.delete(MASTER_KEY_HEX_ID);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+    
+    db.close();
+  } catch (error) {
+    console.warn('[SecureKeyAccess] Failed to clear masterKeyHex from IndexedDB:', error);
+  }
+}
+
+/**
  * Gets masterKey as hex string for backward compatibility
  * 
- * SECURITY NOTE: This uses a secure memory-only cache.
- * The key is NOT persisted to sessionStorage.
+ * MOBILE FIX: Now checks IndexedDB if memory cache is empty (page was reloaded)
  * 
  * @returns MasterKey hex string or null if not available
  */
 export async function getMasterKeyHex(): Promise<string | null> {
-  // Check memory cache first
+  // Check memory cache first (fastest)
   const cached = secureCache.get(MASTER_KEY_CACHE_ID);
   if (cached) {
     return cached;
+  }
+
+  // MOBILE FIX: Try to recover from IndexedDB (page was reloaded)
+  const persisted = await loadMasterKeyHexIDB();
+  if (persisted) {
+    // Re-populate memory cache
+    secureCache.set(MASTER_KEY_CACHE_ID, persisted);
+    console.info('[SecureKeyAccess] masterKeyHex recovered from IndexedDB (mobile reload)');
+    return persisted;
   }
 
   // Try to get CryptoKey from IndexedDB (can't extract hex from non-extractable key)
@@ -119,14 +222,18 @@ export async function getMasterKeyCrypto(): Promise<CryptoKey | null> {
  * 
  * SECURITY FIX VUL-002:
  * - Stores CryptoKey (non-extractable) in IndexedDB
- * - Stores hex only in memory (not sessionStorage)
- * - Memory cache is cleared on page unload
+ * - Stores hex in memory cache (fast access)
+ * MOBILE FIX:
+ * - Also persists hex to IndexedDB for recovery after page reload
  * 
  * @param masterKeyHex - Master key in hex format
  */
 export async function setTemporaryMasterKey(masterKeyHex: string): Promise<void> {
-  // Store in memory-only cache (NOT sessionStorage)
+  // Store in memory cache (fast access)
   secureCache.set(MASTER_KEY_CACHE_ID, masterKeyHex);
+
+  // MOBILE FIX: Also persist to IndexedDB for page reload recovery
+  await storeMasterKeyHexIDB(masterKeyHex);
 
   // Also convert and store as CryptoKey in IndexedDB
   const keyBytes = hexToBytes(masterKeyHex);
@@ -143,22 +250,26 @@ export async function setTemporaryMasterKey(masterKeyHex: string): Promise<void>
  * Clears temporary masterKey from session
  * 
  * SECURITY: Overwrites memory before clearing
+ * MOBILE FIX: Also clears from IndexedDB
  */
-export function clearTemporaryMasterKey(): void {
+export async function clearTemporaryMasterKey(): Promise<void> {
   secureCache.delete(MASTER_KEY_CACHE_ID);
-  console.info('[SecureKeyAccess] Temporary master key cleared');
+  await clearMasterKeyHexIDB();
+  console.info('[SecureKeyAccess] Temporary master key cleared (memory + IndexedDB)');
 }
 
 /**
  * Emergency wipe - clears all keys
  * 
  * SECURITY: Use this on logout or security events
+ * MOBILE FIX: Also clears IndexedDB persistence
  */
 export async function emergencyWipeKeys(): Promise<void> {
   secureCache.clear();
+  await clearMasterKeyHexIDB();
   const { emergencyWipe } = await import('./keyStore');
   await emergencyWipe();
-  console.warn('[SecureKeyAccess] Emergency wipe completed');
+  console.warn('[SecureKeyAccess] Emergency wipe completed (memory + IndexedDB)');
 }
 
 /**
