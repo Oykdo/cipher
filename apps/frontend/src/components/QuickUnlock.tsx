@@ -89,9 +89,11 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
 
     setUnlocking(true);
     setError('');
+    mobileLog('info', '=== UNLOCK STARTED ===');
 
     try {
       // Verify password locally
+      mobileLog('info', 'Verifying password...');
       const normalizedUsername = account.username.toLowerCase();
       let storedHash = localStorage.getItem(`pwd_${normalizedUsername}`);
       if (!storedHash) {
@@ -113,10 +115,12 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
       }
 
       // Get masterKey from KeyVault for this device
+      mobileLog('info', 'Opening KeyVault...');
       let masterKey: string | null = null;
       try {
         const normalizedUsername = account.username.toLowerCase();
         const vault = await getKeyVault(password);
+        mobileLog('info', 'KeyVault opened, getting masterKey...');
         masterKey =
           (await vault.getData(`masterKey:${normalizedUsername}`)) ||
           (await vault.getData(`masterKey:${account.username}`));
