@@ -1,8 +1,17 @@
 import type { AuthSession } from '../store/auth';
 import { getExistingKeyVault } from './keyVault';
-import { getMasterKeyHex as getLegacyMasterKeyHex } from './secureKeyAccess';
+import { getMasterKeyHex as getLegacyMasterKeyHex, setTemporaryMasterKey } from './secureKeyAccess';
 
 import { debugLogger } from './debugLogger';
+
+// Mobile debug helper
+function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
+  try {
+    if (typeof window !== 'undefined' && (window as any).__mobileDebugLog) {
+      (window as any).__mobileDebugLog(level, `[MKResolver] ${msg}`);
+    }
+  } catch { /* ignore */ }
+}
 /**
  * SECURITY FIX: Non-extractable CryptoKey cache
  * 
@@ -49,12 +58,22 @@ async function importAsNonExtractable(masterKeyHex: string): Promise<CryptoKey> 
  * 
  * SECURITY: The string is converted to CryptoKey immediately,
  * then the original string should be cleared by the caller.
+ * 
+ * MOBILE FIX: Also persists to IndexedDB via setTemporaryMasterKey
+ * for recovery after page reload on mobile browsers.
  */
 export async function setSessionMasterKey(masterKey: string): Promise<void> {
+  mobileLog('info', 'setSessionMasterKey() called');
+  
   try {
     cachedCryptoKey = await importAsNonExtractable(masterKey);
-    // SECURITY: MasterKey cached (not logging for security)
+    mobileLog('info', 'CryptoKey imported');
+    
+    // MOBILE FIX: Also persist to IndexedDB for page reload recovery
+    await setTemporaryMasterKey(masterKey);
+    mobileLog('info', 'MasterKey persisted to IndexedDB');
   } catch (err) {
+    mobileLog('error', `Failed: ${(err as Error)?.message || err}`);
     console.error('[masterKeyResolver] Failed to import masterKey as CryptoKey', err);
     throw err;
   }
