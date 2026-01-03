@@ -333,6 +333,26 @@ export default function LoginNew() {
               }
             }
 
+            // If still no masterKey, this is a new device - warn user
+            if (!masterKeyHex) {
+              console.warn('[LoginNew] No masterKey found - new device. User needs to use mnemonic login.');
+              // For now, create a derived key from password so basic functionality works
+              // This won't decrypt old messages but allows new E2EE sessions
+              // TODO: Prompt user to enter mnemonic for full E2EE access
+              try {
+                const { mnemonicToMasterKey } = await import('../services/api-v2');
+                // Hash password to create a deterministic "recovery" key
+                // This is NOT the real masterKey - just allows E2EE to initialize
+                const encoder = new TextEncoder();
+                const passwordData = encoder.encode(password + normalizedUsername + 'recovery');
+                const hashBuffer = await crypto.subtle.digest('SHA-256', passwordData);
+                masterKeyHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+                console.warn('[LoginNew] Created recovery masterKey for new device - old messages may not decrypt');
+              } catch (derivationError) {
+                console.error('[LoginNew] Failed to derive recovery key:', derivationError);
+              }
+            }
+
             if (masterKeyHex) {
               await setSessionMasterKey(masterKeyHex);
               // SECURITY: MasterKey loaded (not logging for security)
