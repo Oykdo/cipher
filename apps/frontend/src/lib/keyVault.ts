@@ -13,6 +13,15 @@
 import { getSecureStorage, closeSecureStorage, SecureStorage } from './secureStorage';
 import { logger } from '@/core/logger';
 
+// Mobile debug helper
+function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
+  try {
+    if (typeof window !== 'undefined' && (window as any).__mobileDebugLog) {
+      (window as any).__mobileDebugLog(level, `[KeyVault] ${msg}`);
+    }
+  } catch { /* ignore */ }
+}
+
 const MASTER_KEY_ID = 'masterKey';
 
 /**
@@ -271,10 +280,25 @@ export function getExistingKeyVault(): KeyVault | null {
  * doesn't conflict with device-local password unlock.
  */
 export async function getE2EEVault(secret: string): Promise<KeyVault> {
+  mobileLog('info', 'getE2EEVault() called');
+  
   if (!e2eeVaultInstance) {
+    mobileLog('info', 'Creating new E2EE vault instance...');
     e2eeVaultInstance = new KeyVault(E2EE_DB_NAME);
-    await e2eeVaultInstance.initialize(secret);
+    
+    try {
+      mobileLog('info', 'Initializing E2EE vault...');
+      await e2eeVaultInstance.initialize(secret);
+      mobileLog('info', 'E2EE vault initialized OK');
+    } catch (err: any) {
+      mobileLog('error', `E2EE vault init FAILED: ${err?.message || err}`);
+      e2eeVaultInstance = null;
+      throw err;
+    }
+  } else {
+    mobileLog('info', 'E2EE vault already exists');
   }
+  
   return e2eeVaultInstance;
 }
 

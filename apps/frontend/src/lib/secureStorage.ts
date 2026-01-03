@@ -13,6 +13,15 @@
 
 import { logger } from '@/core/logger';
 
+// Mobile debug helper
+function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
+  try {
+    if (typeof window !== 'undefined' && (window as any).__mobileDebugLog) {
+      (window as any).__mobileDebugLog(level, `[SecStore] ${msg}`);
+    }
+  } catch { /* ignore */ }
+}
+
 const DB_VERSION = 2; // Incremented for salt storage
 const STORE_NAME = 'vault';
 const SALT_STORE_NAME = 'salts';
@@ -50,18 +59,43 @@ export class SecureStorage {
    * SECURITY FIX VULN-002: Now uses unique salt per user
    */
   async initialize(password: string): Promise<void> {
+    mobileLog('info', `Initializing SecureStorage (db: ${this.dbName})...`);
+    
     try {
+      // Check if IndexedDB is available
+      if (typeof indexedDB === 'undefined') {
+        mobileLog('error', 'IndexedDB NOT available');
+        throw new Error('IndexedDB not available');
+      }
+      mobileLog('info', 'IndexedDB available');
+      
+      // Check if crypto.subtle is available
+      if (!crypto?.subtle) {
+        mobileLog('error', 'crypto.subtle NOT available (needs HTTPS)');
+        throw new Error('crypto.subtle not available - requires secure context (HTTPS)');
+      }
+      mobileLog('info', 'crypto.subtle available');
+      
       // Open IndexedDB first
+      mobileLog('info', 'Opening IndexedDB...');
       this.db = await this.openDatabase();
+      mobileLog('info', 'IndexedDB opened OK');
 
       // Get or create unique salt for this user
+      mobileLog('info', 'Getting/creating salt...');
       this.userSalt = await this.getOrCreateSalt();
+      mobileLog('info', 'Salt OK');
 
       // Derive encryption key from password with unique salt
+      mobileLog('info', 'Deriving encryption key...');
       this.encryptionKey = await this.deriveKey(password, this.userSalt);
+      mobileLog('info', 'Encryption key derived OK');
 
       logger.info('SecureStorage initialized with unique salt');
-    } catch (error) {
+      mobileLog('info', 'SecureStorage initialized successfully');
+    } catch (error: any) {
+      const errMsg = error?.message || String(error);
+      mobileLog('error', `SecureStorage init FAILED: ${errMsg}`);
       logger.error('Failed to initialize SecureStorage', error as Error);
       throw error;
     }
