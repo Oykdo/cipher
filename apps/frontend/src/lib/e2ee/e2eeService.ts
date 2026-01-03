@@ -10,6 +10,14 @@
  */
 
 import { initializeCrypto, type EncryptedData, type KeyBundle } from './index';
+
+// Mobile debug helper
+function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
+  try {
+    const { addDebugLog } = require('../../components/MobileDebugOverlay');
+    addDebugLog(level, `[E2EE] ${msg}`);
+  } catch { /* ignore if not available */ }
+}
 import {
   getOrCreateIdentityKeys,
   storePeerPublicKey,
@@ -78,20 +86,29 @@ const MESSAGE_QUEUE_TIMEOUT_MS = 30000;
  * Should be called after login
  */
 export async function initializeE2EE(username: string): Promise<void> {
+  mobileLog('info', `initializeE2EE(${username}) starting...`);
+  
   if (isE2EEInitialized() && currentUsername === username) {
-    // SECURITY: crypto log removed
+    mobileLog('info', 'Already initialized, skipping');
     return;
   }
 
-  // SECURITY: crypto log removed
-
   // Initialize libsodium
-  await initializeCrypto();
+  try {
+    mobileLog('info', 'Initializing libsodium...');
+    await initializeCrypto();
+    mobileLog('info', 'libsodium OK');
+  } catch (e: any) {
+    mobileLog('error', `libsodium FAILED: ${e?.message || e}`);
+    throw e;
+  }
 
   // Verify E2EE vault is initialized (keyed by masterKey, not the local device password)
+  mobileLog('info', 'Checking KeyVault...');
   const { getExistingE2EEVault } = await import('../keyVault');
   const vault = getExistingE2EEVault();
   if (!vault) {
+    mobileLog('error', 'KeyVault not initialized');
     throw new Error('KeyVault not initialized - cannot initialize E2EE. Please re-login.');
   }
   // SECURITY: crypto log removed

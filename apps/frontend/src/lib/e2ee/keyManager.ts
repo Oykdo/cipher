@@ -18,14 +18,27 @@ import _sodium from 'libsodium-wrappers';
 // Argon2 with WASM support (vite-plugin-wasm)
 let argon2: any = null;
 
+// Mobile debug helper
+function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
+  try {
+    const { addDebugLog } = require('../../components/MobileDebugOverlay');
+    addDebugLog(level, `[KeyMgr] ${msg}`);
+  } catch { /* ignore if not available */ }
+}
+
 async function ensureArgon2Loaded() {
   if (argon2) return;
+  
+  mobileLog('info', 'Loading Argon2 WASM...');
   
   try {
     // Use the bundled build to avoid runtime WASM fetch/import issues (Vite + Vitest/jsdom).
     const module: any = await import('argon2-browser/dist/argon2-bundled.min.js');
     argon2 = module?.default ?? module;
-  } catch (error) {
+    mobileLog('info', 'Argon2 WASM loaded OK');
+  } catch (error: any) {
+    const errMsg = error?.message || String(error);
+    mobileLog('error', `Argon2 WASM failed: ${errMsg}`);
     console.error('[KeyManager] ❌ Failed to load argon2-browser:', error);
     throw new Error('Failed to load argon2-browser. WASM may not be supported.');
   }
@@ -224,7 +237,15 @@ async function decryptPrivateKey(encryptedB64: string, masterKey: Uint8Array): P
  * @returns New key pair
  */
 export async function generateUserKeys(userId: string, username: string): Promise<UserKeyPair> {
-  await _sodium.ready;
+  mobileLog('info', `Generating keys for ${username}...`);
+  
+  try {
+    await _sodium.ready;
+    mobileLog('info', 'libsodium ready');
+  } catch (e: any) {
+    mobileLog('error', `libsodium failed: ${e?.message || e}`);
+    throw e;
+  }
   
   // Generate Curve25519 key pair for encryption (ECDH)
   const encryptionKeyPair = _sodium.crypto_box_keypair();
