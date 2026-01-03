@@ -21,6 +21,15 @@ import * as srp from 'secure-remote-password/client';
 import { debugLogger } from "../lib/debugLogger";
 import '../styles/fluidCrypto.css';
 
+// Mobile debug helper
+function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
+  try {
+    if (typeof window !== 'undefined' && (window as any).__mobileDebugLog) {
+      (window as any).__mobileDebugLog(level, `[QuickUnlock] ${msg}`);
+    }
+  } catch { /* ignore */ }
+}
+
 interface QuickUnlockProps {
   account: LocalAccount;
   onSwitchAccount?: () => void;
@@ -127,22 +136,32 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
       }
 
       if (!masterKey) {
+        mobileLog('error', 'masterKey not found in vault');
         throw new Error(t('quick_unlock.master_key_not_found'));
       }
+      mobileLog('info', 'masterKey retrieved from vault');
 
       // SECURITY: Store masterKey in memory for encryption only (never sent to server)
+      mobileLog('info', 'Calling setSessionMasterKey...');
       await setSessionMasterKey(masterKey);
+      mobileLog('info', 'setSessionMasterKey done');
 
       // Persist for the session + initialize E2EE vault (keyed by masterKey)
       try {
+        mobileLog('info', 'Calling setTemporaryMasterKey...');
         await setTemporaryMasterKey(masterKey);
-      } catch (mkErr) {
+        mobileLog('info', 'setTemporaryMasterKey done');
+      } catch (mkErr: any) {
+        mobileLog('error', `setTemporaryMasterKey failed: ${mkErr?.message || mkErr}`);
         console.warn('[QuickUnlock] Failed to persist masterKey:', mkErr);
       }
 
       try {
+        mobileLog('info', 'Calling getE2EEVault...');
         await getE2EEVault(masterKey);
-      } catch (vaultInitErr) {
+        mobileLog('info', 'E2EE vault initialized');
+      } catch (vaultInitErr: any) {
+        mobileLog('error', `getE2EEVault failed: ${vaultInitErr?.message || vaultInitErr}`);
         console.warn('[QuickUnlock] Failed to init E2EE vault:', vaultInitErr);
       }
 
