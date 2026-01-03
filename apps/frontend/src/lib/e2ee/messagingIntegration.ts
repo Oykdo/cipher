@@ -25,19 +25,40 @@ import { decryptAuthenticated } from './index';
 import { retrieveLegacyIdentityKeys } from './keyManagement';
 import { debugLogger } from '../debugLogger';
 
-async function requireE2EE(): Promise<void> {
-  if (isE2EEInitialized()) return;
+// Mobile debug helper
+function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
+  try {
+    const { addDebugLog } = require('../../components/MobileDebugOverlay');
+    addDebugLog(level, `[MsgInt] ${msg}`);
+  } catch { /* ignore if not available */ }
+}
 
+async function requireE2EE(): Promise<void> {
+  mobileLog('info', 'requireE2EE() called');
+  
+  if (isE2EEInitialized()) {
+    mobileLog('info', 'E2EE already initialized');
+    return;
+  }
+
+  mobileLog('warn', 'E2EE not initialized, attempting init...');
+  
   try {
     await ensureE2EEInitializedForSession();
-  } catch (error) {
+    mobileLog('info', 'ensureE2EEInitializedForSession() completed');
+  } catch (error: any) {
+    const errMsg = error?.message || String(error);
+    mobileLog('error', `E2EE init failed: ${errMsg}`);
     console.error('[E2EE] Failed to initialize for current session:', error);
     throw new Error('E2EE not initialized. Please re-login to enable encryption.');
   }
 
   if (!isE2EEInitialized()) {
+    mobileLog('error', 'E2EE still not initialized after ensureE2EEInitializedForSession');
     throw new Error('E2EE not initialized. Please re-login to enable encryption.');
   }
+  
+  mobileLog('info', 'E2EE now initialized');
 }
 
 // ============================================================================

@@ -144,18 +144,31 @@ export async function initializeE2EE(username: string): Promise<void> {
  * Attempts a lazy re-initialization when state was lost (e.g., after refresh)
  */
 export async function ensureE2EEInitializedForSession(username?: string): Promise<void> {
-  if (isE2EEInitialized()) return;
+  mobileLog('info', 'ensureE2EEInitializedForSession() called');
+  
+  if (isE2EEInitialized()) {
+    mobileLog('info', 'Already initialized, returning');
+    return;
+  }
 
   const targetUsername = username || useAuthStore.getState().session?.user?.username;
+  mobileLog('info', `Target username: ${targetUsername || 'NONE'}`);
+  
   if (!targetUsername) {
+    mobileLog('error', 'No active session - no username');
     throw new Error('No active session available for E2EE initialization. Please log in again.');
   }
 
+  mobileLog('info', 'Checking KeyVault...');
   const { getExistingE2EEVault } = await import('../keyVault');
   const vault = getExistingE2EEVault();
+  
   if (!vault) {
+    mobileLog('error', 'KeyVault NOT initialized');
     throw new Error('KeyVault not initialized - unlock with your password and retry.');
   }
+  
+  mobileLog('info', 'KeyVault OK, calling initializeE2EE...');
 
   if (!initializingPromise) {
     initializingPromise = initializeE2EE(targetUsername).finally(() => {
