@@ -4,10 +4,9 @@ import { useAuthStore } from './store/auth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { proactiveTokenRefresh } from './services/api-interceptor';
 import { useKeyInitialization } from './hooks/useKeyInitialization';
-import { MobileDebugOverlay, setupMobileDebugger, addDebugLog } from './components/MobileDebugOverlay';
-
-// Initialize mobile debugger early
-setupMobileDebugger();
+// Mobile debug overlay - uncomment to enable debugging
+// import { MobileDebugOverlay, setupMobileDebugger, addDebugLog } from './components/MobileDebugOverlay';
+// setupMobileDebugger();
 
 const Landing = lazy(() => import('./screens/Landing'));
 const Login = lazy(() => import('./screens/Login'));
@@ -58,14 +57,10 @@ function App() {
   useEffect(() => {
     if (keyInit.initialized && keyInit.keysExist) {
       console.log('🔐 [App] e2ee-v2 keys ready');
-      addDebugLog('info', 'E2EE keys initialized');
     } else if (keyInit.error) {
       console.error('❌ [App] Key initialization error:', keyInit.error);
-      addDebugLog('error', `E2EE init failed: ${keyInit.error}`);
-    } else if (keyInit.loading) {
-      addDebugLog('info', 'E2EE keys loading...');
     }
-  }, [keyInit.initialized, keyInit.keysExist, keyInit.error, keyInit.loading]);
+  }, [keyInit.initialized, keyInit.keysExist, keyInit.error]);
 
   // Proactive token refresh - refresh 5 minutes before expiration
   useEffect(() => {
@@ -80,7 +75,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <MobileDebugOverlay />
+      {/* <MobileDebugOverlay /> */}
       <Suspense fallback={<div className="dark-matter-bg min-h-screen" />}>
         <Routes>
           {/* Landing Page */}
