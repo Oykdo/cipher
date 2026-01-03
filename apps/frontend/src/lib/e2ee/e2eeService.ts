@@ -11,12 +11,13 @@
 
 import { initializeCrypto, type EncryptedData, type KeyBundle } from './index';
 
-// Mobile debug helper
+// Mobile debug helper (uses global function to avoid ES module issues)
 function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
   try {
-    const { addDebugLog } = require('../../components/MobileDebugOverlay');
-    addDebugLog(level, `[E2EE] ${msg}`);
-  } catch { /* ignore if not available */ }
+    if (typeof window !== 'undefined' && window.__mobileDebugLog) {
+      window.__mobileDebugLog(level, `[E2EE] ${msg}`);
+    }
+  } catch { /* ignore */ }
 }
 import {
   getOrCreateIdentityKeys,

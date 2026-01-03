@@ -25,6 +25,16 @@ export function addDebugLog(level: 'info' | 'warn' | 'error', message: string) {
   updateCallback?.();
 }
 
+// Expose globally for cross-module access (ES modules don't support require())
+declare global {
+  interface Window {
+    __mobileDebugLog?: typeof addDebugLog;
+  }
+}
+if (typeof window !== 'undefined') {
+  window.__mobileDebugLog = addDebugLog;
+}
+
 // Intercept crypto-related errors
 export function setupMobileDebugger() {
   // Check environment

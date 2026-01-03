@@ -18,12 +18,13 @@ import _sodium from 'libsodium-wrappers';
 // Argon2 with WASM support (vite-plugin-wasm)
 let argon2: any = null;
 
-// Mobile debug helper
+// Mobile debug helper (uses global function to avoid ES module issues)
 function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
   try {
-    const { addDebugLog } = require('../../components/MobileDebugOverlay');
-    addDebugLog(level, `[KeyMgr] ${msg}`);
-  } catch { /* ignore if not available */ }
+    if (typeof window !== 'undefined' && (window as any).__mobileDebugLog) {
+      (window as any).__mobileDebugLog(level, `[KeyMgr] ${msg}`);
+    }
+  } catch { /* ignore */ }
 }
 
 async function ensureArgon2Loaded() {

@@ -25,12 +25,13 @@ import { decryptAuthenticated } from './index';
 import { retrieveLegacyIdentityKeys } from './keyManagement';
 import { debugLogger } from '../debugLogger';
 
-// Mobile debug helper
+// Mobile debug helper (uses global function to avoid ES module issues)
 function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
   try {
-    const { addDebugLog } = require('../../components/MobileDebugOverlay');
-    addDebugLog(level, `[MsgInt] ${msg}`);
-  } catch { /* ignore if not available */ }
+    if (typeof window !== 'undefined' && (window as any).__mobileDebugLog) {
+      (window as any).__mobileDebugLog(level, `[MsgInt] ${msg}`);
+    }
+  } catch { /* ignore */ }
 }
 
 async function requireE2EE(): Promise<void> {
