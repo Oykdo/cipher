@@ -15,6 +15,15 @@
 
 import { getMasterKey as getIndexedDBKey, importRawKey, storeMasterKey as storeIndexedDBKey } from './keyStore';
 
+// Mobile debug helper
+function mobileLog(level: 'info' | 'warn' | 'error', msg: string) {
+  try {
+    if (typeof window !== 'undefined' && (window as any).__mobileDebugLog) {
+      (window as any).__mobileDebugLog(level, `[SecKeyAcc] ${msg}`);
+    }
+  } catch { /* ignore */ }
+}
+
 // IndexedDB for persistent masterKeyHex storage (mobile fix)
 const MASTER_KEY_HEX_DB = 'cipher-pulse-mk-hex';
 const MASTER_KEY_HEX_STORE = 'keys';
@@ -179,19 +188,29 @@ async function clearMasterKeyHexIDB(): Promise<void> {
  * @returns MasterKey hex string or null if not available
  */
 export async function getMasterKeyHex(): Promise<string | null> {
+  mobileLog('info', 'getMasterKeyHex() called');
+  
   // Check memory cache first (fastest)
   const cached = secureCache.get(MASTER_KEY_CACHE_ID);
   if (cached) {
+    mobileLog('info', 'Found in memory cache');
     return cached;
   }
+  mobileLog('info', 'Not in memory cache, trying IndexedDB...');
 
   // MOBILE FIX: Try to recover from IndexedDB (page was reloaded)
-  const persisted = await loadMasterKeyHexIDB();
-  if (persisted) {
-    // Re-populate memory cache
-    secureCache.set(MASTER_KEY_CACHE_ID, persisted);
-    console.info('[SecureKeyAccess] masterKeyHex recovered from IndexedDB (mobile reload)');
-    return persisted;
+  try {
+    const persisted = await loadMasterKeyHexIDB();
+    if (persisted) {
+      // Re-populate memory cache
+      secureCache.set(MASTER_KEY_CACHE_ID, persisted);
+      mobileLog('info', 'Recovered from IndexedDB!');
+      console.info('[SecureKeyAccess] masterKeyHex recovered from IndexedDB (mobile reload)');
+      return persisted;
+    }
+    mobileLog('warn', 'Not found in IndexedDB');
+  } catch (err: any) {
+    mobileLog('error', `IndexedDB load failed: ${err?.message || err}`);
   }
 
   // Try to get CryptoKey from IndexedDB (can't extract hex from non-extractable key)
@@ -200,10 +219,12 @@ export async function getMasterKeyHex(): Promise<string | null> {
   if (cryptoKey) {
     // CryptoKey exists but is non-extractable
     // The hex must have been set via setTemporaryMasterKey during login
+    mobileLog('warn', 'CryptoKey exists but no hex - need re-auth');
     console.warn('[SecureKeyAccess] CryptoKey exists but hex not in memory cache - need re-authentication');
     return null;
   }
 
+  mobileLog('error', 'No masterKey found anywhere');
   // No key available
   return null;
 }
@@ -229,11 +250,19 @@ export async function getMasterKeyCrypto(): Promise<CryptoKey | null> {
  * @param masterKeyHex - Master key in hex format
  */
 export async function setTemporaryMasterKey(masterKeyHex: string): Promise<void> {
+  mobileLog('info', 'setTemporaryMasterKey() called');
+  
   // Store in memory cache (fast access)
   secureCache.set(MASTER_KEY_CACHE_ID, masterKeyHex);
+  mobileLog('info', 'Stored in memory cache');
 
   // MOBILE FIX: Also persist to IndexedDB for page reload recovery
-  await storeMasterKeyHexIDB(masterKeyHex);
+  try {
+    await storeMasterKeyHexIDB(masterKeyHex);
+    mobileLog('info', 'Persisted to IndexedDB');
+  } catch (err: any) {
+    mobileLog('error', `Failed to persist to IndexedDB: ${err?.message || err}`);
+  }
 
   // Also convert and store as CryptoKey in IndexedDB
   const keyBytes = hexToBytes(masterKeyHex);
@@ -243,6 +272,7 @@ export async function setTemporaryMasterKey(masterKeyHex: string): Promise<void>
   // Secure wipe of key bytes
   keyBytes.fill(0);
 
+  mobileLog('info', 'Master key stored successfully');
   console.info('[SecureKeyAccess] Master key stored securely (IndexedDB + memory cache)');
 }
 

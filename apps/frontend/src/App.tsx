@@ -4,9 +4,9 @@ import { useAuthStore } from './store/auth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { proactiveTokenRefresh } from './services/api-interceptor';
 import { useKeyInitialization } from './hooks/useKeyInitialization';
-// Mobile debug overlay - uncomment to enable debugging
-// import { MobileDebugOverlay, setupMobileDebugger, addDebugLog } from './components/MobileDebugOverlay';
-// setupMobileDebugger();
+// Mobile debug overlay
+import { MobileDebugOverlay, setupMobileDebugger } from './components/MobileDebugOverlay';
+setupMobileDebugger();
 
 const Landing = lazy(() => import('./screens/Landing'));
 const Login = lazy(() => import('./screens/Login'));
@@ -75,7 +75,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      {/* <MobileDebugOverlay /> */}
+      <MobileDebugOverlay />
       <Suspense fallback={<div className="dark-matter-bg min-h-screen" />}>
         <Routes>
           {/* Landing Page */}
