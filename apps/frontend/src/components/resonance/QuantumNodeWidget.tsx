@@ -1,6 +1,6 @@
-import { Suspense, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { Canvas, useFrame, type RootState } from '@react-three/fiber';
-import { Environment, Float, Points, PointMaterial } from '@react-three/drei';
+import { Float, Points, PointMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 
 export interface QuantumNodeWidgetProps {
@@ -289,10 +289,6 @@ export function QuantumNodeWidget({ resonanceLevel, isLocked, aetherScore, stake
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 10, 5]} intensity={1} />
         <pointLight position={[-10, -10, -5]} intensity={1} color="#00e5ff" />
-
-        <Suspense fallback={null}>
-          <Environment preset="city" />
-        </Suspense>
 
         <Scene resonanceLevel={resonanceLevel} isLocked={isLocked} aetherScore={aetherScore} stakedAmount={stakedAmount} />
       </Canvas>
