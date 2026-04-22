@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { apiv2 } from '../services/api-v2';
 import { debugLogger } from "../lib/debugLogger";
+import { AtomLoader } from './ui';
 import '../styles/fluidCrypto.css';
 
 export interface UserSearchResult {
@@ -125,7 +126,7 @@ export default function UserSearch({ onSelectUser, onCancel, loading: externalLo
             />
             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-grey">
               {(searching || externalLoading) && (
-                <div className="w-5 h-5 border-2 border-quantum-cyan border-t-transparent rounded-full animate-spin"></div>
+                <AtomLoader size="sm" />
               )}
             </div>
           </div>

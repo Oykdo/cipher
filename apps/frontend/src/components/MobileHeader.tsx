@@ -2,6 +2,8 @@ import { Avatar } from "./Avatar";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { useTranslation } from "react-i18next";
 import { Logo } from "./Logo";
+import { useAuthStore } from "../store/auth";
+import { useVaultFingerprint } from "../hooks/useVaultFingerprint";
 
 export interface MobileHeaderProps {
   username: string;
@@ -11,17 +13,20 @@ export interface MobileHeaderProps {
 
 export function MobileHeader({ username, peerName, onMenuClick }: MobileHeaderProps) {
   const { t } = useTranslation();
-  
+  const linkedVault = useAuthStore((s) => s.session?.user?.linkedVault);
+  const selfVaultSeed = linkedVault?.vaultId ?? null;
+  const fingerprint = useVaultFingerprint();
+
   return (
     <header className="lg:hidden sticky top-0 z-20 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 px-4 py-3 flex items-center justify-between min-h-[56px]">
-      <button 
+      <button
         onClick={onMenuClick}
         className="p-2 -ml-2 rounded-lg hover:bg-slate-800 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
         aria-label={t('open_menu')}
       >
         <MenuIcon className="w-6 h-6 text-slate-100" />
       </button>
-      
+
       <div className="flex-1 text-center min-w-0">
         {peerName ? (
           <div className="flex items-center justify-center gap-2">
@@ -31,14 +36,20 @@ export function MobileHeader({ username, peerName, onMenuClick }: MobileHeaderPr
         ) : (
           <div className="flex items-center justify-center gap-2">
             <Logo size="sm" />
-            <h1 className="text-lg font-semibold text-slate-100">Dead Drop</h1>
+            <h1 className="text-lg font-semibold text-slate-100">Cipher</h1>
           </div>
         )}
       </div>
-      
+
       <div className="flex items-center gap-2">
         <ConnectionStatus />
-        <Avatar name={username} size={32} />
+        <Avatar
+          name={username}
+          size={32}
+          vaultSeed={selfVaultSeed}
+          vaultTier={fingerprint?.pioneerTier}
+          fingerprint={fingerprint}
+        />
       </div>
     </header>
   );

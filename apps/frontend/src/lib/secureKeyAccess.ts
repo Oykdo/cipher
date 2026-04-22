@@ -10,7 +10,7 @@
  * we maintain an encrypted memory-only cache that is cleared on page unload.
  */
 
-import { getMasterKey as getIndexedDBKey, importRawKey, storeMasterKey as storeIndexedDBKey } from './keyStore';
+import { getMasterKey as getIndexedDBKey, importRawKey, storeMasterKey as storeIndexedDBKey, emergencyWipe } from './keyStore';
 
 /**
  * SECURITY: Memory-only encrypted cache (cleared on page unload)
@@ -156,7 +156,6 @@ export function clearTemporaryMasterKey(): void {
  */
 export async function emergencyWipeKeys(): Promise<void> {
   secureCache.clear();
-  const { emergencyWipe } = await import('./keyStore');
   await emergencyWipe();
   console.warn('[SecureKeyAccess] Emergency wipe completed');
 }

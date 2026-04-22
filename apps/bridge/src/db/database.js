@@ -919,6 +919,126 @@ class DatabaseService {
         }
     }
 
+    /**
+     * Restore a user's backup produced by `exportUserData`.
+     *
+     * Contract:
+     * - Caller has already verified that `data.userId === userId` (cross-account
+     *   guard in /api/backup/import). This method trusts that check.
+     * - Atomic: wraps everything in a transaction, rolls back on any failure.
+     * - Idempotent: dedup by conversation.id and message.id, `ON CONFLICT DO NOTHING`.
+     *   Re-running the same import yields zero new rows.
+     * - Timelock fields (`unlock_block_height`, `scheduled_burn_at`, `created_at`)
+     *   are preserved verbatim so the Burn Scheduler can re-pick up timers at boot
+     *   and Bitcoin-height unlocks resolve against their original target.
+     *
+     * Messages whose `conversation_id` is neither in the backup's conversations
+     * nor already owned by the user are skipped — a defensive filter against a
+     * malformed backup trying to plant messages in someone else's thread.
+     */
+    async restoreUserData(userId, data) {
+        const stats = {
+            conversationsCreated: 0,
+            conversationsSkipped: 0,
+            messagesRestored: 0,
+            messagesSkipped: 0,
+        };
+
+        const existingConvs = await this.getUserConversations(userId);
+        const allowedConvIds = new Set(existingConvs.map((c) => c.id));
+
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Phase 1 — recreate missing conversations using the senders
+            // present in the backup messages as the member list. Best effort:
+            // if we can't infer at least one other participant we still keep
+            // the user as a sole member so messages attach somewhere.
+            for (const conv of (data.conversations || [])) {
+                if (!conv || !conv.id) continue;
+                if (allowedConvIds.has(conv.id)) {
+                    stats.conversationsSkipped++;
+                    continue;
+                }
+                const convMessages = (data.messages || []).filter(
+                    (m) => m && m.conversation_id === conv.id
+                );
+                const senderIds = Array.from(
+                    new Set(convMessages.map((m) => m.sender_id).filter(Boolean))
+                );
+                if (!senderIds.includes(userId)) senderIds.push(userId);
+                const members = senderIds.slice(0, 2);
+
+                await run(
+                    client,
+                    `INSERT INTO conversations (id) VALUES ($1) ON CONFLICT DO NOTHING`,
+                    [conv.id]
+                );
+                for (const m of members) {
+                    await run(
+                        client,
+                        `INSERT INTO conversation_members (conversation_id, user_id)
+                         VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                        [conv.id, m]
+                    );
+                }
+                allowedConvIds.add(conv.id);
+                stats.conversationsCreated++;
+            }
+
+            // Phase 2 — replay messages, preserving every timelock-relevant
+            // column. ON CONFLICT DO NOTHING makes the import idempotent.
+            await this.ensureSenderPlaintextColumn();
+            for (const msg of (data.messages || [])) {
+                if (!msg || !msg.id || !msg.conversation_id) continue;
+                if (!allowedConvIds.has(msg.conversation_id)) {
+                    stats.messagesSkipped++;
+                    continue;
+                }
+                const scheduledBurnAt = msg.scheduled_burn_at
+                    ? new Date(msg.scheduled_burn_at)
+                    : null;
+                const createdAt = msg.created_at
+                    ? new Date(msg.created_at)
+                    : null;
+                const before = stats.messagesRestored;
+                const result = await client.query(
+                    `INSERT INTO messages
+                        (id, conversation_id, sender_id, body, sender_plaintext,
+                         unlock_block_height, scheduled_burn_at, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, NOW()))
+                     ON CONFLICT (id) DO NOTHING`,
+                    [
+                        msg.id,
+                        msg.conversation_id,
+                        msg.sender_id,
+                        msg.body,
+                        msg.sender_plaintext || null,
+                        msg.unlock_block_height || null,
+                        scheduledBurnAt,
+                        createdAt,
+                    ]
+                );
+                if (result.rowCount && result.rowCount > 0) {
+                    stats.messagesRestored++;
+                } else {
+                    stats.messagesSkipped++;
+                }
+                void before;
+            }
+
+            await client.query('COMMIT');
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
+
+        return stats;
+    }
+
     getDatabasePath() {
         return 'postgres';
     }
@@ -948,6 +1068,10 @@ class DatabaseService {
                 error: error.message
             };
         }
+    }
+
+    async updateUsername(userId, newUsername) {
+        await run(this.pool, `UPDATE users SET username = $1 WHERE id = $2`, [newUsername.toLowerCase(), userId]);
     }
 
     async updateUserSRP(userId, salt, verifier) {

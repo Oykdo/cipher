@@ -1,7 +1,9 @@
-import { useTranslation } from "react-i18next";
-import { useAuthStore } from "../../store/auth";
-import { useSettings } from "../../hooks/useSettings";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useSettings } from "../../hooks/useSettings";
+import { useAuthStore } from "../../store/auth";
+import { AppLockSection } from "./AppLockSection";
+import { formatVaultHandle } from "../../lib/vaultHandle";
 
 export function SecuritySettings() {
     const { t } = useTranslation();
@@ -10,246 +12,196 @@ export function SecuritySettings() {
     const { settings, updateSettings, isUpdating } = useSettings();
     const [showAdvanced, setShowAdvanced] = useState(false);
 
+    const linkedVault = user?.linkedVault;
     const discoverable = settings?.privacy?.discoverable ?? true;
+
+    const identityBadge = linkedVault
+        ? {
+              label: t("settings.security_settings.tier_eidolon", { defaultValue: "Eidolon" }),
+              className: "border-cyan-400/30 bg-cyan-400/12 text-cyan-200",
+              description: t("settings.security_settings.identity_plain_eidolon"),
+          }
+        : user?.securityTier === "dice-key"
+          ? {
+                label: t("settings.security_settings.tier_dicekey"),
+                className: "border-fuchsia-400/30 bg-fuchsia-400/12 text-fuchsia-200",
+                description: t("settings.security_settings.identity_plain_dicekey"),
+            }
+          : {
+                label: t("settings.security_settings.tier_standard"),
+                className: "border-blue-400/30 bg-blue-400/12 text-blue-200",
+                description: t("settings.security_settings.identity_plain_standard"),
+            };
 
     const handleToggleDiscoverable = (checked: boolean) => {
         updateSettings({
             privacy: {
                 ...settings?.privacy,
-                discoverable: checked
-            }
+                discoverable: checked,
+            },
         });
     };
 
     const handleLogout = () => {
-        if (confirm(t('settings.security_settings.delete_account_confirm') || t('settings.security_settings.logout_confirm_default'))) {
+        if (confirm(t("settings.security_settings.logout_confirm_default"))) {
             clearSession();
             window.location.href = "/";
         }
     };
 
+    const handle = formatVaultHandle(linkedVault?.vaultName, linkedVault?.vaultNumber);
+
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="mb-6">
-                <h2 className="text-2xl font-bold text-white mb-2">🔐 {t('settings.security_settings.title')}</h2>
-                <p className="text-slate-400">{t('settings.security_settings.description')}</p>
+            <div>
+                <h2 className="mb-1 text-2xl font-bold text-white">
+                    {t("settings.security_settings.title")}
+                </h2>
+                <p className="text-sm text-slate-400">
+                    {t("settings.security_settings.description_plain")}
+                </p>
             </div>
 
-            {/* Account Security Info */}
-            <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-700/50">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                        <span className="text-2xl">👤</span>
+            {/* Identity — one card, one line, no jargon. */}
+            <div className="cosmic-glass-card rounded-3xl border border-cyan-400/15 p-6 shadow-[0_12px_40px_rgba(8,47,73,0.16)]">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                        <p className="text-sm text-slate-300">
+                            {identityBadge.description}
+                        </p>
                     </div>
-                    <div>
-                        <h3 className="text-lg font-semibold text-white">{t('settings.security_settings.security_info_title')}</h3>
-                        <p className="text-sm text-slate-400">{t('settings.security_settings.security_info_desc')}</p>
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    {/* Security Tier Badge */}
-                    <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg">
-                        <div>
-                            <p className="text-sm font-medium text-slate-300">{t('settings.security_settings.security_tier_label')}</p>
-                            <p className="text-xs text-slate-500 mt-1">{t('settings.security_settings.security_tier_desc')}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {user?.securityTier === 'dice-key' ? (
-                                <span className="px-3 py-1 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-full text-sm font-semibold text-purple-300 flex items-center gap-1">
-                                    <span>🎲</span>
-                                    <span>{t('settings.security_settings.tier_dicekey')}</span>
-                                </span>
-                            ) : (
-                                <span className="px-3 py-1 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 rounded-full text-sm font-semibold text-blue-300 flex items-center gap-1">
-                                    <span>🔑</span>
-                                    <span>{t('settings.security_settings.tier_standard')}</span>
-                                </span>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* E2EE Status */}
-                    <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg">
-                        <div>
-                            <p className="text-sm font-medium text-slate-300">{t('settings.security_settings.e2e_encryption')}</p>
-                            <p className="text-xs text-slate-500 mt-1">{t('settings.security_settings.e2e_desc')}</p>
-                        </div>
-                        <span className="px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full text-sm font-semibold text-green-300">
-                            {t('settings.security_settings.active_status')}
-                        </span>
-                    </div>
-
-                    {/* Zero-Knowledge */}
-                    <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg">
-                        <div>
-                            <p className="text-sm font-medium text-slate-300">{t('settings.security_settings.zero_knowledge')}</p>
-                            <p className="text-xs text-slate-500 mt-1">{t('settings.security_settings.zero_knowledge_desc')}</p>
-                        </div>
-                        <span className="px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full text-sm font-semibold text-green-300">
-                            {t('settings.security_settings.active_status')}
-                        </span>
-                    </div>
+                    <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${identityBadge.className}`}>
+                        {identityBadge.label}
+                    </span>
                 </div>
             </div>
 
-            {/* Privacy Settings Section */}
-            <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-700/50">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                        <span className="text-2xl">🔒</span>
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-semibold text-white">{t('settings.security_settings.privacy_title')}</h3>
-                        <p className="text-sm text-slate-400">{t('settings.security_settings.privacy_desc')}</p>
-                    </div>
+            <AppLockSection />
+
+            {/* Privacy — one actionable toggle. */}
+            <div className="cosmic-glass-card rounded-3xl border border-violet-400/12 p-6 shadow-[0_12px_40px_rgba(88,28,135,0.14)]">
+                <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-white">{t("settings.security_settings.privacy_title")}</h3>
+                    <p className="text-sm text-slate-400">{t("settings.security_settings.privacy_desc")}</p>
                 </div>
 
-                {/* Discoverable Toggle */}
-                <div className="space-y-3">
-                    <div className="p-4 bg-slate-800/50 rounded-lg">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex-1">
-                                <label htmlFor="discoverable-toggle" className="text-white font-medium cursor-pointer flex items-center gap-2">
-                                    <span className="text-lg">{discoverable ? '👁️' : '🔒'}</span>
-                                    <span>{t('settings.security_settings.discoverable_label')}</span>
-                                </label>
-                                <p className="text-xs text-slate-400 mt-2">
-                                    {discoverable
-                                        ? t('settings.security_settings.discoverable_on_desc')
-                                        : t('settings.security_settings.discoverable_off_desc')
-                                    }
-                                </p>
-                            </div>
-
-                            <div className="ml-4">
-                                {isUpdating ? (
-                                    <div className="w-12 h-6 bg-slate-700 rounded-full animate-pulse" />
-                                ) : (
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            id="discoverable-toggle"
-                                            type="checkbox"
-                                            checked={discoverable}
-                                            onChange={(e) => handleToggleDiscoverable(e.target.checked)}
-                                            disabled={isUpdating}
-                                            className="sr-only peer"
-                                        />
-                                        <div className="w-12 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-400 rounded-full peer peer-checked:after:translate-x-6 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-500"></div>
-                                    </label>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                            <p className="text-xs text-blue-300 flex items-start gap-2">
-                                <span className="text-sm">ℹ️</span>
-                                <span>
-                                    {t('settings.security_settings.discoverable_note')}
-                                </span>
+                <div className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 backdrop-blur-sm">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1">
+                            <label htmlFor="discoverable-toggle" className="cursor-pointer text-white font-medium">
+                                {t("settings.security_settings.discoverable_label")}
+                            </label>
+                            <p className="mt-2 text-xs text-slate-400">
+                                {discoverable
+                                    ? t("settings.security_settings.discoverable_on_desc")
+                                    : t("settings.security_settings.discoverable_off_desc")}
                             </p>
                         </div>
+
+                        {isUpdating ? (
+                            <div className="h-6 w-12 rounded-full bg-slate-700 animate-pulse" />
+                        ) : (
+                            <label className="relative inline-flex cursor-pointer items-center">
+                                <input
+                                    id="discoverable-toggle"
+                                    type="checkbox"
+                                    checked={discoverable}
+                                    onChange={(e) => handleToggleDiscoverable(e.target.checked)}
+                                    disabled={isUpdating}
+                                    className="peer sr-only"
+                                />
+                                <div className="h-6 w-12 rounded-full bg-slate-700 transition peer-checked:bg-brand-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-400 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-6" />
+                            </label>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Advanced Security Options */}
-            <div className="bg-slate-900/50 rounded-xl border border-slate-700/50 overflow-hidden">
+            {/* Technical details — collapsed by default. For curious users. */}
+            <div className="cosmic-glass-card rounded-3xl border border-white/10 overflow-hidden">
                 <button
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="w-full p-6 flex items-center justify-between hover:bg-slate-800/30 transition-colors"
+                    className="flex w-full items-center justify-between p-5 transition-colors hover:bg-white/[0.02]"
                 >
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                            <span className="text-2xl">⚙️</span>
-                        </div>
-                        <div className="text-left">
-                            <h3 className="text-lg font-semibold text-white">{t('settings.security_settings.advanced_options')}</h3>
-                            <p className="text-sm text-slate-400">{t('settings.security_settings.advanced_options_desc')}</p>
-                        </div>
+                    <div className="text-left">
+                        <h3 className="text-base font-semibold text-white">
+                            {t("settings.security_settings.details_title")}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                            {t("settings.security_settings.details_desc")}
+                        </p>
                     </div>
-                    <span className="text-slate-400">
-                        {showAdvanced ? '▲' : '▼'}
+                    <span
+                        className={`flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] transition-transform duration-200 ${
+                            showAdvanced ? "rotate-180" : ""
+                        }`}
+                        aria-hidden="true"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 text-slate-400">
+                            <path
+                                fillRule="evenodd"
+                                d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.513a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z"
+                                clipRule="evenodd"
+                            />
+                        </svg>
                     </span>
                 </button>
 
                 {showAdvanced && (
-                    <div className="p-6 pt-0 space-y-3">
-                        <div className="p-4 bg-slate-800/50 rounded-lg">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-slate-300">{t('settings.security_settings.crypto_keys_label')}</p>
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        {user?.securityTier === 'dice-key'
-                                            ? t('settings.security_settings.crypto_keys_dicekey')
-                                            : t('settings.security_settings.crypto_keys_standard')}
-                                    </p>
-                                </div>
-                                <span className="text-xs text-slate-400 font-mono">
-                                    {user?.securityTier === 'dice-key' ? t('settings.security_settings.bits_strength', { count: 775 }) : t('settings.security_settings.bits_strength', { count: 256 })}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="p-4 bg-slate-800/50 rounded-lg">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-slate-300">{t('settings.security_settings.pfs_label')}</p>
-                                    <p className="text-xs text-slate-500 mt-1">{t('settings.security_settings.pfs_desc')}</p>
-                                </div>
-                                <span className="px-2 py-1 bg-green-500/20 border border-green-500/30 rounded-full text-xs font-semibold text-green-300">
-                                    {t('settings.security_settings.active_status')}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="p-4 bg-slate-800/50 rounded-lg">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-slate-300">{t('settings.security_settings.pcs_label')}</p>
-                                    <p className="text-xs text-slate-500 mt-1">{t('settings.security_settings.pcs_desc')}</p>
-                                </div>
-                                <span className="px-2 py-1 bg-green-500/20 border border-green-500/30 rounded-full text-xs font-semibold text-green-300">
-                                    {t('settings.security_settings.active_status')}
-                                </span>
-                            </div>
-                        </div>
+                    <div className="border-t border-white/5 p-5 space-y-2 text-sm">
+                        <KeyValue
+                            label={t("settings.security_settings.kv_username")}
+                            value={`@${user?.username || "—"}`}
+                        />
+                        <KeyValue
+                            label={t("settings.security_settings.kv_user_id")}
+                            value={user?.id || "—"}
+                            mono
+                        />
+                        {linkedVault && (
+                            <>
+                                <KeyValue
+                                    label={t("settings.security_settings.kv_vault")}
+                                    value={handle}
+                                />
+                                <KeyValue
+                                    label={t("settings.security_settings.kv_vault_id")}
+                                    value={linkedVault.vaultId || "—"}
+                                    mono
+                                />
+                            </>
+                        )}
                     </div>
                 )}
             </div>
 
-            {/* Danger Zone */}
-            <div className="bg-gradient-to-br from-red-950/30 to-red-900/20 rounded-xl p-6 border border-red-500/30">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                        <span className="text-2xl">⚠️</span>
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-semibold text-red-400">{t('settings.security_settings.danger_zone')}</h3>
-                        <p className="text-sm text-red-300/70">{t('settings.security_settings.danger_zone_desc')}</p>
-                    </div>
+            {/* Danger zone. */}
+            <div className="rounded-3xl border border-red-500/30 bg-gradient-to-br from-red-950/35 to-red-900/20 p-6 shadow-[0_16px_44px_rgba(127,29,29,0.18)]">
+                <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-red-400">{t("settings.security_settings.danger_zone")}</h3>
+                    <p className="text-sm text-red-300/70">
+                        {t("settings.security_settings.danger_zone_desc_plain")}
+                    </p>
                 </div>
 
-                <div className="space-y-3">
-                    <button
-                        onClick={handleLogout}
-                        className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
-                    >
-                        <span>🚪</span>
-                        <span>{t('settings.security_settings.logout')}</span>
-                    </button>
-
-                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                        <p className="text-xs text-red-300 flex items-start gap-2">
-                            <span className="text-sm">⚠️</span>
-                            <span>
-                                {t('settings.security_settings.logout_warning')}
-                            </span>
-                        </p>
-                    </div>
-                </div>
+                <button
+                    onClick={handleLogout}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-red-700"
+                >
+                    <span>{t("settings.security_settings.logout")}</span>
+                </button>
             </div>
+        </div>
+    );
+}
+
+function KeyValue({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+    return (
+        <div className="flex items-start justify-between gap-4 rounded-xl bg-slate-950/40 px-4 py-3">
+            <span className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</span>
+            <span className={`text-right break-all ${mono ? "font-mono text-xs text-slate-300" : "text-slate-200"}`}>
+                {value}
+            </span>
         </div>
     );
 }

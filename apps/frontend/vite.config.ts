@@ -47,6 +47,28 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
     target: 'esnext', // Support for modern features including WASM
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('scheduler')) return 'vendor-react';
+            if (id.includes('framer-motion')) return 'vendor-motion';
+            if (id.includes('i18next')) return 'vendor-i18n';
+            if (id.includes('libsodium') || id.includes('tweetnacl') || id.includes('@noble') || id.includes('secure-remote-password') || id.includes('argon2-browser')) {
+              return 'vendor-crypto';
+            }
+            if (id.includes('three')) return 'vendor-3d';
+            return 'vendor';
+          }
+
+          if (id.includes('/src/screens/Recovery')) return 'screen-recovery';
+          if (id.includes('/src/lib/e2ee/') || id.includes('/src/core/crypto/') || id.includes('/src/shared/signal')) return 'feature-e2ee';
+          if (id.includes('/src/lib/p2p/') || id.includes('/src/hooks/useP2P') || id.includes('/src/hooks/useSocket')) return 'feature-p2p';
+          if (id.includes('/src/components/conversations/') || id.includes('/src/screens/Conversations')) return 'feature-conversations';
+          return undefined;
+        },
+      },
+    },
   },
   optimizeDeps: {
     exclude: ['argon2-browser'],

@@ -1,10 +1,3 @@
-/**
- * Welcome Page - After DiceKey Account Creation
- * 
- * Affiche l'identifiant et les checksums, force l'utilisateur à se reconnecter
- * pour vérifier qu'il a bien noté ses informations
- */
-
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
@@ -17,6 +10,30 @@ interface WelcomeState {
   userId: string;
   username: string;
   checksums: string[];
+}
+
+function CosmicConstellationLogo() {
+  return (
+    <svg viewBox="0 0 96 96" className="cosmic-constellation" aria-hidden="true">
+      <defs>
+        <linearGradient id="welcomeCosmicCoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00f0ff" />
+          <stop offset="100%" stopColor="#7b2fff" />
+        </linearGradient>
+      </defs>
+      <circle cx="48" cy="48" r="19" fill="none" stroke="rgba(0,240,255,0.28)" strokeWidth="1.5">
+        <animate attributeName="r" values="16;21;16" dur="4s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.4;0.95;0.4" dur="4s" repeatCount="indefinite" />
+      </circle>
+      <path d="M20 30L48 48L73 20M48 48L25 73L74 74M48 48L76 46" fill="none" stroke="rgba(200,220,255,0.4)" strokeWidth="1.2" strokeLinecap="round" />
+      <circle cx="48" cy="48" r="7" fill="url(#welcomeCosmicCoreGradient)" />
+      <circle cx="20" cy="30" r="3.5" fill="#d9e3ff" />
+      <circle cx="73" cy="20" r="3" fill="#8ce8ff" />
+      <circle cx="25" cy="73" r="3" fill="#b78fff" />
+      <circle cx="74" cy="74" r="2.8" fill="#d9e3ff" />
+      <circle cx="76" cy="46" r="2.5" fill="#8ce8ff" />
+    </svg>
+  );
 }
 
 export default function Welcome() {
@@ -45,7 +62,6 @@ export default function Welcome() {
     }
   }, [missingState, navigate]);
 
-  // Generate 5 random checksums to verify on mount
   useEffect(() => {
     if (checksums.length === 30) {
       const indices: number[] = [];
@@ -56,7 +72,7 @@ export default function Welcome() {
         }
       }
       indices.sort((a, b) => a - b);
-      setRandomChecksums(indices.map(i => ({ index: i, value: checksums[i] })));
+      setRandomChecksums(indices.map((i) => ({ index: i, value: checksums[i] })));
     }
   }, [checksums]);
 
@@ -71,10 +87,7 @@ export default function Welcome() {
   };
 
   const copyAllChecksums = () => {
-    // Format: "1. abc123\n2. def456\n..."
-    const formatted = checksums
-      .map((checksum, idx) => `${idx + 1}. ${checksum}`)
-      .join('\n');
+    const formatted = checksums.map((checksum, idx) => `${idx + 1}. ${checksum}`).join('\n');
     navigator.clipboard.writeText(formatted);
     setCopiedChecksums(true);
     setTimeout(() => setCopiedChecksums(false), 2000);
@@ -85,7 +98,6 @@ export default function Welcome() {
   };
 
   const handleVerification = async () => {
-    // Check if all inputs match
     const allCorrect = randomChecksums.every((item, idx) => {
       return userInputs[idx].toLowerCase().trim() === item.value.toLowerCase().trim();
     });
@@ -95,12 +107,10 @@ export default function Welcome() {
       return;
     }
 
-    // Verification successful! Now create the account
     setIsCreatingAccount(true);
     setVerificationError('');
 
     try {
-      // Get pending signup data
       const pendingSignup = sessionStorage.getItem('pendingSignup');
       if (!pendingSignup) {
         throw new Error(t('welcome.error_data_missing'));
@@ -108,25 +118,20 @@ export default function Welcome() {
 
       const signupData = JSON.parse(pendingSignup);
 
-      // Verify data integrity
       if (signupData.userId !== userId || signupData.username !== username) {
         throw new Error(t('welcome.error_data_inconsistent'));
       }
 
-      // ⚠️ CRITICAL: Verify masterKeyHex is present
       if (!signupData.masterKeyHex) {
-        console.error('[Welcome] ⚠️ CRITICAL: masterKeyHex is missing from pendingSignup!');
+        console.error('[Welcome] CRITICAL: masterKeyHex is missing from pendingSignup');
         throw new Error(t('welcome.error_master_key_missing'));
       }
 
-      // ⚠️ CRITICAL: Verify keySet is present
       if (!signupData.keySet) {
-        console.error('[Welcome] ⚠️ CRITICAL: keySet is missing from pendingSignup!');
+        console.error('[Welcome] CRITICAL: keySet is missing from pendingSignup');
         throw new Error(t('welcome.error_data_missing'));
       }
 
-      // Create account via API with all public keys
-      // The backend will derive the same userId from identityPublicKey
       const response = await fetch(`${API_BASE_URL}/api/v2/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,7 +140,7 @@ export default function Welcome() {
           method: 'dice-key',
           masterKeyHex: signupData.masterKeyHex,
           avatarHash: signupData.avatarHash,
-          checksums: signupData.checksums, // Include checksums for recovery assistance
+          checksums: signupData.checksums,
           identityPublicKey: signupData.keySet.identityKey.publicKey,
           signaturePublicKey: signupData.keySet.signatureKey.publicKey,
           signedPreKey: {
@@ -160,23 +165,21 @@ export default function Welcome() {
 
       const responseData = await response.json();
 
-      // Store tokens and user info temporarily for password setup
       sessionStorage.setItem('tempAccessToken', responseData.accessToken);
       sessionStorage.setItem('tempRefreshToken', responseData.refreshToken);
       sessionStorage.setItem('tempUserId', responseData.id);
       sessionStorage.setItem('tempUserSecurityTier', responseData.securityTier);
       sessionStorage.setItem('tempUsername', signupData.username);
 
-      // Navigate to password setup (LoginNew will detect these and go to setpassword step)
       navigate('/login', {
         state: {
           autoSetPassword: true,
-          username: signupData.username
-        }
+          username: signupData.username,
+        },
       });
     } catch (error: any) {
       console.error('Account creation error:', error);
-      setVerificationError(`❌ ${error.message || 'Erreur lors de la création du compte'}`);
+      setVerificationError(`ERROR ${error.message || 'Erreur lors de la creation du compte'}`);
       setIsCreatingAccount(false);
     }
   };
@@ -189,57 +192,49 @@ export default function Welcome() {
   };
 
   return (
-    <div className="dark-matter-bg min-h-screen flex items-center justify-center p-8">
+    <div className="cosmic-scene min-h-screen flex items-center justify-center p-8 relative overflow-hidden">
+      <div className="cosmic-nebula" aria-hidden="true" />
+      <div className="cosmic-stars" aria-hidden="true" />
+      <div className="cosmic-p2p-grid" aria-hidden="true" />
+      <div className="cosmic-volumetric" aria-hidden="true" />
+
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="max-w-3xl w-full"
+        className="max-w-3xl w-full relative z-10"
       >
-        {/* Success Header with Particles */}
         <div className="text-center mb-8">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.5, ease: [0.68, -0.55, 0.265, 1.55] }}
-            className="text-7xl mb-4"
+            className="text-7xl mb-4 cosmic-title-pulse"
           >
-            🎉
+            ACCESS
           </motion.div>
 
-          <motion.h1
-            className="text-4xl font-black mb-4 glow-text-cyan"
-            style={{ color: 'var(--quantum-cyan)' }}
-            animate={{
-              textShadow: [
-                '0 0 20px rgba(0, 229, 255, 0.4)',
-                '0 0 40px rgba(0, 229, 255, 0.6)',
-                '0 0 20px rgba(0, 229, 255, 0.4)',
-              ],
-            }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            {t('welcome.title')}
+          <CosmicConstellationLogo />
+          <motion.h1 className="cosmic-title text-4xl font-black mb-4">
+            <span className="cosmic-title-cipher">{t('welcome.title')}</span>
           </motion.h1>
 
-          <p className="text-soft-grey text-xl">
-            {t('welcome.subtitle')}
-          </p>
+          <p className="text-soft-grey text-xl">{t('welcome.subtitle')}</p>
         </div>
 
-        {/* User ID Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="glass-card p-6 mb-6"
+          className="cosmic-glass-card p-6 mb-6 relative"
         >
+          <div className="cosmic-glow-border" aria-hidden="true" />
           <label className="text-xs uppercase tracking-wider text-muted-grey font-semibold mb-2 block">
             {t('welcome.unique_id')}
           </label>
           <div className="flex items-center gap-3 justify-between">
             <motion.code
               className="text-3xl font-bold font-mono"
-              style={{ color: 'var(--quantum-cyan)' }}
+              style={{ color: 'var(--cosmic-cyan)' }}
               animate={{
                 textShadow: [
                   '0 0 10px rgba(0, 229, 255, 0.4)',
@@ -255,35 +250,36 @@ export default function Welcome() {
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={copyUserId}
-              className="p-3 rounded-lg bg-dark-matter-lighter hover:bg-quantum-cyan/20 transition-colors"
-              title="Copier"
-              aria-label={copied ? 'Identifiant copié' : 'Copier l\'identifiant unique'}
+              className="px-3 py-2 rounded-lg border border-[rgba(0,240,255,0.18)] bg-[rgba(10,18,40,0.7)] hover:bg-[rgba(0,240,255,0.12)] transition-colors text-xs font-semibold tracking-[0.2em]"
+              title={t('common.copy')}
+              aria-label={copied ? t('welcome.copied_id') : t('welcome.copy_id_aria')}
             >
-              {copied ? '✅' : '📋'}
+              {copied ? t('common.done') : t('common.copy')}
             </motion.button>
           </div>
           <p className="text-sm text-soft-grey mt-2">@{username}</p>
         </motion.div>
 
-        {/* Checksums Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="glass-card p-6 mb-6"
+          className="cosmic-glass-card p-6 mb-6 relative"
         >
+          <div className="cosmic-glow-border" aria-hidden="true" />
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-pure-white flex items-center gap-2">
+              <span className="cosmic-badge-cyan">VAULT</span>
               {t('welcome.checksums', { count: checksums.length })}
             </h3>
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={copyAllChecksums}
-              className="px-3 py-2 text-sm rounded-lg bg-dark-matter-lighter hover:bg-quantum-cyan/20 transition-colors"
+              className="px-3 py-2 text-sm rounded-lg border border-[rgba(0,240,255,0.18)] bg-[rgba(10,18,40,0.7)] hover:bg-[rgba(0,240,255,0.12)] transition-colors"
               title={t('welcome.copy_all')}
             >
-              {copiedChecksums ? t('welcome.copied') : t('welcome.copy_all')}
+              {copiedChecksums ? t('common.done') : t('welcome.copy_all')}
             </motion.button>
           </div>
 
@@ -294,48 +290,46 @@ export default function Welcome() {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.5 + idx * 0.01 }}
-                className="flex flex-col items-center gap-1 p-2 bg-dark-matter-lighter rounded-lg hover:bg-dark-matter-light transition-colors"
+                className="flex flex-col items-center gap-1 p-2 bg-dark-matter-lighter rounded-lg hover:bg-dark-matter-light transition-colors border border-[rgba(0,240,255,0.12)]"
               >
-                <span className="text-quantum-cyan text-xs font-bold">{t('welcome.series_number', { number: idx + 1 })}</span>
+                <span className="text-xs font-bold" style={{ color: 'var(--cosmic-cyan)' }}>
+                  {t('welcome.series_number', { number: idx + 1 })}
+                </span>
                 <span className="checksum text-center text-sm">{checksum}</span>
               </motion.div>
             ))}
           </div>
 
-          {/* SECURITY FIX VULN-005: Sanitize translation HTML */}
           <p className="text-xs text-muted-grey mt-4 text-center" dangerouslySetInnerHTML={createSafeHTML(t('welcome.note_numbered'))} />
         </motion.div>
 
-        {/* Critical Warning */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="glass-card p-6 mb-8 border-l-4"
+          className="cosmic-glass-card p-6 mb-8 border-l-4 relative"
           style={{ borderLeftColor: 'var(--error-glow)' }}
         >
+          <div className="cosmic-glow-border" aria-hidden="true" />
           <div className="flex items-start gap-4">
             <motion.span
-              animate={{
-                scale: [1, 1.1, 1],
-              }}
+              animate={{ scale: [1, 1.1, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
-              className="text-4xl"
+              className="cosmic-badge-violet"
             >
-              ⚠️
+              {t('common.warning')}
             </motion.span>
             <div>
               <h4 className="font-bold text-pure-white mb-3 text-xl">
                 {t('welcome.critical_warning')}
               </h4>
-              {/* SECURITY FIX VULN-005: Sanitize all translation HTML */}
               <div className="space-y-3 text-sm text-soft-grey">
                 <div className="flex items-start gap-2">
-                  <span className="text-quantum-cyan font-bold">1.</span>
+                  <span className="font-bold" style={{ color: 'var(--cosmic-cyan)' }}>1.</span>
                   <span dangerouslySetInnerHTML={createSafeHTML(t('welcome.warning_id', { id: userId }))} />
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-quantum-cyan font-bold">2.</span>
+                  <span className="font-bold" style={{ color: 'var(--cosmic-cyan)' }}>2.</span>
                   <span dangerouslySetInnerHTML={createSafeHTML(t('welcome.warning_checksums'))} />
                 </div>
               </div>
@@ -346,7 +340,6 @@ export default function Welcome() {
           </div>
         </motion.div>
 
-        {/* CTA */}
         {verificationStep === 'display' && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -358,39 +351,33 @@ export default function Welcome() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleStartVerification}
-              className="btn btn-primary text-xl px-12 py-4"
-              style={{
-                background: 'linear-gradient(135deg, var(--quantum-cyan), var(--magenta-trust))',
-              }}
+              className="cosmic-cta text-xl px-12 py-4"
             >
-              {t('welcome.noted_verify')}
+              <span>{t('welcome.noted_verify')}</span>
+              <div className="cosmic-cta-glow" aria-hidden="true" />
             </motion.button>
 
-            <p className="text-xs text-muted-grey mt-4">
-              {t('welcome.verify_hint')}
-            </p>
+            <p className="text-xs text-muted-grey mt-4">{t('welcome.verify_hint')}</p>
           </motion.div>
         )}
 
-        {/* Verification Step */}
         {verificationStep === 'verify' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mt-8"
           >
-            <div className="glass-card p-8">
+            <div className="cosmic-glass-card p-8 relative">
+              <div className="cosmic-glow-border" aria-hidden="true" />
               <h3 className="text-2xl font-bold mb-4 text-pure-white text-center">
                 {t('welcome.verification_title')}
               </h3>
-              <p className="text-soft-grey text-center mb-6">
-                {t('welcome.verification_desc')}
-              </p>
+              <p className="text-soft-grey text-center mb-6">{t('welcome.verification_desc')}</p>
 
               <div className="space-y-4 mb-6">
                 {randomChecksums.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-4">
-                    <span className="text-quantum-cyan font-mono font-bold w-24">
+                    <span className="font-mono font-bold w-24" style={{ color: 'var(--cosmic-cyan)' }}>
                       {t('welcome.series_label', { number: item.index + 1 })}
                     </span>
                     <input
@@ -398,7 +385,7 @@ export default function Welcome() {
                       value={userInputs[idx]}
                       onChange={(e) => handleInputChange(idx, e.target.value)}
                       placeholder={t('welcome.checksum_placeholder')}
-                      className="input flex-1 font-mono"
+                      className="cosmic-input cosmic-input-plain flex-1 font-mono"
                       autoFocus={idx === 0}
                     />
                   </div>
@@ -409,7 +396,7 @@ export default function Welcome() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-4 p-3 bg-error-glow/10 border border-error-glow/30 rounded-lg"
+                  className="cosmic-alert-error mb-4"
                   role="alert"
                   aria-live="polite"
                 >
@@ -423,7 +410,7 @@ export default function Welcome() {
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setVerificationStep('display')}
                   disabled={isCreatingAccount}
-                  className="btn btn-ghost flex-1"
+                  className="cosmic-btn-ghost flex-1"
                 >
                   {t('welcome.back')}
                 </motion.button>
@@ -432,26 +419,26 @@ export default function Welcome() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleVerification}
-                  disabled={userInputs.some(input => input.trim() === '') || isCreatingAccount}
-                  className="btn btn-primary flex-1"
+                  disabled={userInputs.some((input) => input.trim() === '') || isCreatingAccount}
+                  className="cosmic-cta flex-1"
                 >
-                  {isCreatingAccount ? t('welcome.creating_account') : t('welcome.verify_create')}
+                  <span>{isCreatingAccount ? t('welcome.creating_account') : t('welcome.verify_create')}</span>
+                  <div className="cosmic-cta-glow" aria-hidden="true" />
                 </motion.button>
               </div>
             </div>
           </motion.div>
         )}
 
-        {/* Security Badges */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
           className="flex justify-center gap-3 mt-8"
         >
-          <div className="badge badge-quantum">🔐 {t('welcome.security_badges.zero_knowledge')}</div>
-          <div className="badge badge-trust">🌌 {t('welcome.security_badges.entropy')}</div>
-          <div className="badge badge-quantum">🎲 {t('welcome.security_badges.dicekey')}</div>
+          <div className="cosmic-badge-cyan">SECURE {t('welcome.security_badges.zero_knowledge')}</div>
+          <div className="cosmic-badge-violet">VOID {t('welcome.security_badges.entropy')}</div>
+          <div className="cosmic-badge-cyan">DICE {t('welcome.security_badges.dicekey')}</div>
         </motion.div>
       </motion.div>
     </div>

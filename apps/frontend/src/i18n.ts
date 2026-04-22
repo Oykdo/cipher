@@ -2,8 +2,8 @@
  * i18n Configuration - react-i18next
  * 
  * Supports 6 languages:
- * - French (fr) - Default
- * - English (en)
+ * - English (en) - Default
+ * - French (fr)
  * - German (de)
  * - Spanish (es)
  * - Chinese Simplified (zh-CN)
@@ -38,8 +38,8 @@ i18n
   .use(initReactI18next) // Pass i18n instance to react-i18next
   .init({
     resources,
-    fallbackLng: 'fr', // Default language
-    lng: localStorage.getItem('dd-lang') || 'fr', // Get saved language or default to French
+    fallbackLng: 'en', // Default language
+    lng: localStorage.getItem('dd-lang') || 'en', // Get saved language or default to English
     
     // Supported languages
     supportedLngs: ['fr', 'en', 'de', 'es', 'zh-CN', 'it'],
@@ -75,4 +75,3 @@ i18n.on('languageChanged', (lng) => {
 });
 
 export default i18n;
-

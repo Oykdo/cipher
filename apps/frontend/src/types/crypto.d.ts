@@ -8,6 +8,10 @@ declare global {
   interface Uint8Array {
     readonly buffer: ArrayBuffer;
   }
+
+  interface RTCConfiguration {
+    encodedInsertableStreams?: boolean;
+  }
 }
 
 export {};

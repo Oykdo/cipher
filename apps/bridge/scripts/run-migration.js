@@ -15,7 +15,7 @@ const { Pool } = pg;
 // Load environment variables from .env file
 dotenv.config({ path: join(dirname(__dirname), '.env') });
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/cipher_pulse';
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/cipher';
 
 async function runMigration() {
   console.log('🚀 Starting e2ee-v2 migration...');

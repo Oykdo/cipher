@@ -4,8 +4,8 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 
 // Configuration
-const SQLITE_DB_PATH = process.env.BRIDGE_DATA_DIR ? join(process.env.BRIDGE_DATA_DIR, 'dead-drop-migration.db') : './data/dead-drop-migration.db';
-const POSTGRES_URL = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/cipherpulse';
+const SQLITE_DB_PATH = process.env.BRIDGE_DATA_DIR ? join(process.env.BRIDGE_DATA_DIR, 'cipher-migration.db') : './data/cipher-migration.db';
+const POSTGRES_URL = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/cipher';
 
 if (!existsSync(SQLITE_DB_PATH)) {
     console.error(`❌ Source database not found at ${SQLITE_DB_PATH}`);

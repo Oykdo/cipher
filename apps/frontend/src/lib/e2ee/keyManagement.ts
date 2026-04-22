@@ -18,6 +18,9 @@ import {
   type KeyBundle,
   type SignedPreKey,
   signData,
+  encryptSymmetric,
+  decryptSymmetric,
+  deriveEncryptionKey,
 } from './index';
 import { getExistingE2EEVault } from '../keyVault';
 import { getMasterKeyHex } from '../secureKeyAccess';
@@ -382,9 +385,6 @@ export async function exportIdentityKeys(
     throw new Error('No identity keys found');
   }
 
-  // Import encryption utilities
-  const { encryptSymmetric, deriveEncryptionKey } = await import('./index');
-
   // Derive key from password
   const passwordBytes = new TextEncoder().encode(password);
   const salt = new Uint8Array(32); // Could use random salt and include it
@@ -412,9 +412,6 @@ export async function importIdentityKeys(
   encryptedBackup: string,
   password: string
 ): Promise<void> {
-  // Import encryption utilities
-  const { decryptSymmetric, deriveEncryptionKey } = await import('./index');
-
   // Derive key from password
   const passwordBytes = new TextEncoder().encode(password);
   const salt = new Uint8Array(32);
@@ -435,4 +432,3 @@ export async function importIdentityKeys(
   await vault.storeData(`e2ee:identity:${username}`, keysJson);
   debugLogger.info('✅ [E2EE] Imported identity keys for user: ${username}');
 }
-

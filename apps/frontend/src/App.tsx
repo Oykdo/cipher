@@ -4,14 +4,13 @@ import { useAuthStore } from './store/auth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { proactiveTokenRefresh } from './services/api-interceptor';
 import { useKeyInitialization } from './hooks/useKeyInitialization';
+import { AppLockOverlay } from './components/AppLockOverlay';
+import { useAppLockActivity } from './hooks/useAppLockActivity';
 
 const Landing = lazy(() => import('./screens/Landing'));
-const Login = lazy(() => import('./screens/Login'));
 const LoginNew = lazy(() => import('./screens/LoginNew'));
 const Welcome = lazy(() => import('./screens/Welcome'));
-const Signup = lazy(() => import('./screens/Signup'));
 const SignupFluid = lazy(() => import('./screens/SignupFluid'));
-const LoginFluid = lazy(() => import('./screens/LoginFluid'));
 const Discover = lazy(() => import('./screens/Discover'));
 const Conversations = lazy(() => import('./screens/Conversations'));
 const Settings = lazy(() => import('./screens/Settings').then(m => ({ default: m.Settings })));
@@ -19,6 +18,7 @@ const P2PChat = lazy(() => import('./screens/P2PChat'));
 const MonitoringDashboard = lazy(() => import('./screens/MonitoringDashboard'));
 const NotFound = lazy(() => import('./screens/NotFound'));
 const Recovery = lazy(() => import('./screens/Recovery'));
+const GenesisAnimation = lazy(() => import('./screens/GenesisAnimation'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const session = useAuthStore((state) => state.session);
@@ -46,6 +46,11 @@ function App() {
   const session = useAuthStore((state) => state.session);
   // Consider authenticated if both user and token exist
   const isAuthenticated = !!session?.user?.id && !!session?.accessToken;
+
+  // App-lock: tracks user activity + auto-locks after 30 min idle. Mounted at
+  // the root so a single listener covers every screen. No-op when the PIN
+  // feature is disabled in Settings.
+  useAppLockActivity();
 
   // Initialize e2ee-v2 keys automatically for logged-in users
   const keyInit = useKeyInitialization();
@@ -85,16 +90,12 @@ function App() {
           {/* Discover Page */}
           <Route path="/discover" element={<Discover />} />
 
-          {/* Auth Routes - Use New versions */}
+          {/* Auth Routes */}
           <Route path="/login" element={<LoginNew />} />
-          <Route path="/login-fluid" element={<LoginFluid />} />
           <Route path="/signup" element={<SignupFluid />} />
           <Route path="/welcome" element={<Welcome />} />
           <Route path="/recovery" element={<Recovery />} />
-
-          {/* Legacy Routes (keep for compatibility) */}
-          <Route path="/login-old" element={<Login />} />
-          <Route path="/signup-old" element={<Signup />} />
+          <Route path="/genesis" element={<GenesisAnimation />} />
 
           {/* Protected Routes */}
           <Route
@@ -139,6 +140,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      <AppLockOverlay />
     </ErrorBoundary>
   );
 }

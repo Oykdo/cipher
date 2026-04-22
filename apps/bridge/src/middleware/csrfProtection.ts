@@ -75,11 +75,16 @@ export function csrfProtection() {
             '/api/v2/auth/login',
             '/api/v2/auth/login-dicekey',
             '/api/v2/auth/login-with-avatar',
+            '/api/v2/auth/eidolon-bridge/session',
+            '/api/v2/auth/vault-token/redeem',
+            '/api/v2/auth/eidolon-connect/session',
+            '/api/v2/auth/qr/',
             '/api/v2/auth/srp/login/init',
             '/api/v2/auth/srp/login/verify',
             '/api/v2/auth/srp-seed/login/init',
             '/api/v2/auth/srp-seed/login/verify',
             '/api/v2/auth/refresh',
+            '/api/v2/vault/keybundle/import', // Pre-auth: runs on /login before any JWT exists
             '/api/public/stripe/create-checkout-session',
             '/api/public/stripe/webhook',
             '/api/generate-dicekey-avatar' // Part of signup flow, no JWT yet

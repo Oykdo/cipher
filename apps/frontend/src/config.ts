@@ -1,7 +1,7 @@
 const RUNTIME_ORIGIN =
   typeof window !== 'undefined' && window.location ? window.location.origin : '';
 
-const isLocalhostUrl = (value: string) => {
+export const isLocalhostUrl = (value: string) => {
   try {
     const url = new URL(value);
     return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
@@ -26,6 +26,15 @@ const DEFAULT_WS_BASE_URL = import.meta.env.PROD
 export const API_BASE_URL = import.meta.env.PROD
   ? pickProdUrl(import.meta.env.VITE_API_BASE_URL, DEFAULT_API_BASE_URL)
   : import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
+
+export const API_SUPPORTS_LOCAL_PSNX = isLocalhostUrl(API_BASE_URL);
+
+export const EIDOLON_CONNECT_APP_ID =
+  import.meta.env.VITE_EIDOLON_CONNECT_APP_ID || 'cipher.desktop';
+export const EIDOLON_CONNECT_BASE_URL =
+  import.meta.env.VITE_EIDOLON_CONNECT_URL || 'http://127.0.0.1:8000';
+export const EIDOLON_CONNECT_SESSION_SECRET =
+  import.meta.env.VITE_EIDOLON_CONNECT_SESSION_SECRET || '';
 
 export const WS_BASE_URL = import.meta.env.PROD
   ? pickProdUrl(import.meta.env.VITE_WS_BASE_URL, DEFAULT_WS_BASE_URL)
@@ -84,6 +93,6 @@ export const FEDERATION_CONFIG = {
 // Local Network Discovery (mDNS/LAN)
 export const LAN_CONFIG = {
   enabled: import.meta.env.VITE_LAN_DISCOVERY_ENABLED === 'true',
-  serviceName: '_cipherpulse._tcp',
+  serviceName: '_cipher._tcp',
   broadcastInterval: 5000, // 5 seconds
 };

@@ -10,6 +10,7 @@
  */
 
 import { initializeCrypto, type EncryptedData, type KeyBundle } from './index';
+import { getExistingE2EEVault } from '../keyVault';
 import {
   getOrCreateIdentityKeys,
   storePeerPublicKey,
@@ -26,6 +27,8 @@ import {
   clearAllSessions,
   resetSessionToNaClBox,
   getEncryptionModePreference,
+  initiateSession,
+  createDoubleRatchetSession,
 } from './sessionManager';
 import { base64ToBytes, bytesToBase64, generateFingerprint } from './index';
 import { useAuthStore } from '../../store/auth';
@@ -39,6 +42,7 @@ import {
   type PublicKeyBundle,
 } from './x3dhManager';
 import { debugLogger } from '../debugLogger';
+import { apiv2 } from '../../services/api-v2';
 
 // ============================================================================
 // SERVICE STATE
@@ -89,7 +93,6 @@ export async function initializeE2EE(username: string): Promise<void> {
   await initializeCrypto();
 
   // Verify E2EE vault is initialized (keyed by masterKey, not the local device password)
-  const { getExistingE2EEVault } = await import('../keyVault');
   const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized - cannot initialize E2EE. Please re-login.');
@@ -134,7 +137,6 @@ export async function ensureE2EEInitializedForSession(username?: string): Promis
     throw new Error('No active session available for E2EE initialization. Please log in again.');
   }
 
-  const { getExistingE2EEVault } = await import('../keyVault');
   const vault = getExistingE2EEVault();
   if (!vault) {
     throw new Error('KeyVault not initialized - unlock with your password and retry.');
@@ -160,9 +162,6 @@ export async function publishKeyBundleToServer(): Promise<void> {
   }
 
   try {
-    // Import dynamically to avoid circular dependency
-    const { apiv2 } = await import('../../services/api-v2');
-
     const keyBundle = await createKeyBundle(currentIdentityKeys);
 
     // Validate and convert types to ensure Zod validation passes on server
@@ -603,7 +602,6 @@ export async function resetPeerSession(peerUsername: string): Promise<void> {
   const peerKey = await retrievePeerPublicKey(currentUsername, peerUsername);
   if (peerKey) {
     // Re-create session with fresh ratchet state
-    const { initiateSession } = await import('./sessionManager');
     await initiateSession(
       currentUsername,
       peerUsername,
@@ -724,7 +722,6 @@ async function ensureX3DHInitialized(): Promise<void> {
   try {
     // Set up OPK replenishment callback before initializing
     setPublishOPKsCallback(async (opks) => {
-      const { apiv2 } = await import('../../services/api-v2');
       await apiv2.replenishOPKs(opks);
     });
     
@@ -750,8 +747,6 @@ async function ensureX3DHInitialized(): Promise<void> {
  */
 async function publishX3DHKeyBundle(bundle: PublicKeyBundle): Promise<void> {
   try {
-    const { apiv2 } = await import('../../services/api-v2');
-    
     // Convert to server format (includes signingKey for Ed25519 SPK verification)
     const serverBundle = {
       identityKey: bytesToBase64(bundle.identityKey),
@@ -806,8 +801,6 @@ export async function handleIncomingHandshakeMessage(
     debugLogger.info('✅ [E2EE Service] X3DH handshake completed with ${peerUsername} (as responder)');
     
     // Create Double Ratchet session for Bob
-    const { createDoubleRatchetSession } = await import('./sessionManager');
-    
     // Get peer's public key from the message
     const message = JSON.parse(messageJson);
     const peerPublicKey = base64ToBytes(message.senderIdentityKey);
@@ -859,8 +852,6 @@ export async function initiateX3DHSession(peerUsername: string): Promise<void> {
   }
   
   // Fetch peer's X3DH key bundle from server
-  const { apiv2 } = await import('../../services/api-v2');
-  
   try {
     // Use consume-opk endpoint to atomically get and consume an OPK
     const response = await apiv2.consumeOPK(peerUsername);
@@ -910,7 +901,6 @@ export async function initiateX3DHSession(peerUsername: string): Promise<void> {
     if (!currentUsername) {
       throw new Error('Current username not set');
     }
-    const { createDoubleRatchetSession } = await import('./sessionManager');
     await createDoubleRatchetSession(
       currentUsername,
       peerUsername,
@@ -963,4 +953,3 @@ export function getSigningKeyPair(): { publicKey: Uint8Array; privateKey: Uint8A
   }
   return currentIdentityKeys.signingKeyPair;
 }
-

@@ -3,6 +3,10 @@ import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth";
 import { authFetchV2WithRefresh } from "../../services/api-interceptor";
 import { LanguageSelector } from "../LanguageSelector";
+import { AtomLoader } from "../ui";
+import { HolographicAvatar } from "../HolographicAvatar";
+import { useVaultFingerprint } from "../../hooks/useVaultFingerprint";
+import { formatVaultHandle } from "../../lib/vaultHandle";
 
 export function GeneralSettings() {
     const { t, i18n } = useTranslation();
@@ -13,6 +17,8 @@ export function GeneralSettings() {
     const [stats, setStats] = useState({ conversationsCount: 0, messagesSent: 0 });
 
     const hasAccessToken = !!session?.accessToken;
+    const linkedVault = session?.user?.linkedVault;
+    const fingerprint = useVaultFingerprint();
 
     useEffect(() => {
         if (!hasAccessToken) {
@@ -23,60 +29,53 @@ export function GeneralSettings() {
             setLoading(true);
             setError(null);
             try {
-                const data = await authFetchV2WithRefresh('/users/me');
+                const data = await authFetchV2WithRefresh("/users/me");
                 setUserDetails(data);
-                
-                // Load stats from API
+
                 try {
-                    // Fetch conversations to count them
-                    const conversationsData = await authFetchV2WithRefresh('/conversations');
+                    const conversationsData = await authFetchV2WithRefresh("/conversations");
                     const conversationsCount = conversationsData?.conversations?.length || 0;
-                    
-                    // Count messages across all conversations
+
                     let totalMessagesSent = 0;
                     if (conversationsData?.conversations) {
                         for (const conv of conversationsData.conversations) {
                             try {
                                 const messagesData = await authFetchV2WithRefresh(`/conversations/${conv.id}/messages`);
                                 if (messagesData?.messages) {
-                                    // Count only messages sent by current user
                                     const sentByUser = messagesData.messages.filter(
                                         (m: any) => m.senderId === session?.user?.id
                                     );
                                     totalMessagesSent += sentByUser.length;
                                 }
                             } catch (msgErr) {
-                                // Skip if conversation messages can't be loaded
                                 console.warn(`Failed to load messages for conversation ${conv.id}:`, msgErr);
                             }
                         }
                     }
-                    
+
                     setStats({
                         conversationsCount,
-                        messagesSent: totalMessagesSent
+                        messagesSent: totalMessagesSent,
                     });
                 } catch (statsErr) {
-                    console.error('Failed to load stats:', statsErr);
+                    console.error("Failed to load stats:", statsErr);
                 }
             } catch (err) {
-                console.error('Failed to load user details:', err);
-                setError(err instanceof Error ? err.message : t('errors.unknown_error'));
+                console.error("Failed to load user details:", err);
+                setError(err instanceof Error ? err.message : t("errors.unknown_error"));
             } finally {
                 setLoading(false);
             }
         };
 
         void loadUserDetails();
-    }, [hasAccessToken, session?.user?.id]);
+    }, [hasAccessToken, session?.user?.id, t]);
 
     const formatDate = (timestamp: string | number) => {
         return new Date(timestamp).toLocaleString(i18n.language, {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+            year: "numeric",
+            month: "long",
+            day: "numeric",
         });
     };
 
@@ -84,106 +83,142 @@ export function GeneralSettings() {
         navigator.clipboard.writeText(text);
     };
 
+    const securityBadge = session?.user?.securityTier === "dice-key"
+        ? {
+            className: "border-fuchsia-400/30 bg-fuchsia-400/12 text-fuchsia-200",
+            label: t("settings.general_settings.security_level_dicekey"),
+        }
+        : linkedVault?.vaultId
+            ? {
+                className: "border-cyan-400/30 bg-cyan-400/12 text-cyan-200",
+                label: t("settings.general_settings.security_level_eidolon_approx", { bits: "8,000" }),
+            }
+            : {
+                className: "border-cyan-400/30 bg-cyan-400/12 text-cyan-200",
+                label: t("settings.general_settings.security_level_standard", { bits: userDetails?.keyBits || 256 }),
+            };
+
+    const handle = formatVaultHandle(linkedVault?.vaultName, linkedVault?.vaultNumber);
+
     return (
         <div className="space-y-6">
-            {/* États globaux */}
             {!hasAccessToken && (
-                <div className="p-3 rounded bg-amber-500/10 border border-amber-500/40 text-sm text-amber-300">
-                    {t('settings.general_settings.invalid_session')}
+                <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 shadow-[0_0_24px_rgba(245,158,11,0.12)]">
+                    {t("settings.general_settings.invalid_session")}
                 </div>
             )}
 
             {loading && hasAccessToken && (
-                <div className="p-3 rounded bg-slate-900/60 border border-slate-700 text-sm text-slate-300">
-                    {t('settings.general_settings.loading_account_info')}
+                <div className="cosmic-glass-card rounded-2xl px-4 py-6">
+                    <div className="flex items-center justify-center">
+                        <AtomLoader size="lg" />
+                    </div>
                 </div>
             )}
 
             {error && (
-                <div className="p-3 rounded bg-red-500/10 border border-red-500/40 text-sm text-red-300">
-                    {t('settings.general_settings.error_loading_info')} {error}
+                <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 shadow-[0_0_24px_rgba(248,113,113,0.12)]">
+                    {t("settings.general_settings.error_loading_info")} {error}
                 </div>
             )}
 
-            <div>
-                <h2 className="text-xl font-semibold text-white mb-4">{t('settings.general_settings.account_info_title')}</h2>
-                <div className="space-y-3">
-                    <div className="flex justify-between items-center py-3 border-b border-slate-800">
-                        <span className="text-slate-400">{t('settings.general_settings.username')}</span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-white font-medium">@{session?.user?.username}</span>
-                            <button
-                                onClick={() => copyToClipboard(session?.user?.username || '')}
-                                className="text-slate-500 hover:text-brand-400 transition-colors"
-                                title={t('settings.general_settings.copy')}
+            {/* Identity card — single source of truth for "who I am". */}
+            {linkedVault && (
+                <div className="cosmic-glass-card cosmic-glow-border overflow-hidden rounded-3xl border border-cyan-400/15 p-6 shadow-[0_18px_60px_rgba(8,47,73,0.22)]">
+                    <div className="flex flex-col items-center gap-4 text-center">
+                        <HolographicAvatar
+                            seed={linkedVault.vaultId}
+                            size={120}
+                            tier={fingerprint?.pioneerTier}
+                            spinorSignature={fingerprint?.spinorSignature}
+                            bellMax={fingerprint?.bellMax}
+                            bellIsQuantum={fingerprint?.bellIsQuantum}
+                            prismHueOffset={fingerprint?.prismHueOffset}
+                            depthLevel={fingerprint?.depthLevel}
+                            createdAt={fingerprint?.createdAt}
+                            forceMaxDetail
+                        />
+                        <div className="flex flex-col items-center gap-2">
+                            <div className="font-mono text-2xl font-semibold tracking-tight text-white">
+                                {handle}
+                            </div>
+                            <span
+                                className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${securityBadge.className}`}
                             >
-                                📋
-                            </button>
-                        </div>
-                    </div>
-                    <div className="flex justify-between items-center py-3 border-b border-slate-800">
-                        <span className="text-slate-400">{t('settings.general_settings.security_level')}</span>
-                        <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${session?.user?.securityTier === 'dice-key'
-                                ? 'bg-purple-500/20 text-purple-400'
-                                : 'bg-blue-500/20 text-blue-400'
-                                }`}>
-                                {session?.user?.securityTier === 'dice-key'
-                                    ? t('settings.general_settings.security_level_dicekey')
-                                    : t('settings.general_settings.security_level_standard', { bits: userDetails?.keyBits || 256 })}
+                                {securityBadge.label}
                             </span>
                         </div>
                     </div>
-                    <div className="flex justify-between items-center py-3 border-b border-slate-800">
-                        <span className="text-slate-400">{t('settings.general_settings.user_id')}</span>
+                </div>
+            )}
+
+            {/* Compact account details — no vault-id noise, just the human-readable bits. */}
+            <div>
+                <h2 className="mb-4 text-xl font-semibold text-white">
+                    {t("settings.general_settings.account_info_title")}
+                </h2>
+                <div className="cosmic-glass-card rounded-3xl border border-white/10 p-5 shadow-[0_12px_40px_rgba(2,6,23,0.18)]">
+                    <div className="flex items-center justify-between border-b border-white/10 py-3">
+                        <span className="text-slate-400">{t("settings.general_settings.username")}</span>
                         <div className="flex items-center gap-2">
-                            <span className="text-white font-mono text-sm">{session?.user?.id?.substring(0, 12)}...</span>
+                            <span className="font-medium text-white">@{linkedVault?.vaultName || session?.user?.username}</span>
                             <button
-                                onClick={() => copyToClipboard(session?.user?.id || '')}
-                                className="text-slate-500 hover:text-brand-400 transition-colors"
-                                title={t('settings.general_settings.copy_full_id')}
+                                onClick={() => copyToClipboard(linkedVault?.vaultName || session?.user?.username || "")}
+                                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300 transition hover:border-cyan-300/40 hover:text-cyan-200"
+                                title={t("settings.general_settings.copy")}
                             >
-                                📋
+                                COPY
                             </button>
                         </div>
                     </div>
                     {userDetails?.createdAt && (
-                        <div className="flex justify-between items-center py-3">
-                            <span className="text-slate-400">{t('settings.general_settings.account_created_at')}</span>
-                            <span className="text-white font-medium">{formatDate(userDetails.createdAt)}</span>
+                        <div className="flex items-center justify-between py-3">
+                            <span className="text-slate-400">
+                                {t("settings.general_settings.account_created_at")}
+                            </span>
+                            <span className="font-medium text-white">{formatDate(userDetails.createdAt)}</span>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Language Selection */}
-            <div>
-                <h2 className="text-xl font-semibold text-white mb-4">{t('settings.general_settings.language')}</h2>
-                <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800">
-                    <p className="text-slate-400 text-sm mb-4">{t('settings.general_settings.select_language')}</p>
+            <div className="relative z-20">
+                <h2 className="mb-4 text-xl font-semibold text-white">
+                    {t("settings.general_settings.language")}
+                </h2>
+                <div className="cosmic-glass-card relative z-20 overflow-visible rounded-3xl border border-white/10 p-5 shadow-[0_12px_40px_rgba(2,6,23,0.18)]">
+                    <p className="mb-4 text-sm text-slate-300">
+                        {t("settings.general_settings.select_language")}
+                    </p>
                     <LanguageSelector />
                 </div>
             </div>
 
-            {/* Account Stats */}
             {userDetails && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800">
-                        <div className="text-slate-400 text-sm mb-1">{t('settings.general_settings.stats_conversations')}</div>
-                        <div className="text-white text-2xl font-bold">
-                            {stats.conversationsCount}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div className="cosmic-glass-card rounded-3xl border border-cyan-400/10 p-5 shadow-[0_12px_40px_rgba(8,47,73,0.16)]">
+                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-cyan-200/80">
+                            {t("settings.general_settings.stats_conversations")}
                         </div>
+                        <div className="text-2xl font-bold text-white">{stats.conversationsCount}</div>
                     </div>
-                    <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800">
-                        <div className="text-slate-400 text-sm mb-1">{t('settings.general_settings.stats_messages_sent')}</div>
-                        <div className="text-white text-2xl font-bold">
-                            {stats.messagesSent}
+                    <div className="cosmic-glass-card rounded-3xl border border-emerald-400/10 p-5 shadow-[0_12px_40px_rgba(6,78,59,0.16)]">
+                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-cyan-200/80">
+                            {t("settings.general_settings.stats_messages_sent")}
                         </div>
+                        <div className="text-2xl font-bold text-white">{stats.messagesSent}</div>
                     </div>
-                    <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800">
-                        <div className="text-slate-400 text-sm mb-1">{t('settings.general_settings.stats_active_days')}</div>
-                        <div className="text-white text-2xl font-bold">
-                            {userDetails.createdAt ? Math.floor((Date.now() - new Date(userDetails.createdAt).getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0}
+                    <div className="cosmic-glass-card rounded-3xl border border-blue-400/10 p-5 shadow-[0_12px_40px_rgba(30,64,175,0.14)]">
+                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-cyan-200/80">
+                            {t("settings.general_settings.stats_active_days")}
+                        </div>
+                        <div className="text-2xl font-bold text-white">
+                            {userDetails.createdAt
+                                ? Math.floor(
+                                      (Date.now() - new Date(userDetails.createdAt).getTime()) /
+                                          (1000 * 60 * 60 * 24)
+                                  ) + 1
+                                : 0}
                         </div>
                     </div>
                 </div>

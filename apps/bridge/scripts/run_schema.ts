@@ -2,7 +2,7 @@ import pg from 'pg';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const POSTGRES_URL = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/cipherpulse';
+const POSTGRES_URL = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/cipher';
 const SCHEMA_PATH = join(process.cwd(), 'scripts', 'schema_postgresql.sql');
 
 async function runSchema() {

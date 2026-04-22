@@ -1,10 +1,3 @@
-/**
- * Attachment Input Component
- * 
- * Provides file selection and preview for sending attachments
- * with Time Lock and Burn After Reading support
- */
-
 import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +20,6 @@ export function AttachmentInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [thumbnail, setThumbnail] = useState<string | null>(null);
 
-  // Generate thumbnail preview for images
   const generatePreview = useCallback(async (file: File) => {
     if (file.type.startsWith('image/')) {
       try {
@@ -62,7 +54,6 @@ export function AttachmentInput({
 
   return (
     <div className="attachment-input">
-      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -72,74 +63,48 @@ export function AttachmentInput({
         aria-label={t('attachments.select_file')}
       />
 
-      {/* Attachment button */}
       {!selectedFile && (
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
-          className="
-            text-quantum-cyan hover:text-quantum-cyan/80
-            transition-colors p-2 rounded-lg
-            hover:bg-quantum-cyan/10
-            disabled:opacity-50 disabled:cursor-not-allowed
-          "
+          className="transition-colors p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border border-[rgba(0,240,255,0.18)] text-[var(--cosmic-cyan)] hover:bg-[rgba(0,240,255,0.10)] hover:text-[var(--cosmic-cyan)]"
           aria-label={t('attachments.attach_file')}
           title={t('attachments.attach_file')}
         >
-          📎
+          FILE
         </button>
       )}
 
-      {/* File preview */}
       <AnimatePresence>
         {selectedFile && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="
-              flex items-center gap-3 p-3 
-              bg-dark-matter-lighter border border-quantum-cyan/30 
-              rounded-lg
-            "
+            className="flex items-center gap-3 p-3 bg-[rgba(6,12,26,0.82)] border border-[rgba(0,240,255,0.22)] rounded-lg backdrop-blur-xl"
           >
-            {/* Thumbnail or icon */}
             <div className="flex-shrink-0">
               {thumbnail ? (
-                <img
-                  src={thumbnail}
-                  alt={selectedFile.name}
-                  className="w-12 h-12 object-cover rounded"
-                />
+                <img src={thumbnail} alt={selectedFile.name} className="w-12 h-12 object-cover rounded" />
               ) : (
-                <div className="w-12 h-12 flex items-center justify-center text-2xl bg-dark-matter rounded">
+                <div className="w-12 h-12 flex items-center justify-center text-2xl bg-[rgba(255,255,255,0.04)] rounded border border-[rgba(0,240,255,0.12)]">
                   {getFileIcon(selectedFile.type)}
                 </div>
               )}
             </div>
 
-            {/* File info */}
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-pure-white font-medium truncate">
-                {selectedFile.name}
-              </p>
-              <p className="text-xs text-muted-grey">
-                {formatFileSize(selectedFile.size)}
-              </p>
+              <p className="text-sm text-pure-white font-medium truncate">{selectedFile.name}</p>
+              <p className="text-xs text-muted-grey">{formatFileSize(selectedFile.size)}</p>
             </div>
 
-            {/* Remove button */}
             <button
               onClick={handleClear}
-              className="
-                flex-shrink-0 text-error-glow hover:text-error-glow/80
-                transition-colors p-2 rounded-lg
-                hover:bg-error-glow/10
-              "
+              className="flex-shrink-0 text-error-glow hover:text-error-glow/80 transition-colors p-2 rounded-lg hover:bg-error-glow/10"
               aria-label={t('attachments.remove')}
               title={t('attachments.remove')}
             >
-              ✕
+              CLEAR
             </button>
           </motion.div>
         )}

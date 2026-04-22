@@ -55,7 +55,7 @@ export function LanguageSelector() {
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative z-30" ref={dropdownRef}>
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -83,7 +83,7 @@ export function LanguageSelector() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="absolute right-0 mt-2 w-56 rounded-lg bg-slate-800 border border-slate-700 shadow-xl overflow-hidden z-50"
+            className="absolute right-0 z-[100] mt-2 w-56 overflow-hidden rounded-lg border border-slate-700 bg-slate-800 shadow-xl"
           >
             <div className="py-1">
               {LANGUAGES.map((language) => (
@@ -145,4 +145,3 @@ export function LanguageSelectorCompact() {
     </div>
   );
 }
-

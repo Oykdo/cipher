@@ -9,6 +9,30 @@ interface CosmicLoaderProps {
   onComplete?: () => void;
 }
 
+function CosmicConstellationLogo() {
+  return (
+    <svg viewBox="0 0 96 96" className="cosmic-constellation" aria-hidden="true">
+      <defs>
+        <linearGradient id="cosmicLoaderCoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00f0ff" />
+          <stop offset="100%" stopColor="#7b2fff" />
+        </linearGradient>
+      </defs>
+      <circle cx="48" cy="48" r="19" fill="none" stroke="rgba(0,240,255,0.28)" strokeWidth="1.5">
+        <animate attributeName="r" values="16;21;16" dur="4s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.4;0.95;0.4" dur="4s" repeatCount="indefinite" />
+      </circle>
+      <path d="M20 30L48 48L73 20M48 48L25 73L74 74M48 48L76 46" fill="none" stroke="rgba(200,220,255,0.4)" strokeWidth="1.2" strokeLinecap="round" />
+      <circle cx="48" cy="48" r="7" fill="url(#cosmicLoaderCoreGradient)" />
+      <circle cx="20" cy="30" r="3.5" fill="#d9e3ff" />
+      <circle cx="73" cy="20" r="3" fill="#8ce8ff" />
+      <circle cx="25" cy="73" r="3" fill="#b78fff" />
+      <circle cx="74" cy="74" r="2.8" fill="#d9e3ff" />
+      <circle cx="76" cy="46" r="2.5" fill="#8ce8ff" />
+    </svg>
+  );
+}
+
 export default function CosmicLoader({ stage, progress = 0, onComplete }: CosmicLoaderProps) {
   const { t } = useTranslation();
   const [isBreakthrough, setIsBreakthrough] = useState(false);
@@ -17,25 +41,21 @@ export default function CosmicLoader({ stage, progress = 0, onComplete }: Cosmic
     {
       id: 'normalizing',
       label: t('cosmic_loader.stage_normalizing'),
-      icon: '🌀',
       description: t('cosmic_loader.stage_normalizing_desc'),
     },
     {
       id: 'argon2',
       label: t('cosmic_loader.stage_argon2'),
-      icon: '🔥',
       description: t('cosmic_loader.stage_argon2_desc'),
     },
     {
       id: 'hkdf',
       label: t('cosmic_loader.stage_hkdf'),
-      icon: '🔗',
       description: t('cosmic_loader.stage_hkdf_desc'),
     },
     {
       id: 'keygen',
       label: t('cosmic_loader.stage_keygen'),
-      icon: '🔐',
       description: t('cosmic_loader.stage_keygen_desc'),
     },
   ];
@@ -43,22 +63,23 @@ export default function CosmicLoader({ stage, progress = 0, onComplete }: Cosmic
   const currentStageIndex = stages.findIndex((s) => s.id === stage);
 
   useEffect(() => {
-    if (stage === 'complete' && progress >= 100) {
-      // Trigger breakthrough animation
-      setIsBreakthrough(true);
+    if (stage !== 'complete' || progress < 100) return;
 
-      // Wait for animation to finish before calling onComplete
-      const timer = setTimeout(() => {
-        if (onComplete) onComplete();
-      }, 1500); // 1.5s duration for the breakthrough effect
+    setIsBreakthrough(true);
+    const timer = setTimeout(() => {
+      if (onComplete) onComplete();
+    }, 1500);
 
-      return () => clearTimeout(timer);
-    }
+    return () => clearTimeout(timer);
   }, [stage, progress, onComplete]);
 
   return (
-    <div className="dark-matter-bg min-h-screen flex items-center justify-center p-8 overflow-hidden relative">
-      {/* Breakthrough Flash Overlay */}
+    <div className="cosmic-scene min-h-screen flex items-center justify-center p-8 overflow-hidden relative">
+      <div className="cosmic-nebula" aria-hidden="true" />
+      <div className="cosmic-stars" aria-hidden="true" />
+      <div className="cosmic-p2p-grid" aria-hidden="true" />
+      <div className="cosmic-volumetric" aria-hidden="true" />
+
       <AnimatePresence>
         {isBreakthrough && (
           <motion.div
@@ -75,15 +96,14 @@ export default function CosmicLoader({ stage, progress = 0, onComplete }: Cosmic
         animate={isBreakthrough ? {
           scale: [1, 1.5, 50],
           opacity: [1, 1, 0],
-          filter: ['blur(0px)', 'blur(0px)', 'blur(20px)']
+          filter: ['blur(0px)', 'blur(0px)', 'blur(20px)'],
         } : {
           opacity: 1,
-          scale: 1
+          scale: 1,
         }}
         transition={isBreakthrough ? { duration: 1.2, ease: "easeInOut" } : { duration: 0.5 }}
         className="max-w-2xl w-full text-center relative z-10"
       >
-        {/* Cosmic Rings */}
         <div className="flex justify-center mb-8">
           <div className={`cosmic-loader ${isBreakthrough ? 'accelerate' : ''}`}>
             <div className="cosmic-ring" />
@@ -92,7 +112,7 @@ export default function CosmicLoader({ stage, progress = 0, onComplete }: Cosmic
             <div className="cosmic-center">
               <motion.span
                 animate={{
-                  scale: [1, 1.2, 1],
+                  scale: [1, 1.08, 1],
                   rotate: [0, 180, 360],
                 }}
                 transition={{
@@ -100,14 +120,16 @@ export default function CosmicLoader({ stage, progress = 0, onComplete }: Cosmic
                   repeat: Infinity,
                   ease: 'linear',
                 }}
+                className="text-base"
+                aria-hidden="true"
               >
-                🔐
+                &#x2731;
               </motion.span>
             </div>
           </div>
         </div>
 
-        {/* Main Title */}
+        <CosmicConstellationLogo />
         <motion.h2
           animate={{
             textShadow: [
@@ -117,18 +139,15 @@ export default function CosmicLoader({ stage, progress = 0, onComplete }: Cosmic
             ],
           }}
           transition={{ duration: 2, repeat: Infinity }}
-          className="text-3xl font-black mb-4"
-          style={{ color: 'var(--quantum-cyan)' }}
+          className="cosmic-title text-3xl font-black mb-4"
         >
-          {t('cosmic_loader.title')}
+          <span className="cosmic-title-cipher">{t('cosmic_loader.title')}</span>
         </motion.h2>
 
-        <p className="text-soft-grey mb-8">
-          {t('cosmic_loader.subtitle')}
-        </p>
+        <p className="text-soft-grey mb-8">{t('cosmic_loader.subtitle')}</p>
 
-        {/* Stage Progress */}
-        <div className="glass-card p-8 mb-6">
+        <div className="cosmic-glass-card p-8 mb-6 relative">
+          <div className="cosmic-glow-border" aria-hidden="true" />
           <div className="space-y-4">
             {stages.map((s, idx) => {
               const isActive = idx === currentStageIndex;
@@ -140,58 +159,43 @@ export default function CosmicLoader({ stage, progress = 0, onComplete }: Cosmic
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.1 }}
-                  className={`flex items-center gap-4 p-4 rounded-xl transition-all ${isActive
-                    ? 'bg-quantum-cyan/10 border-2 border-quantum-cyan'
-                    : isComplete
-                      ? 'bg-success-glow/10'
-                      : 'bg-dark-matter-lighter/50'
-                    }`}
+                  className="cosmic-status-card"
                   style={{
-                    borderColor: isActive ? 'var(--quantum-cyan)' : 'transparent',
+                    borderColor: isActive ? 'var(--cosmic-cyan)' : undefined,
+                    boxShadow: isActive ? '0 0 0 1px rgba(0,240,255,0.18), 0 18px 40px rgba(0,0,0,0.35)' : undefined,
+                    background: isComplete
+                      ? 'linear-gradient(180deg, rgba(8, 18, 38, 0.95) 0%, rgba(6, 12, 26, 0.92) 100%)'
+                      : undefined,
                   }}
                 >
-                  {/* Icon */}
                   <motion.div
-                    animate={
-                      isActive
-                        ? {
-                          scale: [1, 1.2, 1],
-                          rotate: [0, 10, -10, 0],
-                        }
-                        : {}
-                    }
-                    transition={{ duration: 0.6, repeat: isActive ? Infinity : 0 }}
-                    className="text-3xl"
-                  >
-                    {isComplete ? '✅' : s.icon}
-                  </motion.div>
+                    animate={isActive ? { scale: [1, 1.3, 1] } : {}}
+                    transition={{ duration: 1, repeat: isActive ? Infinity : 0 }}
+                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${isComplete ? 'cosmic-dot cosmic-dot-cyan' : isActive ? 'cosmic-dot cosmic-dot-cyan' : 'cosmic-dot cosmic-dot-violet'}`}
+                    style={{ opacity: isComplete || isActive ? 1 : 0.4 }}
+                  />
 
-                  {/* Content */}
                   <div className="flex-1 text-left">
                     <div
-                      className={`font-semibold text-sm ${isActive
-                        ? 'text-quantum-cyan'
-                        : isComplete
-                          ? 'text-success-glow'
-                          : 'text-muted-grey'
-                        }`}
+                      className="font-semibold text-sm"
+                      style={{
+                        color: isActive
+                          ? 'var(--cosmic-cyan)'
+                          : isComplete
+                            ? 'var(--success-glow)'
+                            : 'var(--cosmic-text-secondary)',
+                      }}
                     >
                       {s.label}
                     </div>
-                    <div
-                      className={`text-xs ${isActive || isComplete ? 'text-soft-grey' : 'text-muted-grey'
-                        }`}
-                    >
-                      {s.description}
-                    </div>
+                    <div className="text-xs text-soft-grey">{s.description}</div>
                   </div>
 
-                  {/* Loading indicator */}
                   {isActive && (
                     <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      className="w-6 h-6 border-2 border-quantum-cyan border-t-transparent rounded-full"
+                      className="w-6 h-6 border-2 border-[var(--cosmic-cyan)] border-t-transparent rounded-full"
                     />
                   )}
                 </motion.div>
@@ -199,7 +203,6 @@ export default function CosmicLoader({ stage, progress = 0, onComplete }: Cosmic
             })}
           </div>
 
-          {/* Overall Progress Bar */}
           {progress > 0 && (
             <div className="mt-6">
               <div className="progress-container h-2">
@@ -217,34 +220,12 @@ export default function CosmicLoader({ stage, progress = 0, onComplete }: Cosmic
           )}
         </div>
 
-        {/* Entropy Info */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="flex items-center justify-center gap-4"
-        >
-          <div className="badge badge-quantum">
-            <span>🎲</span>
-            <span>{t('cosmic_loader.entropy_badge')}</span>
-          </div>
-          <div className="badge badge-trust">
-            <span>🛡️</span>
-            <span>{t('cosmic_loader.quantum_badge')}</span>
-          </div>
-        </motion.div>
-
-        {/* Fun Fact */}
         <motion.p
-          animate={{
-            opacity: [0.5, 1, 0.5],
-          }}
+          animate={{ opacity: [0.4, 0.7, 0.4] }}
           transition={{ duration: 3, repeat: Infinity }}
-          className="text-xs text-muted-grey mt-8"
+          className="text-xs text-muted-grey mt-6"
         >
-          {t('cosmic_loader.fun_fact')}
-          <br />
-          {t('cosmic_loader.fun_fact_2')}
+          {t('cosmic_loader.subtitle')}
         </motion.p>
       </motion.div>
     </div>

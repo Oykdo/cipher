@@ -191,7 +191,7 @@ export async function exportUserData(
       const blob = new Blob([JSON.stringify(encrypted, null, 2)], { type: 'application/json' });
       return {
         blob,
-        filename: `cipher-pulse-export-encrypted-${Date.now()}.json`,
+        filename: `cipher-export-encrypted-${Date.now()}.json`,
       };
     }
 
@@ -207,7 +207,7 @@ export async function exportUserData(
   // Add metadata
   exportData.version = 2;
   exportData.exportedAt = new Date().toISOString();
-  exportData.application = 'Cipher Pulse';
+  exportData.application = 'Cipher';
 
   const jsonData = JSON.stringify(exportData, null, 2);
 
@@ -216,14 +216,14 @@ export async function exportUserData(
     const blob = new Blob([JSON.stringify(encrypted, null, 2)], { type: 'application/json' });
     return {
       blob,
-      filename: `cipher-pulse-export-encrypted-${Date.now()}.json`,
+      filename: `cipher-export-encrypted-${Date.now()}.json`,
     };
   }
 
   const blob = new Blob([jsonData], { type: 'application/json' });
   return {
     blob,
-    filename: `cipher-pulse-export-${Date.now()}.json`,
+    filename: `cipher-export-${Date.now()}.json`,
   };
 }
 
@@ -233,7 +233,8 @@ export async function exportUserData(
 export async function importUserData(
   token: string,
   file: File,
-  password?: string
+  password: string | undefined,
+  currentUserId: string,
 ): Promise<{ success: boolean; message: string; imported: { conversations: number; messages: number } }> {
   const fileContent = await file.text();
   let parsedData: ExportedData | EncryptedExport;
@@ -265,6 +266,16 @@ export async function importUserData(
   const data = parsedData as ExportedData;
   if (!data.version || !data.conversations || !data.messages) {
     throw new Error('Invalid export file structure');
+  }
+
+  // Cross-account guard: the backup's `user.id` must match the logged-in user.
+  // Without this, Bob could hand Alice his export and she'd import his
+  // conversations/messages under her own account. The file has been decrypted
+  // client-side at this point so we have the plaintext ownerId.
+  if (data.user?.id && data.user.id !== currentUserId) {
+    throw new Error(
+      'This backup belongs to a different account and cannot be imported here.',
+    );
   }
 
   // Send to server for import

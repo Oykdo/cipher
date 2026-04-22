@@ -1,7 +1,7 @@
 /**
  * Logo Component - Project Chimera
  * 
- * Logo SVG Dead Drop avec gradient brand
+ * Logo SVG Cipher avec gradient brand
  */
 
 import { cn } from '../lib/utils';
@@ -11,7 +11,7 @@ export interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   /** Classe CSS supplémentaire */
   className?: string;
-  /** Afficher le texte "Dead Drop" */
+  /** Afficher le texte "Cipher" */
   showText?: boolean;
 }
 
@@ -30,7 +30,7 @@ export function Logo({ size = 'md', className, showText = false }: LogoProps) {
         viewBox="0 0 100 100"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        aria-label="Dead Drop Logo"
+        aria-label="Cipher Logo"
       >
         <defs>
           <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -48,7 +48,7 @@ export function Logo({ size = 'md', className, showText = false }: LogoProps) {
           </filter>
         </defs>
         
-        {/* Dead drop shape - stylized envelope/lockbox */}
+        {/* Cipher shape - stylized envelope/lockbox */}
         <g filter="url(#glow)">
           {/* Main container */}
           <rect 
@@ -113,7 +113,7 @@ export function Logo({ size = 'md', className, showText = false }: LogoProps) {
       
       {showText && (
         <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-200">
-          Dead Drop
+          Cipher
         </span>
       )}
     </div>

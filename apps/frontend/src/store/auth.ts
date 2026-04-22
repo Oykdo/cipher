@@ -3,10 +3,19 @@ import { persist } from 'zustand/middleware';
 
 export type SecurityTier = 'standard' | 'dice-key';
 
+export interface LinkedVault {
+  vaultId: string;
+  vaultNumber?: number | null;
+  vaultName?: string | null;
+  source?: string;
+  appId?: string;
+}
+
 interface User {
   id: string;
   username: string;
   securityTier: SecurityTier;
+  linkedVault?: LinkedVault;
 }
 
 export interface AuthSession {
@@ -20,6 +29,7 @@ interface AuthState {
   setSession: (session: AuthSession) => void;
   clearSession: () => void;
   updateTokens: (accessToken: string, refreshToken: string) => void;
+  updateLinkedVault: (linkedVault?: LinkedVault) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -34,6 +44,22 @@ export const useAuthStore = create<AuthState>()(
             ? { ...state.session, accessToken, refreshToken }
             : null,
         })),
+      updateLinkedVault: (linkedVault) =>
+        set((state) => {
+          if (!state.session) {
+            return { session: null };
+          }
+
+          return {
+            session: {
+              ...state.session,
+              user: {
+                ...state.session.user,
+                linkedVault,
+              },
+            },
+          };
+        }),
     }),
     {
       name: 'cipher-pulse-auth',

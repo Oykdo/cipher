@@ -94,7 +94,7 @@ export function buildCspHeader(config: CspConfig, nonce: string): string {
 }
 
 /**
- * Default CSP configuration for Dead Drop (STRICT MODE)
+ * Default CSP configuration for Cipher (STRICT MODE)
  * 
  * SECURITY:
  * - NO 'unsafe-inline' for scripts - Uses nonces instead

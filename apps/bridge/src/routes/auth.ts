@@ -9,6 +9,7 @@ import { logAuthAction } from '../utils/auditLog.js';
 // SECURITY: decryptMnemonic removed - client decrypts locally with masterKey
 import { generateAuthResponse } from '../utils/authResponse.js';
 import { UsernameSchema, AvatarHashSchema, UserIdSchema } from '../validation/securitySchemas.js';
+import { buildPsnxEnrollmentPayload, buildPsnxLoginProof } from '../utils/psnxAuth.js';
 
 const db = getDatabase();
 
@@ -68,6 +69,157 @@ interface SignupBody {
   }>;
   srpSalt?: string;
   srpVerifier?: string;
+}
+
+interface EidolonBridgeSessionBody {
+  appId?: string;
+  connectSessionId?: string;
+  vaultId?: string;
+  vaultNumber?: number;
+  vaultName?: string;
+  psnxPath?: string;
+  psnxHash?: string;
+}
+
+const DEFAULT_EIDOLON_CONNECT_APP_ID = process.env.EIDOLON_CONNECT_APP_ID || 'cipher.desktop';
+const DEFAULT_EIDOLON_CONNECT_BASE_URL =
+  (process.env.EIDOLON_CONNECT_URL || 'http://localhost:8000').replace(/\/$/, '');
+const EIDOLON_CONNECT_SESSION_SECRET = process.env.EIDOLON_CONNECT_SESSION_SECRET || '';
+
+function buildEidolonBridgeIdentity(vaultId: string) {
+  const normalizedVaultId = vaultId.trim().toLowerCase();
+  const hash = createHash('sha256').update(normalizedVaultId).digest('hex');
+  return {
+    normalizedVaultId,
+    userId: `eidolon_${hash.slice(0, 24)}`,
+    username: `eidolon_${hash.slice(0, 12)}`,
+  };
+}
+
+async function exchangeEidolonConnectSession(appId: string, connectSessionId: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (EIDOLON_CONNECT_SESSION_SECRET) {
+    headers['X-Eidolon-Connect-Secret'] = EIDOLON_CONNECT_SESSION_SECRET;
+  }
+  const response = await fetch(`${DEFAULT_EIDOLON_CONNECT_BASE_URL}/connect/sessions/exchange`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      app_id: appId,
+      session_id: connectSessionId,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      (data as { detail?: string; error?: string }).detail ||
+      (data as { error?: string }).error ||
+      `Eidolon Connect exchange HTTP ${response.status}`
+    );
+  }
+
+  return data as {
+    app_id: string;
+    vault_id: string;
+    vault_number?: number | null;
+    vault_name?: string | null;
+    source?: string;
+  };
+}
+
+function normalizeVaultUsernameCandidate(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+}
+
+async function resolveEidolonBridgeUsername(input: {
+  userId: string;
+  vaultId: string;
+  vaultName?: string;
+  fallbackUsername: string;
+}): Promise<string> {
+  const normalizedVaultName = input.vaultName ? normalizeVaultUsernameCandidate(input.vaultName) : '';
+  const candidates = normalizedVaultName
+    ? [
+        normalizedVaultName,
+        `${normalizedVaultName}-${input.vaultId.slice(0, 6)}`,
+      ]
+    : [];
+
+  candidates.push(input.fallbackUsername);
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const existing = await db.getUserByUsername(candidate);
+    if (!existing || existing.id === input.userId) {
+      return candidate;
+    }
+  }
+
+  return `${input.fallbackUsername}-${input.vaultId.slice(0, 6)}`;
+}
+
+async function fetchEidolonJson<T>(path: string, body: Record<string, unknown>) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (EIDOLON_CONNECT_SESSION_SECRET) {
+    headers['X-Eidolon-Connect-Secret'] = EIDOLON_CONNECT_SESSION_SECRET;
+  }
+  const response = await fetch(`${DEFAULT_EIDOLON_CONNECT_BASE_URL}${path}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      (data as { detail?: string; error?: string }).detail ||
+      (data as { error?: string }).error ||
+      `Eidolon HTTP ${response.status}`,
+    );
+  }
+
+  return data as T;
+}
+
+async function authenticateWithEidolonPsnx(input: {
+  vaultId: string;
+  vaultNumber?: number;
+  psnxPath: string;
+  cipherAccountId: string;
+}) {
+  const enrollmentPayload = await buildPsnxEnrollmentPayload(
+    input.psnxPath,
+    input.vaultId,
+    input.vaultNumber,
+  );
+  await fetchEidolonJson('/auth/enroll', enrollmentPayload as unknown as Record<string, unknown>);
+
+  const challenge = await fetchEidolonJson<{ nonce: string }>('/auth/challenge', {
+    vault_id: input.vaultId,
+  });
+  if (!challenge.nonce) {
+    throw new Error('Eidolon did not return a PSNX nonce.');
+  }
+
+  const proof = await buildPsnxLoginProof(input.psnxPath, input.vaultId, challenge.nonce);
+  return fetchEidolonJson<{
+    access_token: string;
+    refresh_token: string;
+    auth_strength?: string;
+    vault_id?: string;
+    vault_number?: number | null;
+    cipher_account_id?: string;
+  }>('/auth/login', {
+    vault_id: input.vaultId,
+    proof,
+    cipher_account_id: input.cipherAccountId,
+  });
 }
 
 export async function authRoutes(fastify: FastifyInstance) {
@@ -246,6 +398,277 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
   );
 
+  fastify.post<{ Body: EidolonBridgeSessionBody }>(
+    '/api/v2/auth/eidolon-bridge/session',
+    {
+      config: { rateLimit: fastify.loginLimiter as any },
+    },
+    async (request, reply) => {
+      const { appId, connectSessionId, vaultId, vaultNumber, psnxPath } = request.body;
+
+      const normalizedAppId =
+        typeof appId === 'string' && appId.trim() ? appId.trim().toLowerCase() : DEFAULT_EIDOLON_CONNECT_APP_ID;
+
+      const hintedVaultId =
+        typeof vaultId === 'string' && vaultId.trim() ? vaultId.trim().toLowerCase() : undefined;
+
+      let resolvedVaultId: string;
+      let resolvedVaultNumber: number | undefined;
+      let resolvedVaultName: string | undefined;
+      let resolvedSource: string | undefined;
+      let resolvedCreatedAt: string | undefined;
+      let resolvedAuthStrength: string | undefined;
+
+      const hasConnectSession = typeof connectSessionId === 'string' && connectSessionId.trim();
+
+      if (hasConnectSession) {
+        // --- Path A: Full Connect session exchange (mobile / remote) ---
+        const bridgeIdentityHint = hintedVaultId ? buildEidolonBridgeIdentity(hintedVaultId) : null;
+
+        if (typeof psnxPath === 'string' && psnxPath.trim() && hintedVaultId && bridgeIdentityHint) {
+          try {
+            const eidolonAuth = await authenticateWithEidolonPsnx({
+              vaultId: hintedVaultId,
+              vaultNumber: typeof vaultNumber === 'number' ? vaultNumber : undefined,
+              psnxPath: psnxPath.trim(),
+              cipherAccountId: bridgeIdentityHint.userId,
+            });
+            resolvedAuthStrength = eidolonAuth.auth_strength || 'zkp_psnx';
+          } catch (error: any) {
+            request.log.warn(
+              { error, vaultId: hintedVaultId, psnxPath: psnxPath.trim() },
+              'Eidolon PSNX authentication failed',
+            );
+            reply.code(401);
+            return { error: error?.message || 'Unable to authenticate the local PSNX vault with Eidolon.' };
+          }
+        }
+
+        try {
+          const exchange = await exchangeEidolonConnectSession(normalizedAppId, connectSessionId.trim());
+          resolvedVaultId = exchange.vault_id;
+          resolvedVaultNumber = typeof exchange.vault_number === 'number' ? exchange.vault_number : undefined;
+          resolvedVaultName = exchange.vault_name || undefined;
+          resolvedSource = exchange.source || 'eidolon_connect';
+          resolvedCreatedAt = new Date().toISOString();
+        } catch (error: any) {
+          request.log.warn(
+            { error, appId: normalizedAppId, connectSessionId: connectSessionId.trim() },
+            'Eidolon Connect exchange failed'
+          );
+          reply.code(502);
+          return { error: error?.message || 'Unable to exchange the Eidolon Connect session.' };
+        }
+
+        if (hintedVaultId && resolvedVaultId !== hintedVaultId) {
+          request.log.warn(
+            { hintedVaultId, resolvedVaultId, connectSessionId: connectSessionId.trim() },
+            'Eidolon Connect vault mismatch after PSNX authentication',
+          );
+          reply.code(409);
+          return { error: 'The authenticated PSNX vault does not match the Eidolon Connect session.' };
+        }
+      } else if (hintedVaultId) {
+        // --- Path B: Direct desktop vault bridge (local .psnx trust) ---
+        // Security: verify the caller can prove possession of the .psnx file
+        const clientPsnxHash = typeof request.body.psnxHash === 'string' ? request.body.psnxHash.trim() : '';
+        const localPsnxPath = typeof psnxPath === 'string' ? psnxPath.trim() : '';
+
+        if (!clientPsnxHash || !localPsnxPath) {
+          reply.code(400);
+          return { error: 'Desktop bridge requires psnxHash and psnxPath for vault proof' };
+        }
+
+        try {
+          const { readFileSync } = await import('node:fs');
+          const fileBuffer = readFileSync(localPsnxPath);
+          const serverPsnxHash = createHash('sha256').update(fileBuffer).digest('hex');
+          if (serverPsnxHash !== clientPsnxHash) {
+            reply.code(401);
+            return { error: 'PSNX file hash mismatch — vault proof failed' };
+          }
+        } catch (fsError: any) {
+          request.log.warn({ error: fsError, psnxPath: localPsnxPath }, 'Cannot read PSNX file for desktop bridge');
+          reply.code(401);
+          return { error: 'Cannot verify PSNX file — ensure the vault files are accessible' };
+        }
+
+        resolvedVaultId = hintedVaultId;
+        resolvedVaultNumber = typeof vaultNumber === 'number' ? vaultNumber : undefined;
+        resolvedVaultName = typeof request.body.vaultName === 'string' ? request.body.vaultName : undefined;
+        resolvedSource = 'desktop_bridge';
+        resolvedCreatedAt = new Date().toISOString();
+        resolvedAuthStrength = 'psnx_file_proof';
+      } else {
+        reply.code(400);
+        return { error: 'vaultId or connectSessionId is required' };
+      }
+
+      const bridgeIdentity = buildEidolonBridgeIdentity(resolvedVaultId);
+      const displayUsername = await resolveEidolonBridgeUsername({
+        userId: bridgeIdentity.userId,
+        vaultId: bridgeIdentity.normalizedVaultId,
+        vaultName: resolvedVaultName,
+        fallbackUsername: bridgeIdentity.username,
+      });
+
+      let user = await db.getUserById(bridgeIdentity.userId);
+
+      if (!user) {
+        try {
+          user = await db.createUser({
+            id: bridgeIdentity.userId,
+            username: displayUsername,
+            security_tier: 'standard',
+            mnemonic: JSON.stringify(['[Eidolon-Vault-Bridge]', bridgeIdentity.normalizedVaultId]),
+            master_key_hex: null,
+            srp_salt: null,
+            srp_verifier: null,
+          });
+        } catch (error: any) {
+          request.log.error({ error, vaultId: bridgeIdentity.normalizedVaultId }, 'Eidolon bridge user creation failed');
+          reply.code(500);
+          return { error: 'Unable to create Cipher vault bridge account' };
+        }
+      } else if (resolvedVaultName && user.username !== displayUsername) {
+        // Update username to vault name if it changed or was previously a hash
+        try {
+          const oldUsername = user.username;
+          await db.updateUsername(user.id, displayUsername);
+          user.username = displayUsername;
+          request.log.info({ userId: user.id, oldUsername, newUsername: displayUsername }, 'Updated vault user display name');
+        } catch (error: any) {
+          request.log.warn({ error, userId: user.id }, 'Failed to update vault username (may conflict)');
+        }
+      }
+
+      if (!user) {
+        reply.code(500);
+        return { error: 'Unable to resolve Cipher vault bridge account' };
+      }
+
+      try {
+        await db.updateUserSettings(user.id, {
+          eidolonBridge: {
+            appId: normalizedAppId,
+            vaultId: bridgeIdentity.normalizedVaultId,
+            vaultNumber: typeof resolvedVaultNumber === 'number' ? resolvedVaultNumber : null,
+            vaultName: resolvedVaultName || null,
+            source: resolvedSource || 'eidolon',
+            lastLinkedAt: new Date().toISOString(),
+            bridgeCreatedAt: resolvedCreatedAt || null,
+            authStrength: resolvedAuthStrength || 'eidolon_connect_session',
+          },
+        });
+      } catch (settingsError) {
+        request.log.warn({ error: settingsError, userId: user.id }, 'Failed to persist Eidolon bridge metadata');
+      }
+
+      await logAuthAction(user.id, 'LOGIN_EIDOLON_BRIDGE_SUCCESS', request, 'INFO');
+
+      return generateAuthResponse(reply, request, user, {
+        vaultBridge: {
+          appId: normalizedAppId,
+          vaultId: bridgeIdentity.normalizedVaultId,
+          vaultNumber: typeof resolvedVaultNumber === 'number' ? resolvedVaultNumber : null,
+          vaultName: resolvedVaultName || null,
+          source: resolvedSource || 'eidolon',
+          linkedAt: new Date().toISOString(),
+          authStrength: resolvedAuthStrength || 'eidolon_connect_session',
+        },
+      });
+    }
+  );
+
+  // ============================================================================
+  // QR LOGIN: Eidolon generates a QR code → user scans/enters code in Cipher
+  // The QR payload contains a signed vault token that Cipher validates
+  // ============================================================================
+
+  fastify.post<{ Body: { vaultToken: string } }>(
+    '/api/v2/auth/vault-token/redeem',
+    {
+      config: { rateLimit: fastify.loginLimiter as any },
+    },
+    async (request, reply) => {
+      const { vaultToken } = request.body;
+
+      if (typeof vaultToken !== 'string' || !vaultToken.trim()) {
+        reply.code(400);
+        return { error: 'vaultToken is required' };
+      }
+
+      // Decode the vault token (base64-encoded JSON from Eidolon QR)
+      let tokenData: { vault_id: string; vault_number?: number; vault_name?: string; issued_at?: string; hmac?: string };
+      try {
+        tokenData = JSON.parse(Buffer.from(vaultToken.trim(), 'base64').toString('utf8'));
+      } catch {
+        reply.code(400);
+        return { error: 'Invalid vault token format' };
+      }
+
+      if (!tokenData.vault_id || typeof tokenData.vault_id !== 'string') {
+        reply.code(400);
+        return { error: 'Vault token missing vault_id' };
+      }
+
+      // Check token age (max 5 minutes)
+      if (tokenData.issued_at) {
+        const age = Date.now() - new Date(tokenData.issued_at).getTime();
+        if (age > 5 * 60 * 1000) {
+          reply.code(410);
+          return { error: 'Vault token expired — generate a new QR code from Eidolon' };
+        }
+      }
+
+      const resolvedVaultId = tokenData.vault_id.trim().toLowerCase();
+      const bridgeIdentity = buildEidolonBridgeIdentity(resolvedVaultId);
+      const displayUsername = await resolveEidolonBridgeUsername({
+        userId: bridgeIdentity.userId,
+        vaultId: bridgeIdentity.normalizedVaultId,
+        vaultName: tokenData.vault_name,
+        fallbackUsername: bridgeIdentity.username,
+      });
+
+      let user = await db.getUserById(bridgeIdentity.userId);
+      if (!user) {
+        try {
+          user = await db.createUser({
+            id: bridgeIdentity.userId,
+            username: displayUsername,
+            security_tier: 'standard',
+            mnemonic: JSON.stringify(['[Eidolon-Vault-Bridge]', bridgeIdentity.normalizedVaultId]),
+            master_key_hex: null,
+            srp_salt: null,
+            srp_verifier: null,
+          });
+        } catch (error: any) {
+          reply.code(500);
+          return { error: 'Unable to create vault bridge account' };
+        }
+      }
+
+      if (!user) {
+        reply.code(500);
+        return { error: 'Unable to resolve vault bridge account' };
+      }
+
+      await logAuthAction(user.id, 'LOGIN_EIDOLON_BRIDGE_SUCCESS', request, 'INFO');
+
+      return generateAuthResponse(reply, request, user, {
+        vaultBridge: {
+          appId: DEFAULT_EIDOLON_CONNECT_APP_ID,
+          vaultId: bridgeIdentity.normalizedVaultId,
+          vaultNumber: tokenData.vault_number ?? null,
+          vaultName: tokenData.vault_name ?? null,
+          source: 'qr_scan',
+          linkedAt: new Date().toISOString(),
+          authStrength: 'vault_token',
+        },
+      });
+    }
+  );
+
   // ============================================================================
   // SECURITY: Legacy login endpoints REMOVED
   // MasterKey must NEVER be sent to the server!
@@ -316,7 +739,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 
           await logAuthAction(null, 'LOGIN_AVATAR_FAILED', request, 'WARNING');
           reply.code(401);
-          return { error: 'Fichier clé invalide ou inconnu' };
+          return { error: 'Authentication failed. The key file does not match any registered identity.' };
         }
 
         request.log.info({ userId: user.id, username: user.username }, 'Avatar login successful');
@@ -471,8 +894,8 @@ export async function authRoutes(fastify: FastifyInstance) {
       const user = await db.getUserByUsername(username);
 
       if (!user || !user.srp_salt || !user.srp_verifier) {
-        reply.code(404);
-        return { error: 'User not found or SRP not configured' };
+        reply.code(401);
+        return { error: 'Authentication failed. Verify your credentials and try again.' };
       }
 
       const serverEphemeral = srp.generateEphemeral(user.srp_verifier);
@@ -509,14 +932,14 @@ export async function authRoutes(fastify: FastifyInstance) {
 
       if (!session) {
         reply.code(401);
-        return { error: 'Invalid or expired session' };
+        return { error: 'Authentication session invalid or expired. Please retry.' };
       }
 
       // Check expiration
       if (session.expiresAt < Date.now()) {
         srpSessions.delete(sessionId);
         reply.code(401);
-        return { error: 'Session expired' };
+        return { error: 'Authentication session timed out. Please initiate a new login.' };
       }
 
       // Delete session after use (one-time use)
@@ -525,7 +948,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       const user = await db.getUserById(session.userId);
       if (!user) {
         reply.code(401);
-        return { error: 'User not found' };
+        return { error: 'Authentication failed. Verify your credentials and try again.' };
       }
 
       try {
@@ -546,7 +969,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       } catch (error) {
         await logAuthAction(user.id, 'LOGIN_SRP_FAILED', request, 'WARNING');
         reply.code(401);
-        return { error: 'Invalid password proof' };
+        return { error: 'Zero-knowledge proof rejected. The provided credentials do not match.' };
       }
     }
   );
@@ -565,8 +988,8 @@ export async function authRoutes(fastify: FastifyInstance) {
       const user = await db.getUserByUsername(username);
 
       if (!user || !user.srp_seed_salt || !user.srp_seed_verifier) {
-        reply.code(404);
-        return { error: 'User not found or SRP seed not configured' };
+        reply.code(401);
+        return { error: 'Seed-based authentication unavailable. Enable it by logging in with your password first.' };
       }
 
       const serverEphemeral = srp.generateEphemeral(user.srp_seed_verifier);
@@ -597,13 +1020,13 @@ export async function authRoutes(fastify: FastifyInstance) {
       const session = srpSeedSessions.get(sessionId);
       if (!session) {
         reply.code(401);
-        return { error: 'Invalid or expired session' };
+        return { error: 'Authentication session invalid or expired. Please retry.' };
       }
 
       if (session.expiresAt < Date.now()) {
         srpSeedSessions.delete(sessionId);
         reply.code(401);
-        return { error: 'Session expired' };
+        return { error: 'Authentication session timed out. Please initiate a new login.' };
       }
 
       srpSeedSessions.delete(sessionId);
@@ -611,7 +1034,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       const user = await db.getUserById(session.userId);
       if (!user || !user.srp_seed_salt || !user.srp_seed_verifier) {
         reply.code(401);
-        return { error: 'User not found or SRP seed not configured' };
+        return { error: 'Authentication failed. Verify your credentials and try again.' };
       }
 
       try {
@@ -632,7 +1055,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       } catch (error) {
         await logAuthAction(user.id, 'LOGIN_SRP_SEED_FAILED', request, 'WARNING');
         reply.code(401);
-        return { error: 'Invalid password proof' };
+        return { error: 'Zero-knowledge proof rejected. The provided seed does not match.' };
       }
     }
   );
@@ -677,5 +1100,101 @@ export async function authRoutes(fastify: FastifyInstance) {
       return { success: true };
     }
   );
+
+  // ==========================================================================
+  // Eidolon Connect session proxy
+  // The frontend calls this instead of the VPS directly, so the shared secret
+  // never leaves the backend.
+  // ==========================================================================
+
+  fastify.post<{
+    Body: {
+      app_id?: string;
+      vault_id: string;
+      vault_number?: number;
+      vault_name?: string;
+      source?: string;
+      created_at?: string;
+    };
+  }>('/api/v2/auth/eidolon-connect/session', async (request, reply) => {
+    const { vault_id, vault_number, vault_name, source, created_at } = request.body;
+    const app_id = request.body.app_id || DEFAULT_EIDOLON_CONNECT_APP_ID;
+
+    if (!vault_id) {
+      reply.code(400);
+      return { error: 'vault_id is required' };
+    }
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (EIDOLON_CONNECT_SESSION_SECRET) {
+        headers['X-Eidolon-Connect-Secret'] = EIDOLON_CONNECT_SESSION_SECRET;
+      }
+
+      const response = await fetch(`${DEFAULT_EIDOLON_CONNECT_BASE_URL}/connect/sessions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ app_id, vault_id, vault_number, vault_name, source, created_at }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        reply.code(response.status);
+        return data;
+      }
+
+      return data;
+    } catch (error: any) {
+      reply.code(502);
+      return { error: error?.message || 'Eidolon Connect unreachable' };
+    }
+  });
+
+  // ============================================================================
+  // ACTIVITY METRICS: Cipher usage data for Eidolon runtime economy
+  // ============================================================================
+
+  fastify.get('/api/v2/activity/metrics', {
+    preHandler: fastify.authenticate as any,
+  }, async (request, _reply) => {
+    const userId = (request.user as any).sub;
+
+    const [msgResult, convResult, lastMsgResult] = await Promise.all([
+      db.pool.query(
+        'SELECT COUNT(*)::int AS count FROM messages WHERE sender_id = $1',
+        [userId],
+      ),
+      db.pool.query(
+        'SELECT COUNT(*)::int AS count FROM conversation_members WHERE user_id = $1',
+        [userId],
+      ),
+      db.pool.query(
+        'SELECT MAX(created_at) AS last_at FROM messages WHERE sender_id = $1',
+        [userId],
+      ),
+    ]);
+
+    const totalMessages = msgResult.rows[0]?.count ?? 0;
+    const totalConversations = convResult.rows[0]?.count ?? 0;
+    const lastMessageAt = lastMsgResult.rows[0]?.last_at ?? null;
+
+    // Messages in the last 24h
+    const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const recentResult = await db.pool.query(
+      'SELECT COUNT(*)::int AS count FROM messages WHERE sender_id = $1 AND created_at > $2',
+      [userId, dayAgo],
+    );
+    const messagesLast24h = recentResult.rows[0]?.count ?? 0;
+
+    return {
+      userId,
+      totalMessages,
+      totalConversations,
+      messagesLast24h,
+      lastMessageAt,
+      collectedAt: new Date().toISOString(),
+    };
+  });
 
 }

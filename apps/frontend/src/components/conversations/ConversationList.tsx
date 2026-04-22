@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import type { ConversationSummaryV2 } from '../../services/api-v2';
+import { AtomLoader } from '../ui';
 
 interface ConversationListProps {
   loading: boolean;
@@ -38,8 +39,8 @@ export function ConversationList({
       {/* Conversations */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="p-4 text-center text-soft-grey">
-            {t('common.loading')}
+          <div className="p-6 flex items-center justify-center">
+            <AtomLoader size="lg" />
           </div>
         ) : conversations.length === 0 ? (
           <div className="p-4 text-center text-soft-grey">

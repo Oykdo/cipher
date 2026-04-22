@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
 import { apiv2 } from '../services/api-v2';
+import { AtomLoader } from './ui';
 
 interface ConversationRequest {
     id: string;
@@ -241,9 +242,8 @@ export default function ConversationRequests({
                 {/* Content */}
                 <div className="p-4">
                     {loading ? (
-                        <div className="text-center py-8">
-                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-quantum-cyan"></div>
-                            <p className="text-muted-grey text-sm mt-2">{t('common.loading')}</p>
+                        <div className="py-8 flex items-center justify-center">
+                            <AtomLoader size="lg" />
                         </div>
                     ) : requests.length === 0 ? (
                         <motion.div

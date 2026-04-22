@@ -1,25 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- Flat colors tuned to match the official-style Pi logo (purple coin + gold ring + Pi glyph). -->
+  <!--
+    Pi Network logo — flat recreation of the official visual (purple coin +
+    gold ring + Pi glyph). Tuned so the glyph sits fully inside the gold ring
+    with clearance top and bottom; earlier version had stems that overran the
+    ring and looked truncated at 56x56 rendering.
+  -->
+
+  <!-- Purple coin -->
   <circle cx="256" cy="256" r="246" fill="#5B2C83"/>
 
-  <!-- Gold ring -->
-  <circle cx="256" cy="256" r="170" fill="none" stroke="#F4B64A" stroke-width="44"/>
+  <!-- Gold ring — center radius 178, stroke width 36
+       so inner clearzone goes from radius 160 to radius 196 -->
+  <circle cx="256" cy="256" r="178" fill="none" stroke="#F4B64A" stroke-width="36"/>
 
-  <!-- Pi glyph -->
+  <!-- Pi glyph — bounds roughly 160..360 x 188..424 so it stays fully
+       inside the ring's clearzone with ~40 px padding on every side. -->
   <g fill="#F4B64A">
-    <!-- top dots -->
-    <rect x="206" y="176" width="44" height="34" rx="8"/>
-    <rect x="262" y="176" width="44" height="34" rx="8"/>
+    <!-- Top dots -->
+    <rect x="214" y="188" width="38" height="30" rx="7"/>
+    <rect x="262" y="188" width="38" height="30" rx="7"/>
 
-    <!-- top bar -->
-    <rect x="152" y="214" width="260" height="66" rx="30"/>
+    <!-- Top horizontal bar -->
+    <rect x="162" y="222" width="192" height="52" rx="24"/>
 
-    <!-- left arm (curved stub) -->
-    <rect x="152" y="266" width="102" height="66" rx="30"/>
+    <!-- Left curved arm — short stub extending down-left from the bar -->
+    <rect x="162" y="266" width="80" height="52" rx="24"/>
 
-    <!-- stems -->
-    <rect x="220" y="268" width="62" height="210" rx="26"/>
-    <rect x="298" y="268" width="62" height="210" rx="26"/>
+    <!-- Vertical stems — shortened so they stay inside the ring -->
+    <rect x="212" y="266" width="50" height="158" rx="22"/>
+    <rect x="282" y="266" width="50" height="158" rx="22"/>
   </g>
 </svg>

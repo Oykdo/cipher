@@ -135,6 +135,141 @@ export class SignalingServer {
         });
       });
 
+      socket.on(
+        'call:invite',
+        (data: {
+          to: string;
+          conversationId: string;
+          mediaType: 'audio' | 'video';
+          encryptedCallKey?: string;
+          signature?: string;
+          signedAt?: number;
+        }) => {
+          const targetSocketId = this.onlinePeers.get(data.to);
+
+          if (!targetSocketId) {
+            socket.emit('call:unavailable', {
+              peerId: data.to,
+              conversationId: data.conversationId,
+            });
+            return;
+          }
+
+          this.io.to(targetSocketId).emit('call:invite', {
+            from: userId,
+            conversationId: data.conversationId,
+            mediaType: data.mediaType,
+            encryptedCallKey: data.encryptedCallKey,
+            signature: data.signature,
+            signedAt: data.signedAt,
+          });
+        }
+      );
+
+      socket.on(
+        'call:accept',
+        (data: {
+          to: string;
+          conversationId: string;
+          mediaType: 'audio' | 'video';
+          signature?: string;
+          signedAt?: number;
+        }) => {
+          const targetSocketId = this.onlinePeers.get(data.to);
+
+          if (!targetSocketId) {
+            socket.emit('call:unavailable', {
+              peerId: data.to,
+              conversationId: data.conversationId,
+            });
+            return;
+          }
+
+          this.io.to(targetSocketId).emit('call:accept', {
+            from: userId,
+            conversationId: data.conversationId,
+            mediaType: data.mediaType,
+            signature: data.signature,
+            signedAt: data.signedAt,
+          });
+        }
+      );
+
+      socket.on(
+        'call:decline',
+        (data: { to: string; conversationId: string; reason?: string; signature?: string; signedAt?: number }) => {
+          const targetSocketId = this.onlinePeers.get(data.to);
+
+          if (!targetSocketId) {
+            socket.emit('call:unavailable', {
+              peerId: data.to,
+              conversationId: data.conversationId,
+            });
+            return;
+          }
+
+          this.io.to(targetSocketId).emit('call:decline', {
+            from: userId,
+            conversationId: data.conversationId,
+            reason: data.reason,
+            signature: data.signature,
+            signedAt: data.signedAt,
+          });
+        }
+      );
+
+      socket.on(
+        'call:end',
+        (data: { to: string; conversationId: string; reason?: string; signature?: string; signedAt?: number }) => {
+          const targetSocketId = this.onlinePeers.get(data.to);
+
+          if (!targetSocketId) {
+            socket.emit('call:unavailable', {
+              peerId: data.to,
+              conversationId: data.conversationId,
+            });
+            return;
+          }
+
+          this.io.to(targetSocketId).emit('call:end', {
+            from: userId,
+            conversationId: data.conversationId,
+            reason: data.reason,
+            signature: data.signature,
+            signedAt: data.signedAt,
+          });
+        }
+      );
+
+      socket.on(
+        'call:signal',
+        (data: {
+          to: string;
+          conversationId: string;
+          signal: { description?: unknown; candidate?: unknown };
+          signature?: string;
+          signedAt?: number;
+        }) => {
+          const targetSocketId = this.onlinePeers.get(data.to);
+
+          if (!targetSocketId) {
+            socket.emit('call:unavailable', {
+              peerId: data.to,
+              conversationId: data.conversationId,
+            });
+            return;
+          }
+
+          this.io.to(targetSocketId).emit('call:signal', {
+            from: userId,
+            conversationId: data.conversationId,
+            signal: data.signal,
+            signature: data.signature,
+            signedAt: data.signedAt,
+          });
+        }
+      );
+
       // Handle disconnection
       socket.on('disconnect', () => {
         console.log('🔌 [SIGNALING] Peer disconnected', userId);

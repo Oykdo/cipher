@@ -20,15 +20,34 @@ let argon2: any = null;
 
 async function ensureArgon2Loaded() {
   if (argon2) return;
-  
+
+  // argon2-browser is a UMD module that attaches to `self.argon2`.
+  // In Electron/Vite, `self` may not propagate correctly, so we
+  // ensure a landing zone exists and pick it up after import.
+  const g = typeof self !== 'undefined' ? self : (globalThis as any);
+
   try {
-    // Use the bundled build to avoid runtime WASM fetch/import issues (Vite + Vitest/jsdom).
-    const module: any = await import('argon2-browser/dist/argon2-bundled.min.js');
-    argon2 = module?.default ?? module;
-  } catch (error) {
-    console.error('[KeyManager] ❌ Failed to load argon2-browser:', error);
-    throw new Error('Failed to load argon2-browser. WASM may not be supported.');
+    await import('argon2-browser');
+    // UMD attaches to self.argon2
+    if (typeof g.argon2?.hash === 'function') {
+      argon2 = g.argon2;
+      return;
+    }
+  } catch {
+    // main entry failed
   }
+
+  try {
+    await import('argon2-browser/dist/argon2-bundled.min.js');
+    if (typeof g.argon2?.hash === 'function') {
+      argon2 = g.argon2;
+      return;
+    }
+  } catch {
+    // bundled entry failed
+  }
+
+  throw new Error('Failed to load argon2-browser. WASM may not be supported.');
 }
 
 // ============================================================================

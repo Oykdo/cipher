@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth";
 import { getRecoveryKeys } from "../../services/api-interceptor";
-import { getExistingKeyVault, getKeyVault } from "../../lib/keyVault";
+import { getKeyVault } from "../../lib/keyVault";
 import { exportUserData, importUserData, validateExportFile } from "../../lib/dataExport";
 import { getBackupExportPassword, hasBackupExportPassword, setBackupExportPassword } from "../../lib/backupPassword";
 import { scryptAsync } from "@noble/hashes/scrypt";
@@ -11,6 +11,7 @@ import {
     importFromBackupVault, 
     validateBackupFile,
 } from "../../lib/backup";
+import { exportVaultKeybundle } from "../../lib/keybundle";
 
 // File System Access API Types
 interface FileSystemFileHandle {
@@ -39,6 +40,7 @@ declare global {
 export function BackupSettings() {
     const { t } = useTranslation();
     const session = useAuthStore((state) => state.session);
+    const linkedVault = session?.user?.linkedVault;
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const token = useAuthStore((state) => state.session?.accessToken);
@@ -65,6 +67,24 @@ export function BackupSettings() {
     const [exportProgress, setExportProgress] = useState<{ stage: string; progress: number } | null>(null);
     const useVaultV2 = true; // Always use new secure format (Argon2id + XChaCha20-Poly1305)
     const [backupValidation, setBackupValidation] = useState<{ valid: boolean; version: number; encrypted: boolean; createdAt?: string } | null>(null);
+
+    // Keybundle download state
+    const [keybundleState, setKeybundleState] = useState<'idle' | 'downloading' | 'ok' | 'error'>('idle');
+    const [keybundleMessage, setKeybundleMessage] = useState<string>('');
+
+    const handleDownloadKeybundle = async () => {
+        if (!linkedVault?.vaultId) return;
+        setKeybundleState('downloading');
+        setKeybundleMessage('');
+        const r = await exportVaultKeybundle(linkedVault.vaultId);
+        if (r.ok) {
+            setKeybundleState('ok');
+            setKeybundleMessage(`${r.filename} — ${Math.round(r.size / 1024)} KB`);
+        } else {
+            setKeybundleState('error');
+            setKeybundleMessage(r.error);
+        }
+    };
 
     useEffect(() => {
         if (!showExportModal) return;
@@ -244,7 +264,7 @@ export function BackupSettings() {
 
             // Generate export content with REAL recovery keys (English by default)
             let content = `═══════════════════════════════════════════════════════\n`;
-            content += `  CIPHER PULSE - RECOVERY KEYS\n`;
+            content += `  CIPHER - RECOVERY KEYS\n`;
             content += `═══════════════════════════════════════════════════════\n\n`;
             content += `⚠️  CRITICAL INFORMATION - NEVER SHARE THIS FILE\n\n`;
             content += `Username: ${recoveryData.username}\n`;
@@ -299,14 +319,14 @@ export function BackupSettings() {
             content += `• NEVER share this information with ANYONE\n`;
             content += `• No support member will EVER ask for these keys\n\n`;
             content += `═══════════════════════════════════════════════════════\n`;
-            content += `  Cipher Pulse - Zero-Knowledge Architecture\n`;
+            content += `  Cipher - Zero-Knowledge Architecture\n`;
             content += `  Without these keys, NO ONE (not even us) can\n`;
             content += `  recover your account. This is the price of security.\n`;
             content += `═══════════════════════════════════════════════════════\n`;
 
             // Create download
             const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-            const filename = `cipher-pulse-recovery-${recoveryData.username}-${Date.now()}.txt`;
+            const filename = `cipher-recovery-${recoveryData.username}-${Date.now()}.txt`;
 
             // Try File System Access API
             if (window.showSaveFilePicker) {
@@ -357,35 +377,6 @@ export function BackupSettings() {
         } finally {
             setLoading(false);
         }
-    };
-
-    const exportRecoveryKeys = async () => {
-        const username = session?.user?.username;
-
-        if (!session?.accessToken || !username) {
-            setMessage({ type: 'error', text: t('settings.backup_settings.invalid_session') });
-            return;
-        }
-
-        // Try to get existing KeyVault first
-        const vault = getExistingKeyVault();
-        if (!vault) {
-            // KeyVault not initialized - show password prompt
-            setShowPasswordPrompt(true);
-            return;
-        }
-
-        const masterKey =
-            (await vault.getData(`masterKey:${username.toLowerCase()}`)) ||
-            (await vault.getData(`masterKey:${username}`));
-        if (!masterKey) {
-            // No masterKey in vault - show password prompt to reinitialize
-            setShowPasswordPrompt(true);
-            return;
-        }
-
-        // Vault available and has masterKey - proceed with export
-        await performExport(masterKey);
     };
 
     // RGPD Compliant Full Data Export
@@ -452,7 +443,7 @@ export function BackupSettings() {
                     { includeMessages, includeContacts: true, includeIdentityKeys: false },
                     (stage, progress) => setExportProgress({ stage, progress })
                 );
-                filename = `cipher-pulse-backup-v2-${Date.now()}.json`;
+                filename = `cipher-backup-v2-${Date.now()}.json`;
             } else {
                 // Fallback to legacy export (PBKDF2 + AES-GCM)
                 const result = await exportUserData(
@@ -542,7 +533,7 @@ export function BackupSettings() {
             const v2Validation = await validateBackupFile(file);
             if (v2Validation.valid && v2Validation.version === 2) {
                 setBackupValidation(v2Validation);
-                setMessage({ type: 'success', text: t('settings.backup_settings.secure_backup_detected', 'Secure backup v2 detected. Enter password to import.') });
+                setMessage({ type: 'success', text: t('settings.backup_settings.secure_backup_detected', 'Sauvegarde v2 détectée. Entrez le mot de passe pour restaurer.') });
                 return;
             }
 
@@ -551,7 +542,7 @@ export function BackupSettings() {
             setImportValidation(validation);
 
             if (validation.encrypted && !importPassword) {
-                setMessage({ type: 'error', text: t('settings.backup_settings.file_encrypted', 'This file is encrypted. Please enter the password.') });
+                setMessage({ type: 'error', text: t('settings.backup_settings.file_encrypted', 'Fichier chiffré. Entrez le mot de passe.') });
             }
         } catch {
             setMessage({ type: 'error', text: t('settings.backup_settings.invalid_file', 'Invalid backup file') });
@@ -594,7 +585,11 @@ export function BackupSettings() {
                 }
             } else if (token) {
                 // Fall back to legacy v1 import
-                const result = await importUserData(token, importFile, importPassword);
+                const currentUserId = session?.user?.id;
+                if (!currentUserId) {
+                    throw new Error('Not authenticated');
+                }
+                const result = await importUserData(token, importFile, importPassword, currentUserId);
 
                 setMessage({
                     type: 'success',
@@ -623,12 +618,16 @@ export function BackupSettings() {
         <div className="space-y-8">
             {/* Password Prompt Modal */}
             {showPasswordPrompt && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900 rounded-lg p-6 max-w-md w-full border border-slate-700">
-                        <h3 className="text-xl font-semibold text-white mb-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+                    <div className="cosmic-glass-card cosmic-glow-border w-full max-w-md rounded-3xl p-6">
+                        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.26em] text-amber-200">
+                            <span>VAULT</span>
+                            <span>UNLOCK</span>
+                        </div>
+                        <h3 className="mb-4 text-xl font-semibold text-white">
                             {t('settings.backup_settings.unlock_vault_title')}
                         </h3>
-                        <p className="text-slate-400 text-sm mb-4">
+                        <p className="mb-4 text-sm text-slate-300">
                             {t('settings.backup_settings.unlock_vault_desc')}
                         </p>
                         <input
@@ -636,12 +635,12 @@ export function BackupSettings() {
                             value={unlockPassword}
                             onChange={(e) => setUnlockPassword(e.target.value)}
                             placeholder={t('settings.backup_settings.password_placeholder')}
-                            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white mb-4 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            className="cosmic-input mb-4 w-full"
                             onKeyDown={(e) => e.key === 'Enter' && handleUnlockVault()}
                             autoFocus
                         />
                         {unlockError && (
-                            <p className="text-red-400 text-sm mb-4">{unlockError}</p>
+                            <p className="mb-4 text-sm text-red-200">{unlockError}</p>
                         )}
                         <div className="flex gap-3">
                             <button
@@ -650,14 +649,14 @@ export function BackupSettings() {
                                     setUnlockPassword("");
                                     setUnlockError("");
                                 }}
-                                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg"
+                                className="cosmic-btn-ghost flex-1"
                             >
                                 {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleUnlockVault}
                                 disabled={loading || !unlockPassword}
-                                className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="cosmic-cta flex flex-1 items-center justify-center gap-2 disabled:opacity-60"
                             >
                                 {loading && (
                                     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -674,91 +673,75 @@ export function BackupSettings() {
 
             {/* Status Message */}
             {message && (
-                <div className={`p-4 rounded-lg border ${message.type === "success"
-                    ? "bg-green-500/10 border-green-500/40 text-green-300"
-                    : "bg-red-500/10 border-red-500/40 text-red-300"
+                <div className={`rounded-2xl border px-4 py-3 text-sm ${message.type === "success"
+                    ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                    : "border-red-400/30 bg-red-500/10 text-red-200"
                     }`}>
                     {message.text}
                 </div>
             )}
 
-            {/* Recovery Keys Export */}
-            <div>
-                <h2 className="text-xl font-semibold text-white mb-4">{t('settings.backup_settings.keys_backup_title')}</h2>
-                <div className="p-6 bg-slate-900/50 rounded-lg border border-slate-800">
-                    <div className="flex items-start gap-4">
-                        <div className="p-3 bg-amber-500/20 rounded-full">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                            </svg>
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-lg font-medium text-white mb-2">{t('settings.backup_settings.export_recovery_keys')}</h3>
-                            <p className="text-slate-400 text-sm mb-4">
-                                {t('settings.backup_settings.export_recovery_keys_desc')}
-                            </p>
+            {/* Primary CTA — download the Eidolon keybundle (identity backup). */}
+            {linkedVault && (
+                <div>
+                    <h2 className="mb-4 text-xl font-semibold text-white">
+                        {t('settings.backup_settings.keybundle_title')}
+                    </h2>
+                    <div className="cosmic-glass-card cosmic-glow-border rounded-3xl border border-amber-400/20 p-6">
+                        <p className="mb-4 text-sm leading-6 text-slate-300">
+                            {t('settings.backup_settings.keybundle_desc')}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-3">
                             <button
-                                onClick={exportRecoveryKeys}
-                                disabled={loading}
-                                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={handleDownloadKeybundle}
+                                disabled={keybundleState === 'downloading'}
+                                className="cosmic-cta inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                {loading ? (
-                                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                ) : (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                )}
-                                {loading ? t('settings.backup_settings.exporting') : t('settings.backup_settings.export_keys_button')}
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                {keybundleState === 'downloading'
+                                    ? t('settings.backup_settings.keybundle_downloading')
+                                    : t('settings.backup_settings.keybundle_download')}
                             </button>
+                            {keybundleState === 'ok' && (
+                                <span className="text-xs text-emerald-300/80">{keybundleMessage}</span>
+                            )}
+                            {keybundleState === 'error' && (
+                                <span className="text-xs text-rose-300/80">{keybundleMessage}</span>
+                            )}
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Data Portability Section (RGPD Article 20) */}
+            {/* Conversations export / import. */}
             <div>
-                <h2 className="text-xl font-semibold text-white mb-4">
-                    {t('settings.backup_settings.rgpd_title', 'RGPD Data Portability')}
+                <h2 className="mb-4 text-xl font-semibold text-white">
+                    {t('settings.backup_settings.conversations_title')}
                 </h2>
-                <div className="p-6 bg-slate-900/50 rounded-lg border border-slate-800">
-                    <div className="flex items-start gap-4 mb-6">
-                        <div className="p-3 bg-green-500/20 rounded-full">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-medium text-white mb-2">
-                                {t('settings.backup_settings.rgpd_desc_title', 'Your Data, Your Control')}
-                            </h3>
-                            <p className="text-slate-400 text-sm">
-                                {t('settings.backup_settings.rgpd_desc', 'Export all your data (conversations, messages, contacts) in a portable JSON format. Optionally encrypt with a password for secure storage. Import on any Cipher Pulse instance.')}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="cosmic-glass-card cosmic-glow-border rounded-3xl p-6">
+                    <p className="mb-5 text-sm leading-6 text-slate-300">
+                        {t('settings.backup_settings.conversations_desc')}
+                    </p>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <button
                             onClick={() => setShowExportModal(true)}
-                            className="px-4 py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                            className="cosmic-cta inline-flex min-h-[56px] items-center justify-center gap-2 shadow-[0_10px_30px_rgba(16,185,129,0.18)]"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
-                            {t('settings.backup_settings.export_all_data', 'Export All Data')}
+                            {t('settings.backup_settings.conversations_export')}
                         </button>
                         <button
                             onClick={() => setShowImportModal(true)}
-                            className="px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                            className="cosmic-btn-ghost inline-flex min-h-[56px] items-center justify-center gap-2 border-white/10 bg-white/[0.03]"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                             </svg>
-                            {t('settings.backup_settings.import_data', 'Import Data')}
+                            {t('settings.backup_settings.conversations_import')}
                         </button>
                     </div>
                 </div>
@@ -766,22 +749,28 @@ export function BackupSettings() {
 
             {/* Secure Backup Export Modal */}
             {showExportModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900 rounded-lg p-6 max-w-md w-full border border-slate-700">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+                    <div className="cosmic-glass-card cosmic-glow-border w-full max-w-md rounded-3xl p-6">
+                        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.26em] text-emerald-200">
+                            <span>SECURE</span>
+                            <span>BACKUP</span>
+                        </div>
                         <h3 className="text-xl font-semibold text-white mb-4">
-                            {t('settings.backup_settings.export_data_title', 'Create Secure Backup')}
+                            {t('settings.backup_settings.export_data_title', linkedVault
+                                ? 'Nouvelle sauvegarde Cipher'
+                                : 'Nouvelle sauvegarde chiffrée')}
                         </h3>
 
                         {/* Progress indicator */}
                         {exportProgress && (
                             <div className="mb-4">
-                                <div className="flex justify-between text-sm text-slate-400 mb-1">
+                                <div className="flex justify-between text-sm text-slate-300 mb-1">
                                     <span>{exportProgress.stage}</span>
                                     <span>{Math.round(exportProgress.progress)}%</span>
                                 </div>
-                                <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+                                <div className="w-full h-2 bg-slate-900/80 rounded-full overflow-hidden">
                                     <div 
-                                        className="h-full bg-green-500 transition-all duration-300"
+                                        className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-300"
                                         style={{ width: `${exportProgress.progress}%` }}
                                     />
                                 </div>
@@ -790,10 +779,9 @@ export function BackupSettings() {
 
                         <div className="space-y-4 mb-6">
                             {/* Security info */}
-                            <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                                <p className="text-green-400 text-sm">
-                                    <strong>{t('settings.backup_settings.secure_format', 'Secure Format:')}</strong> {t('settings.backup_settings.secure_format_desc', 'Argon2id key derivation + XChaCha20-Poly1305 encryption')}
-                                </p>
+                            <div className="flex items-start gap-2.5 rounded-2xl border border-white/8 bg-white/[0.03] px-3.5 py-2.5">
+                                <span className="mt-px shrink-0 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-400">crypto</span>
+                                <span className="text-xs leading-relaxed text-slate-400">{t('settings.backup_settings.secure_format_desc', 'Argon2id + XChaCha20-Poly1305')}</span>
                             </div>
 
                             <label className="flex items-center gap-3 cursor-pointer">
@@ -801,23 +789,23 @@ export function BackupSettings() {
                                     type="checkbox"
                                     checked={includeMessages}
                                     onChange={(e) => setIncludeMessages(e.target.checked)}
-                                    className="w-5 h-5 rounded bg-slate-800 border-slate-600"
+                                    className="h-5 w-5 rounded border-white/20 bg-slate-950/80 text-cyan-400 focus:ring-cyan-400"
                                     disabled={loading}
                                 />
-                                <span className="text-slate-300">
-                                    {t('settings.backup_settings.include_messages', 'Include message history')}
+                                <span className="text-slate-200">
+                                    {t('settings.backup_settings.include_messages', 'Inclure l\'historique des messages')}
                                 </span>
                             </label>
 
-                            <div className="border-t border-slate-700 pt-4">
+                            <div className="border-t border-white/10 pt-4">
                                 {checkingSavedExportPassword ? (
-                                    <p className="text-slate-400 text-sm">
+                                    <p className="text-slate-300 text-sm">
                                         {t('settings.backup_settings.checking_saved_password', 'Checking saved backup password for this device...')}
                                     </p>
                                 ) : hasSavedExportPassword && !changeExportPassword ? (
-                                    <div className="p-3 bg-slate-800/40 border border-slate-700 rounded-lg">
-                                        <p className="text-slate-300 text-sm">
-                                            {t('settings.backup_settings.saved_password_in_use', 'A backup password is already set for this device. Future exports will reuse it automatically.')}
+                                    <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
+                                        <p className="text-slate-200 text-sm">
+                                            {t('settings.backup_settings.saved_password_in_use', 'Mot de passe de sauvegarde actif sur cet appareil. Les exports suivants le réutiliseront.')}
                                         </p>
                                         <div className="mt-3 flex gap-2">
                                             <button
@@ -827,7 +815,7 @@ export function BackupSettings() {
                                                     setExportPassword('');
                                                     setExportPasswordConfirm('');
                                                 }}
-                                                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm"
+                                                className="cosmic-btn-ghost text-sm"
                                                 disabled={loading}
                                             >
                                                 {t('settings.backup_settings.change_backup_password', 'Change password')}
@@ -836,15 +824,15 @@ export function BackupSettings() {
                                     </div>
                                 ) : (
                                     <>
-                                        <p className="text-slate-400 text-sm mb-3">
-                                            {t('settings.backup_settings.backup_password_required', 'Create a strong password to protect your backup:')}
+                                        <p className="text-slate-300 text-sm mb-3">
+                                            {t('settings.backup_settings.backup_password_required', 'Définissez un mot de passe pour protéger la sauvegarde :')}
                                         </p>
                                         <input
                                             type="password"
                                             value={exportPassword}
                                             onChange={(e) => setExportPassword(e.target.value)}
                                             placeholder={t('settings.backup_settings.export_password_placeholder', 'Backup password (min. 8 characters)')}
-                                            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white mb-2"
+                                            className="cosmic-input w-full mb-2"
                                             disabled={loading}
                                         />
                                         <input
@@ -852,11 +840,11 @@ export function BackupSettings() {
                                             value={exportPasswordConfirm}
                                             onChange={(e) => setExportPasswordConfirm(e.target.value)}
                                             placeholder={t('settings.backup_settings.confirm_password', 'Confirm password')}
-                                            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
+                                            className="cosmic-input w-full"
                                             disabled={loading}
                                         />
                                         {exportPassword && exportPassword.length < 8 && (
-                                            <p className="text-amber-400 text-xs mt-1">
+                                            <p className="text-amber-200 text-xs mt-1">
                                                 {t('settings.backup_settings.password_min_length', 'Password must be at least 8 characters')}
                                             </p>
                                         )}
@@ -873,7 +861,7 @@ export function BackupSettings() {
                                     setExportPasswordConfirm('');
                                     setExportProgress(null);
                                 }}
-                                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg"
+                                className="cosmic-btn-ghost flex-1"
                                 disabled={loading}
                             >
                                 {t('common.cancel')}
@@ -887,7 +875,7 @@ export function BackupSettings() {
                                         ? !exportPassword || exportPassword.length < 8 || exportPassword !== exportPasswordConfirm
                                         : false)
                                 }
-                                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="cosmic-cta flex flex-1 items-center justify-center gap-2 disabled:opacity-60"
                             >
                                 {loading && (
                                     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -904,22 +892,32 @@ export function BackupSettings() {
 
             {/* Secure Backup Import Modal */}
             {showImportModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900 rounded-lg p-6 max-w-md w-full border border-slate-700">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+                    <div className="cosmic-glass-card cosmic-glow-border w-full max-w-md rounded-3xl p-6">
+                        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.26em] text-cyan-200">
+                            <span>RESTORE</span>
+                            <span>BACKUP</span>
+                        </div>
                         <h3 className="text-xl font-semibold text-white mb-4">
-                            {t('settings.backup_settings.import_data_title', 'Restore from Backup')}
+                            {t('settings.backup_settings.import_data_title', linkedVault
+                                ? 'Restaurer une sauvegarde'
+                                : 'Importer une sauvegarde')}
                         </h3>
+
+                        <div className="mb-4 rounded-2xl border border-cyan-400/25 bg-cyan-400/[0.06] p-3 text-xs leading-5 text-slate-200">
+                            {t('settings.backup_settings.import_merge_notice')}
+                        </div>
 
                         {/* Progress indicator */}
                         {exportProgress && (
                             <div className="mb-4">
-                                <div className="flex justify-between text-sm text-slate-400 mb-1">
+                                <div className="flex justify-between text-sm text-slate-300 mb-1">
                                     <span>{exportProgress.stage}</span>
                                     <span>{Math.round(exportProgress.progress)}%</span>
                                 </div>
-                                <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+                                <div className="w-full h-2 bg-slate-900/80 rounded-full overflow-hidden">
                                     <div 
-                                        className="h-full bg-green-500 transition-all duration-300"
+                                        className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-300"
                                         style={{ width: `${exportProgress.progress}%` }}
                                     />
                                 </div>
@@ -928,43 +926,50 @@ export function BackupSettings() {
 
                         <div className="space-y-4 mb-6">
                             <div>
-                                <label className="block text-slate-300 text-sm mb-2">
-                                    {t('settings.backup_settings.select_file', 'Select backup file')}
+                                <label className="block text-slate-200 text-sm mb-2">
+                                    {t('settings.backup_settings.select_file', 'Fichier de sauvegarde')}
                                 </label>
                                 <input
                                     type="file"
                                     accept=".json"
                                     onChange={handleImportFileSelect}
                                     disabled={loading}
-                                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-slate-700 file:text-white disabled:opacity-50"
+                                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-2 text-white file:mr-4 file:rounded-full file:border file:border-white/10 file:bg-white/5 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-200 disabled:opacity-50"
                                 />
                             </div>
 
                             {/* v2 Backup Validation */}
                             {backupValidation && (
-                                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30">
-                                    <div className="text-green-400 text-sm">
-                                        <p className="font-medium">{t('settings.backup_settings.secure_backup_v2', 'Secure Backup v2')}</p>
-                                        <p className="text-xs mt-1">
-                                            {t('settings.backup_settings.created_at', 'Created')}: {backupValidation.createdAt ? new Date(backupValidation.createdAt).toLocaleString() : 'Unknown'}
-                                        </p>
+                                <div className="flex items-start gap-2.5 rounded-2xl border border-white/8 bg-white/[0.03] px-3.5 py-2.5">
+                                    <span className="mt-px shrink-0 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-400">v2</span>
+                                    <div className="text-xs leading-relaxed text-slate-400">
+                                        <span className="text-slate-300">{t('settings.backup_settings.secure_backup_v2', 'Sauvegarde chiffree v2')}</span>
+                                        {backupValidation.createdAt && (
+                                            <span className="ml-2 text-slate-500">{new Date(backupValidation.createdAt).toLocaleString()}</span>
+                                        )}
                                     </div>
                                 </div>
                             )}
 
                             {/* v1 Backup Validation */}
                             {importValidation && !backupValidation && (
-                                <div className={`p-3 rounded-lg ${importValidation.valid ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+                                <div className="flex items-start gap-2.5 rounded-2xl border border-white/8 bg-white/[0.03] px-3.5 py-2.5">
                                     {importValidation.valid ? (
-                                        <div className="text-amber-400 text-sm">
-                                            <p className="font-medium">{t('settings.backup_settings.legacy_backup', 'Legacy Backup v1')}</p>
-                                            <p className="text-xs mt-1">
-                                                {importValidation.stats.conversations} conversations, {importValidation.stats.messages} messages
-                                                {importValidation.encrypted && ' (encrypted)'}
-                                            </p>
-                                        </div>
+                                        <>
+                                            <span className="mt-px shrink-0 rounded-md border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-400">v1</span>
+                                            <div className="text-xs leading-relaxed text-slate-400">
+                                                <span className="text-slate-300">{t('settings.backup_settings.legacy_backup', 'Sauvegarde legacy')}</span>
+                                                <span className="ml-2 text-slate-500">
+                                                    {importValidation.stats.conversations} conv. {importValidation.stats.messages} msg.
+                                                    {importValidation.encrypted && ' (chiffre)'}
+                                                </span>
+                                            </div>
+                                        </>
                                     ) : (
-                                        <p className="text-red-400 text-sm">{t('settings.backup_settings.invalid_file', 'Invalid backup file')}</p>
+                                        <>
+                                            <span className="mt-px shrink-0 rounded-md border border-red-500/25 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-red-400">err</span>
+                                            <span className="text-xs leading-relaxed text-slate-400">{t('settings.backup_settings.invalid_file', 'Fichier invalide')}</span>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -972,7 +977,7 @@ export function BackupSettings() {
                             {/* Password input - always shown for v2, conditional for v1 */}
                             {(backupValidation || importValidation?.encrypted) && (
                                 <div>
-                                    <label className="block text-slate-300 text-sm mb-2">
+                                    <label className="block text-slate-200 text-sm mb-2">
                                         {t('settings.backup_settings.decrypt_password', 'Backup password')}
                                     </label>
                                     <input
@@ -980,7 +985,7 @@ export function BackupSettings() {
                                         value={importPassword}
                                         onChange={(e) => setImportPassword(e.target.value)}
                                         placeholder={t('settings.backup_settings.enter_password', 'Enter password')}
-                                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
+                                        className="cosmic-input w-full"
                                         disabled={loading}
                                     />
                                 </div>
@@ -997,7 +1002,7 @@ export function BackupSettings() {
                                     setBackupValidation(null);
                                     setExportProgress(null);
                                 }}
-                                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg"
+                                className="cosmic-btn-ghost flex-1"
                                 disabled={loading}
                             >
                                 {t('common.cancel')}
@@ -1005,7 +1010,7 @@ export function BackupSettings() {
                             <button
                                 onClick={handleRgpdImport}
                                 disabled={loading || !importFile || (!backupValidation && !importValidation?.valid) || ((backupValidation || importValidation?.encrypted) && !importPassword)}
-                                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="cosmic-cta flex flex-1 items-center justify-center gap-2 disabled:opacity-60"
                             >
                                 {loading && (
                                     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">

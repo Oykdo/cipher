@@ -12,6 +12,7 @@ export * from './Dialog';
 // Loading states
 export * from './Skeleton';
 export * from './Spinner';
+export * from './AtomLoader';
 
 // Empty states
 export * from './EmptyState';

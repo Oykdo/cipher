@@ -31,6 +31,7 @@ import { getCachedDecryptedMessage } from '../e2ee/decryptedMessageCache';
 import { decryptReceivedMessage } from '../e2ee/messagingIntegration';
 import { getMyFingerprint, isE2EEInitialized } from '../e2ee/e2eeService';
 import { useAuthStore } from '../../store/auth';
+import { apiv2 } from '../../services/api-v2';
 
 import { debugLogger } from "../debugLogger";
 /**
@@ -61,8 +62,6 @@ export async function exportToBackupVault(
   try {
     // Fetch user data from API
     onProgress?.('Fetching conversations...', 10);
-    const { apiv2 } = await import('../../services/api-v2');
-    
     const { conversations } = await apiv2.listConversations();
     const contacts = options.includeContacts ? await fetchContacts() : [];
 
@@ -419,7 +418,6 @@ async function fetchContacts(): Promise<Array<{
 }>> {
   try {
     // Fetch contacts from conversations (users we've messaged)
-    const { apiv2 } = await import('../../services/api-v2');
     const { conversations } = await apiv2.listConversations();
     
     // Extract unique contacts

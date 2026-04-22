@@ -19,8 +19,8 @@ const DEFAULT_PROD_ORIGINS = Array.from(
     new Set(
         [
             renderOrigin,
-            'https://cipher-pulse.onrender.com',
-            'https://www.cipher-pulse.onrender.com',
+            'https://cipher.onrender.com',
+            'https://www.cipher.onrender.com',
             'https://cipher-7d9p.onrender.com',
             'https://www.cipher-7d9p.onrender.com',
             'https://cipher.onrender.com',

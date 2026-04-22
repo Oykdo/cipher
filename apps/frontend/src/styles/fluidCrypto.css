@@ -247,6 +247,247 @@ body {
 }
 
 /* ============================================================================
+   AUTH SCENE - Cipher x Eidolon login signature
+   ============================================================================ */
+
+.auth-login-scene {
+  isolation: isolate;
+}
+
+.auth-login-atmosphere {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.auth-login-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(14px);
+  opacity: 0.65;
+}
+
+.auth-login-orb-cyan {
+  width: 28rem;
+  height: 28rem;
+  top: -8rem;
+  left: -10rem;
+  background:
+    radial-gradient(circle,
+      rgba(0, 229, 255, 0.2) 0%,
+      rgba(0, 229, 255, 0.08) 38%,
+      transparent 72%);
+}
+
+.auth-login-orb-magenta {
+  width: 32rem;
+  height: 32rem;
+  right: -12rem;
+  bottom: -10rem;
+  background:
+    radial-gradient(circle,
+      rgba(217, 70, 239, 0.18) 0%,
+      rgba(217, 70, 239, 0.08) 42%,
+      transparent 74%);
+}
+
+.auth-login-orb-amber {
+  width: 20rem;
+  height: 20rem;
+  top: 24%;
+  right: 18%;
+  background:
+    radial-gradient(circle,
+      rgba(245, 158, 11, 0.14) 0%,
+      rgba(245, 158, 11, 0.05) 44%,
+      transparent 72%);
+}
+
+.auth-login-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 120px 120px;
+  mask-image: radial-gradient(circle at center, black 30%, transparent 85%);
+  opacity: 0.3;
+}
+
+.auth-login-runes {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: space-between;
+  justify-content: space-between;
+  padding: 4rem 5rem;
+  font-size: 0.66rem;
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.45em;
+  color: rgba(250, 250, 250, 0.12);
+  text-transform: uppercase;
+}
+
+.auth-viewport {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  position: relative;
+}
+
+.auth-stage {
+  width: 100%;
+  position: relative;
+}
+
+.auth-stage-narrow {
+  max-width: 40rem;
+}
+
+.auth-stage-wide {
+  max-width: 72rem;
+}
+
+.auth-header {
+  position: relative;
+}
+
+.auth-kicker {
+  margin-bottom: 0.9rem;
+  font-size: 0.72rem;
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  color: rgba(250, 250, 250, 0.54);
+}
+
+.auth-title {
+  letter-spacing: -0.04em;
+}
+
+.auth-subtitle {
+  max-width: 42rem;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.7;
+}
+
+.auth-panel {
+  border-radius: 2rem;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+    rgba(13, 16, 22, 0.78);
+}
+
+.auth-panel-cyan {
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.48),
+    0 0 0 1px rgba(0, 229, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.auth-panel-magenta {
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.48),
+    0 0 0 1px rgba(217, 70, 239, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.auth-panel-error {
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.48),
+    0 0 0 1px rgba(239, 68, 68, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.auth-method-grid {
+  align-items: stretch;
+}
+
+.auth-method-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-method-hero::after {
+  content: '';
+  position: absolute;
+  inset: auto -8% -42% auto;
+  width: 20rem;
+  height: 20rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.16), transparent 70%);
+}
+
+.auth-method-preview {
+  border-radius: 1.4rem;
+  backdrop-filter: blur(18px);
+}
+
+.auth-method-card {
+  min-height: 17.5rem;
+  border-radius: 1.75rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-method-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), transparent 55%);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.auth-method-mark {
+  font-size: 0.95rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  font-weight: var(--font-black);
+  color: rgba(250, 250, 250, 0.9);
+}
+
+.auth-inline-note {
+  border-radius: 1.2rem;
+}
+
+.auth-alert {
+  border-radius: 1.2rem;
+  backdrop-filter: blur(14px);
+}
+
+.auth-actions {
+  flex-wrap: wrap;
+}
+
+.auth-actions > * {
+  min-width: 10rem;
+}
+
+.auth-dropzone {
+  min-height: 13rem;
+  border-radius: 1.5rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.015);
+  transition: all var(--duration-normal) var(--ease-fluid);
+}
+
+.auth-dropzone:hover {
+  transform: translateY(-1px);
+}
+
+/* ============================================================================
    GLASSMORPHISM
    ============================================================================ */
 
@@ -504,6 +745,22 @@ body {
   }
   100% {
     transform: translateX(100%);
+  }
+}
+
+/* ============================================================================
+   VAULT DETECTED — Animated conic border
+   ============================================================================ */
+
+@property --vault-border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes vault-border-spin {
+  to {
+    --vault-border-angle: 360deg;
   }
 }
 
@@ -797,6 +1054,30 @@ body {
    ============================================================================ */
 
 @media (max-width: 768px) {
+  .auth-login-runes {
+    padding: 2.5rem 1.5rem;
+    font-size: 0.56rem;
+    letter-spacing: 0.28em;
+  }
+
+  .auth-viewport {
+    padding: 1.5rem 1rem;
+  }
+
+  .auth-panel,
+  .auth-method-card,
+  .auth-method-preview,
+  .auth-inline-note,
+  .auth-alert,
+  .auth-dropzone {
+    border-radius: 1.35rem;
+  }
+
+  .auth-actions > * {
+    min-width: unset;
+    flex: 1 1 100%;
+  }
+
   .dice-input {
     width: 3rem;
     height: 3rem;
@@ -856,4 +1137,850 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ============================================================================
+   COSMIC CYBERPUNK — Theme Extension
+   Deep void · Animated nebula · Glassmorphism pulse · P2P grid
+   ============================================================================ */
+
+:root {
+  /* Void Palette */
+  --cosmic-void: #020408;
+  --cosmic-void-deep: #060b18;
+  --cosmic-void-mid: #0a1025;
+  --cosmic-indigo: #0f0a2e;
+  --cosmic-indigo-rich: #1a0e4a;
+
+  /* Neon Accents */
+  --cosmic-cyan: #00f0ff;
+  --cosmic-cyan-soft: #00c8e0;
+  --cosmic-cyan-dim: #007a8a;
+  --cosmic-cyan-glow: rgba(0, 240, 255, 0.35);
+  --cosmic-violet: #7b2fff;
+  --cosmic-violet-mid: #5b1fd0;
+  --cosmic-violet-glow: rgba(123, 47, 255, 0.3);
+  --cosmic-magenta: #c040ff;
+
+  /* Glass */
+  --cosmic-glass-bg: rgba(8, 12, 32, 0.55);
+  --cosmic-glass-border: rgba(0, 240, 255, 0.12);
+  --cosmic-glass-highlight: rgba(0, 240, 255, 0.06);
+
+  /* Text */
+  --cosmic-text: #e8edf5;
+  --cosmic-text-soft: rgba(200, 215, 240, 0.6);
+  --cosmic-text-muted: rgba(160, 180, 210, 0.4);
+}
+
+/* ── Scene Container ───────────────────────────────────── */
+
+.cosmic-scene {
+  position: relative;
+  min-height: 100vh;
+  background: var(--cosmic-void);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* ── Animated Nebula (CSS only, 3 layers) ──────────────── */
+
+.cosmic-nebula {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.cosmic-nebula::before,
+.cosmic-nebula::after,
+.cosmic-nebula-layer {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  will-change: transform;
+}
+
+/* Layer 1: Deep Indigo Core */
+.cosmic-nebula::before {
+  width: 140%;
+  height: 140%;
+  top: -30%;
+  left: -20%;
+  background: radial-gradient(
+    ellipse at 35% 40%,
+    rgba(15, 10, 46, 0.8) 0%,
+    rgba(26, 14, 74, 0.3) 35%,
+    transparent 70%
+  );
+  animation: cosmic-nebula-drift-1 30s ease-in-out infinite;
+}
+
+/* Layer 2: Cyan Wisps */
+.cosmic-nebula::after {
+  width: 120%;
+  height: 120%;
+  bottom: -25%;
+  right: -15%;
+  background: radial-gradient(
+    ellipse at 65% 60%,
+    rgba(0, 240, 255, 0.06) 0%,
+    rgba(0, 200, 224, 0.025) 40%,
+    transparent 70%
+  );
+  animation: cosmic-nebula-drift-2 40s ease-in-out infinite;
+}
+
+/* Layer 3: Violet Hint (extra div required) */
+.cosmic-nebula-layer {
+  width: 100%;
+  height: 100%;
+  top: 10%;
+  left: 20%;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    rgba(123, 47, 255, 0.045) 0%,
+    rgba(192, 64, 255, 0.015) 45%,
+    transparent 75%
+  );
+  animation: cosmic-nebula-drift-3 50s ease-in-out infinite;
+}
+
+@keyframes cosmic-nebula-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(3%, 2%) scale(1.02); }
+  66% { transform: translate(-2%, -1%) scale(0.98); }
+}
+
+@keyframes cosmic-nebula-drift-2 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-4%, 3%) rotate(2deg); }
+}
+
+@keyframes cosmic-nebula-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(5%, -3%) scale(1.03); }
+  70% { transform: translate(-3%, 2%) scale(0.97); }
+}
+
+/* ── Star Field (CSS box-shadow technique) ─────────────── */
+
+.cosmic-stars {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.cosmic-stars::before,
+.cosmic-stars::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+}
+
+.cosmic-stars::before {
+  box-shadow:
+    120px 80px 0 0 rgba(200,220,255,0.4),
+    350px 150px 0 0 rgba(200,220,255,0.3),
+    580px 60px 0 0 rgba(200,220,255,0.5),
+    800px 200px 0 0 rgba(200,220,255,0.25),
+    200px 350px 0 0 rgba(200,220,255,0.4),
+    450px 420px 0 0 rgba(200,220,255,0.35),
+    680px 380px 0 0 rgba(200,220,255,0.3),
+    950px 100px 0 0 rgba(200,220,255,0.45),
+    100px 520px 0 0 rgba(200,220,255,0.3),
+    750px 550px 0 0 rgba(200,220,255,0.4),
+    300px 600px 0 0 rgba(200,220,255,0.25),
+    1100px 300px 0 0 rgba(200,220,255,0.35),
+    1250px 450px 0 0 rgba(200,220,255,0.3),
+    50px 700px 0 0 rgba(200,220,255,0.45),
+    900px 650px 0 0 rgba(200,220,255,0.3),
+    550px 750px 0 0 rgba(200,220,255,0.2),
+    1300px 180px 0 0 rgba(200,220,255,0.35),
+    1400px 600px 0 0 rgba(200,220,255,0.25),
+    420px 50px 0 0 rgba(0,240,255,0.3),
+    870px 470px 0 0 rgba(0,240,255,0.25);
+  animation: cosmic-star-twinkle 6s ease-in-out infinite;
+}
+
+.cosmic-stars::after {
+  box-shadow:
+    180px 130px 0 0 rgba(200,220,255,0.3),
+    400px 250px 0 0 rgba(200,220,255,0.45),
+    620px 170px 0 0 rgba(200,220,255,0.25),
+    840px 330px 0 0 rgba(200,220,255,0.35),
+    260px 440px 0 0 rgba(200,220,255,0.3),
+    500px 520px 0 0 rgba(200,220,255,0.4),
+    720px 280px 0 0 rgba(200,220,255,0.2),
+    1000px 420px 0 0 rgba(200,220,255,0.45),
+    160px 620px 0 0 rgba(200,220,255,0.25),
+    380px 700px 0 0 rgba(200,220,255,0.35),
+    1150px 150px 0 0 rgba(200,220,255,0.3),
+    1050px 580px 0 0 rgba(200,220,255,0.4),
+    700px 90px 0 0 rgba(123,47,255,0.25),
+    1200px 700px 0 0 rgba(123,47,255,0.2);
+  animation: cosmic-star-twinkle 6s ease-in-out infinite 3s;
+}
+
+@keyframes cosmic-star-twinkle {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* ── P2P Grid Decoration ───────────────────────────────── */
+
+.cosmic-p2p-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image:
+    linear-gradient(rgba(0, 240, 255, 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.4) 1px, transparent 1px);
+  background-size: 140px 140px;
+  mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
+}
+
+/* Floating nodes */
+.cosmic-p2p-node {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--cosmic-cyan);
+  box-shadow: 0 0 8px var(--cosmic-cyan-glow);
+  opacity: 0.3;
+  animation: cosmic-float 8s ease-in-out infinite;
+}
+
+.cosmic-p2p-node:nth-child(2) { animation-delay: -2s; opacity: 0.2; }
+.cosmic-p2p-node:nth-child(3) { animation-delay: -4s; opacity: 0.25; }
+.cosmic-p2p-node:nth-child(4) { animation-delay: -6s; opacity: 0.15; }
+
+@keyframes cosmic-float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  25% { transform: translateY(-12px) translateX(4px); }
+  50% { transform: translateY(-6px) translateX(-6px); }
+  75% { transform: translateY(-18px) translateX(2px); }
+}
+
+/* ── Volumetric Overlay ────────────────────────────────── */
+
+.cosmic-volumetric {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 45%, rgba(0, 240, 255, 0.02) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 50%, rgba(123, 47, 255, 0.015) 0%, transparent 60%);
+}
+
+/* ── Glassmorphism Card ────────────────────────────────── */
+
+.cosmic-glass-card {
+  position: relative;
+  border-radius: 1.25rem;
+  background: var(--cosmic-glass-bg);
+  backdrop-filter: blur(40px) saturate(1.6);
+  -webkit-backdrop-filter: blur(40px) saturate(1.6);
+  border: 1px solid var(--cosmic-glass-border);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
+    inset 0 0 60px 0 rgba(0, 240, 255, 0.01),
+    0 25px 60px -12px rgba(0, 0, 0, 0.5),
+    0 0 80px -20px rgba(0, 240, 255, 0.06);
+}
+
+/* ── Pulsating Glow Border ─────────────────────────────── */
+
+.cosmic-glow-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: calc(1.25rem + 1px);
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 240, 255, 0.35) 0%,
+    rgba(123, 47, 255, 0.15) 30%,
+    rgba(0, 240, 255, 0.08) 60%,
+    rgba(123, 47, 255, 0.3) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: cosmic-border-pulse 4s ease-in-out infinite;
+  z-index: 0;
+}
+
+@keyframes cosmic-border-pulse {
+  0%, 100% {
+    opacity: 0.6;
+    filter: drop-shadow(0 0 6px rgba(0, 240, 255, 0.15));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 18px rgba(0, 240, 255, 0.3))
+           drop-shadow(0 0 35px rgba(123, 47, 255, 0.12));
+  }
+}
+
+/* ── Cosmic Input ──────────────────────────────────────── */
+
+.cosmic-input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  padding-left: 2.75rem;
+  border: 1px solid rgba(0, 240, 255, 0.08);
+  border-radius: 0.75rem;
+  background: rgba(4, 8, 20, 0.7);
+  color: var(--cosmic-text);
+  font-size: var(--text-base);
+  transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cosmic-input::placeholder {
+  color: rgba(0, 240, 255, 0.15);
+  font-weight: 300;
+}
+
+.cosmic-input:focus {
+  outline: none;
+  border-color: rgba(0, 240, 255, 0.3);
+  background: rgba(4, 8, 20, 0.85);
+  box-shadow:
+    0 0 0 3px rgba(0, 240, 255, 0.06),
+    inset 0 0 20px rgba(0, 240, 255, 0.02);
+}
+
+.cosmic-input:hover:not(:focus) {
+  border-color: rgba(0, 240, 255, 0.15);
+}
+
+/* Input without icon padding */
+.cosmic-input-plain {
+  padding-left: 1rem;
+}
+
+/* Input icon */
+.cosmic-input-icon {
+  position: absolute;
+  left: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: var(--cosmic-text-muted);
+  pointer-events: none;
+  transition: color 300ms ease;
+}
+
+.cosmic-input-wrap:focus-within .cosmic-input-icon {
+  color: var(--cosmic-cyan);
+  filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.3));
+}
+
+.cosmic-input-wrap {
+  position: relative;
+}
+
+/* ── CTA Button (Gradient Violet→Cyan) ─────────────────── */
+
+.cosmic-cta {
+  position: relative;
+  width: 100%;
+  padding: 0.9rem 1.5rem;
+  border: none;
+  border-radius: 0.875rem;
+  background: linear-gradient(135deg, var(--cosmic-violet) 0%, var(--cosmic-violet-mid) 40%, var(--cosmic-cyan-soft) 100%);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: var(--text-base);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1;
+}
+
+.cosmic-cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0.875rem;
+  background: linear-gradient(135deg, var(--cosmic-violet) 0%, var(--cosmic-magenta) 50%, var(--cosmic-cyan) 100%);
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.cosmic-cta:hover::before {
+  opacity: 1;
+}
+
+.cosmic-cta:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 30px -5px rgba(123, 47, 255, 0.4),
+    0 0 50px -10px rgba(0, 240, 255, 0.15);
+}
+
+.cosmic-cta:active {
+  transform: translateY(0);
+}
+
+.cosmic-cta:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.cosmic-cta > span {
+  position: relative;
+  z-index: 2;
+}
+
+/* CTA volumetric glow underneath */
+.cosmic-cta-glow {
+  position: absolute;
+  bottom: -25px;
+  left: 10%;
+  width: 80%;
+  height: 50px;
+  background: radial-gradient(ellipse at center, rgba(123, 47, 255, 0.2) 0%, rgba(0, 240, 255, 0.08) 40%, transparent 70%);
+  filter: blur(18px);
+  pointer-events: none;
+  animation: cosmic-cta-pulse 3s ease-in-out infinite;
+}
+
+@keyframes cosmic-cta-pulse {
+  0%, 100% { opacity: 0.5; transform: scaleX(1); }
+  50% { opacity: 1; transform: scaleX(1.08); }
+}
+
+/* ── Separator with Pulse Dot ──────────────────────────── */
+
+.cosmic-separator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 1.5rem 0;
+}
+
+.cosmic-sep-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(0, 240, 255, 0.15) 50%, transparent 100%);
+}
+
+.cosmic-sep-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--cosmic-cyan);
+  box-shadow: 0 0 8px var(--cosmic-cyan-glow);
+  animation: cosmic-dot-pulse 3s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.cosmic-sep-text {
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cosmic-text-muted);
+  flex-shrink: 0;
+}
+
+@keyframes cosmic-dot-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.4); }
+}
+
+/* ── Kicker / Tagline ──────────────────────────────────── */
+
+.cosmic-kicker {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: rgba(250, 250, 250, 0.45);
+  margin-bottom: 0.75rem;
+}
+
+.cosmic-tagline {
+  font-size: 0.68rem;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cosmic-text-muted);
+}
+
+/* ── Cosmic Title ──────────────────────────────────────── */
+
+.cosmic-title {
+  letter-spacing: -0.03em;
+}
+
+.cosmic-title-cipher {
+  color: var(--cosmic-text);
+  text-shadow: 0 0 30px rgba(0, 240, 255, 0.08);
+}
+
+.cosmic-title-pulse {
+  color: var(--cosmic-cyan);
+  font-weight: 700;
+  text-shadow:
+    0 0 20px rgba(0, 240, 255, 0.35),
+    0 0 40px rgba(0, 240, 255, 0.12);
+}
+
+/* ── Cosmic Card (method cards, feature cards) ─────────── */
+
+.cosmic-method-card {
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cosmic-method-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), transparent 55%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.cosmic-method-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow:
+    0 20px 50px -10px rgba(0, 0, 0, 0.5),
+    0 0 30px -5px var(--cosmic-cyan-glow);
+  border-color: rgba(0, 240, 255, 0.25);
+}
+
+.cosmic-outer-glow {
+  position: absolute;
+  inset: -18%;
+  background:
+    radial-gradient(circle at 50% 25%, rgba(0, 240, 255, 0.12), transparent 45%),
+    radial-gradient(circle at 50% 75%, rgba(123, 47, 255, 0.1), transparent 50%);
+  filter: blur(36px);
+  opacity: 0.75;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.cosmic-constellation {
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 1.5rem;
+  display: block;
+  filter:
+    drop-shadow(0 0 16px rgba(0, 240, 255, 0.2))
+    drop-shadow(0 0 32px rgba(123, 47, 255, 0.12));
+}
+
+.cosmic-panel-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.cosmic-status-card {
+  border-radius: 1rem;
+  border: 1px solid rgba(0, 240, 255, 0.16);
+  background: linear-gradient(180deg, rgba(0, 240, 255, 0.08), rgba(4, 8, 20, 0.4));
+  padding: 1rem 1.1rem;
+}
+
+.cosmic-success-text {
+  color: #72f6ba;
+  text-shadow: 0 0 10px rgba(114, 246, 186, 0.18);
+}
+
+/* ── Cosmic Badge ──────────────────────────────────────── */
+
+.cosmic-badge-cyan {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(0, 240, 255, 0.1);
+  color: var(--cosmic-cyan);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+}
+
+.cosmic-badge-violet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(123, 47, 255, 0.1);
+  color: #b380ff;
+  border: 1px solid rgba(123, 47, 255, 0.3);
+}
+
+/* ── Cosmic Dots ──────────────────────────────────────── */
+
+.cosmic-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.cosmic-dot-cyan {
+  background: var(--cosmic-cyan);
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.4);
+}
+
+.cosmic-dot-violet {
+  background: #b380ff;
+  box-shadow: 0 0 6px rgba(123, 47, 255, 0.4);
+}
+
+/* ── Cosmic Success Check Animation ──────────────────── */
+
+@keyframes cosmic-circle-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ── Cosmic Alert (error) ──────────────────────────────── */
+
+.cosmic-alert-error {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #ff6b6b;
+}
+
+/* ── Cosmic Dropzone ───────────────────────────────────── */
+
+.cosmic-dropzone {
+  min-height: 10rem;
+  border: 2px dashed rgba(0, 240, 255, 0.15);
+  border-radius: 1rem;
+  background: rgba(4, 8, 20, 0.5);
+  transition: all 300ms ease;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cosmic-dropzone:hover {
+  border-color: rgba(0, 240, 255, 0.3);
+  background: rgba(0, 240, 255, 0.02);
+}
+
+.cosmic-dropzone.dragging {
+  border-color: var(--cosmic-cyan);
+  background: rgba(0, 240, 255, 0.05);
+  box-shadow: inset 0 0 30px rgba(0, 240, 255, 0.04);
+}
+
+.cosmic-dropzone.has-file {
+  border-color: rgba(16, 185, 129, 0.4);
+  border-style: solid;
+  background: rgba(16, 185, 129, 0.05);
+}
+
+/* ── Ghost Button (cosmic variant) ─────────────────────── */
+
+.cosmic-btn-ghost {
+  position: relative;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  border: 1.5px solid rgba(0, 240, 255, 0.2);
+  background: transparent;
+  color: var(--cosmic-cyan);
+  cursor: pointer;
+  transition: all 200ms ease;
+  font-size: var(--text-base);
+}
+
+.cosmic-btn-ghost:hover {
+  background: rgba(0, 240, 255, 0.06);
+  border-color: rgba(0, 240, 255, 0.35);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.08);
+}
+
+.cosmic-btn-ghost:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Responsive Cosmic ─────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .cosmic-nebula::before { filter: blur(60px); }
+  .cosmic-nebula::after { filter: blur(60px); }
+  .cosmic-nebula-layer { filter: blur(60px); }
+}
+
+/* ============================================================================
+   VAULT RESONANCE ORB - Resonance / Entropy visualization
+   ============================================================================ */
+
+:root {
+  /* Resonance palette (health = cyan → green) */
+  --resonance-high: #00e5ff;
+  --resonance-mid: #0ea5e9;
+  --resonance-low: #475569;
+  --resonance-glow: rgba(0, 229, 255, 0.35);
+
+  /* Entropy palette (chaos = magenta → red) */
+  --entropy-low: rgba(217, 70, 239, 0.0);
+  --entropy-mid: rgba(217, 70, 239, 0.3);
+  --entropy-high: rgba(239, 68, 68, 0.5);
+  --entropy-crackle: #ef4444;
+
+  /* Rosetta Stone accent */
+  --rosetta-gold: #fbbf24;
+  --rosetta-glow: rgba(251, 191, 36, 0.4);
+}
+
+.vault-orb-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vault-orb-canvas {
+  display: block;
+  border-radius: 50%;
+}
+
+.vault-orb-halo {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  pointer-events: none;
+  transition: box-shadow 1.2s var(--ease-smooth), opacity 1.2s var(--ease-smooth);
+}
+
+.vault-orb-halo--resonant {
+  box-shadow: 0 0 18px var(--resonance-glow), 0 0 40px var(--resonance-glow);
+  opacity: 1;
+}
+
+.vault-orb-halo--dim {
+  box-shadow: 0 0 6px rgba(71, 85, 105, 0.2);
+  opacity: 0.5;
+}
+
+.vault-orb-halo--rosetta {
+  box-shadow:
+    0 0 18px var(--resonance-glow),
+    0 0 40px var(--resonance-glow),
+    0 0 8px var(--rosetta-glow);
+}
+
+@keyframes orbBreath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes entropyFlicker {
+  0%, 100% { opacity: 0.85; }
+  25% { opacity: 0.92; }
+  50% { opacity: 0.78; }
+  75% { opacity: 0.95; }
+}
+
+.vault-orb-container--breathing {
+  animation: orbBreath 3s var(--ease-smooth) infinite;
+}
+
+.vault-orb-container--flickering {
+  animation: entropyFlicker 0.8s steps(4) infinite;
+}
+
+/* Widget layout */
+.vault-resonance-widget {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 9999px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 0.3s var(--ease-fluid);
+}
+
+.vault-resonance-widget:hover {
+  border-color: rgba(0, 229, 255, 0.2);
+}
+
+.vault-resonance-widget__metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.vault-resonance-widget__label {
+  font-size: var(--text-xs);
+  color: var(--muted-grey);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.vault-resonance-widget__value {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  line-height: 1;
+  transition: color 0.6s var(--ease-smooth);
+}
+
+.vault-resonance-widget__value--high {
+  color: var(--resonance-high);
+}
+
+.vault-resonance-widget__value--mid {
+  color: var(--resonance-mid);
+}
+
+.vault-resonance-widget__value--low {
+  color: var(--resonance-low);
+}
+
+.vault-resonance-widget__rosetta {
+  font-size: var(--text-xs);
+  color: var(--rosetta-gold);
+  font-weight: var(--font-semibold);
+  white-space: nowrap;
 }

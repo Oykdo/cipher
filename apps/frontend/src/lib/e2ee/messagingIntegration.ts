@@ -20,10 +20,13 @@ import {
   ensureDoubleRatchetSession,
   ensureE2EEInitializedForSession,
   getCurrentUsername,
+  deletePeerSession,
 } from './e2eeService';
 import { decryptAuthenticated } from './index';
 import { retrieveLegacyIdentityKeys } from './keyManagement';
+import { getEncryptionModePreference } from './sessionManager';
 import { debugLogger } from '../debugLogger';
+import { apiv2 } from '../../services/api-v2';
 
 async function requireE2EE(): Promise<void> {
   if (isE2EEInitialized()) return;
@@ -62,8 +65,6 @@ export async function ensurePeerKey(peerUsername: string): Promise<boolean> {
   }
 
   try {
-    const { apiv2 } = await import('../../services/api-v2');
-    
     // ALWAYS fetch from server to check for key changes
     const keyBundle = await apiv2.getPeerKeyBundle(peerUsername);
 
@@ -86,7 +87,6 @@ export async function ensurePeerKey(peerUsername: string): Promise<boolean> {
 
       // Clear any persisted session that may contain the corrupted peer public key
       try {
-        const { deletePeerSession } = await import('./e2eeService');
         await deletePeerSession(peerUsername);
       } catch (e) {
         console.warn('[E2EE] Failed to delete corrupted session during repair:', e);
@@ -99,8 +99,6 @@ export async function ensurePeerKey(peerUsername: string): Promise<boolean> {
       console.warn(`⚠️ [E2EE] Resetting E2EE session with ${peerUsername} due to key change`);
       
       // Import deletePeerSession to clear the old session
-      const { deletePeerSession } = await import('./e2eeService');
-      
       // Delete the old session (it's now invalid)
       try {
         await deletePeerSession(peerUsername);
@@ -159,7 +157,6 @@ export async function encryptMessageForSending(
   // If user prefers Double Ratchet, attempt to establish X3DH/DR session before encrypting.
   // IMPORTANT: still signaling only; message payload remains E2EE.
   try {
-    const { getEncryptionModePreference } = await import('./sessionManager');
     if (getEncryptionModePreference(recipientUsername) === 'double-ratchet') {
       await ensureDoubleRatchetSession(recipientUsername, true);
     }
@@ -373,4 +370,3 @@ export async function getConversationEncryptionStatus(
   const peerFingerprint = await getPeerFingerprint(peerUsername);
   return peerFingerprint ? 'e2ee' : 'legacy';
 }
-

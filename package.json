@@ -1,11 +1,13 @@
 {
-  "name": "cipher-pulse",
+  "name": "cipher",
   "version": "1.0.0",
-  "description": "Cipher Pulse - Secure E2E encrypted messenger with Time-Lock and DiceKey",
+  "description": "Cipher - Secure E2E encrypted messenger with Time-Lock and DiceKey",
   "main": "main.js",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:bridge\" \"npm run dev:frontend\" \"npm run dev:electron\"",
+    "dev": "concurrently \"npm run dev:lock\" \"npm run dev:api\" \"npm run dev:bridge\" \"npm run dev:frontend\" \"npm run dev:electron\"",
+    "dev:lock": "cd ../Eidolon && python scripts/public/run_lock_server.py",
+    "dev:api": "cd ../Eidolon && python -m src.api.server",
     "dev:bridge": "cd apps/bridge && npm run dev",
     "dev:frontend": "cd apps/frontend && npm run dev",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
@@ -46,8 +48,8 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.projectchimera.deaddrop",
-    "productName": "Dead Drop",
+    "appId": "com.projectchimera.cipher",
+    "productName": "Cipher",
     "copyright": "Copyright © 2025 Project Chimera",
     "directories": {
       "output": "release",
@@ -59,6 +61,7 @@
       "apps/frontend/dist/**/*",
       "apps/bridge/dist/**/*",
       "apps/bridge/node_modules/**/*",
+      "apps/bridge/.env.production",
       "node_modules/**/*",
       "package.json"
     ],
@@ -69,6 +72,14 @@
         "filter": [
           "!*.db",
           "!*.db-*"
+        ]
+      },
+      {
+        "from": "assets/eidolon-installer",
+        "to": "eidolon-installer",
+        "filter": [
+          "**/*",
+          "!.gitkeep"
         ]
       }
     ],
@@ -89,7 +100,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Dead Drop"
+      "shortcutName": "Cipher"
     },
     "mac": {
       "target": [

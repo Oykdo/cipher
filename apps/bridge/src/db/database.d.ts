@@ -2,7 +2,13 @@
  * Type definitions for database.js
  */
 
+import type { Pool } from 'pg';
+
 export interface DbInstance {
+  // Underlying pg connection pool (used for ad-hoc queries that don't have a
+  // dedicated helper method yet — see `activity/metrics` route).
+  pool: Pool;
+
   // Users
   createUser(user: any): Promise<any>;
   getUserById(id: string): Promise<any | null>;
@@ -62,6 +68,9 @@ export interface DbInstance {
   createAttachment(data: any): Promise<any>;
   getAttachmentById(id: string): Promise<any | null>;
   deleteAttachment(attachmentId: string): Promise<any>;
+
+  // Username update
+  updateUsername(userId: string, newUsername: string): Promise<void>;
 
   // SRP
   updateUserSRP(userId: string, salt: string, verifier: string): Promise<void>;

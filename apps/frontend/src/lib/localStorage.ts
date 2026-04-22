@@ -10,6 +10,7 @@ import { debugLogger } from './debugLogger';
 export interface LocalAccount {
   username: string;
   securityTier: 'standard' | 'dice-key';
+  quickUnlockEnabled?: boolean;
   lastUsed?: number;
 }
 
@@ -72,13 +73,14 @@ export function getLocalAccounts(): LocalAccount[] {
         accountsMap.set(username, {
           username,
           securityTier: 'standard', // Default assumption
+          quickUnlockEnabled: true,
           lastUsed: undefined,
         });
       }
     }
   }
 
-  return Array.from(accountsMap.values());
+  return Array.from(accountsMap.values()).filter(account => account.quickUnlockEnabled !== false);
 }
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Conversations - Cipher Pulse Messenger
+ * Conversations - Cipher Messenger
  * 
  * Interface de messagerie avec support de :
  * - Burn After Reading (messages auto-destructibles)
@@ -18,6 +18,7 @@ import { useSocketEvent, useConversationRoom, useTypingIndicator } from '../hook
 import UserSearch, { type UserSearchResult } from '../components/UserSearch';
 import { ConversationList } from '../components/conversations/ConversationList';
 import { ChatHeader, type ConnectionMode } from '../components/conversations/ChatHeader';
+import { CallOverlay } from '../components/conversations/CallOverlay';
 import { MessageList } from '../components/conversations/MessageList';
 import { MessageInput } from '../components/conversations/MessageInput';
 import { useConversationMessages } from '../hooks/useConversationMessages';
@@ -25,16 +26,21 @@ import { encryptMessageForSending, decryptReceivedMessage } from '../lib/e2ee/me
 import { getEncryptionModePreference } from '../lib/e2ee/sessionManager';
 import { getCachedDecryptedMessage, cacheDecryptedMessage, clearAllDecryptedCache } from '../lib/e2ee/decryptedMessageCache';
 import { hasUserKeys, loadUserKeys } from '../lib/e2ee/keyManager';
+import CosmicConstellationLogo from '../components/CosmicConstellationLogo';
 import { getConversationParticipantKeys } from '../lib/e2ee/publicKeyService';
 import { encryptSelfEncryptingMessage, decryptSelfEncryptingMessage, isSelfEncryptingMessage } from '../lib/e2ee/selfEncryptingMessage';
 import { hasArchivedMessages } from '../lib/backup';
 import ConversationRequests from '../components/ConversationRequests';
 import { useP2P } from '../hooks/useP2P';
+import { useConversationCall } from '../hooks/useConversationCall';
 import { P2P_CONFIG, SIGNALING_SERVERS } from '../config';
 import { debugLogger } from "../lib/debugLogger";
 import { encryptAttachment, type EncryptedAttachment, type SecurityMode } from '../lib/attachment';
 import { base64ToBytes } from '../shared/crypto';
 import { loadPendingBurnAcks, removePendingBurnAck, upsertPendingBurnAck } from '../lib/burn/pendingBurnAcks';
+import { clearKeyCache } from '../lib/encryption';
+import VaultResonanceWidget from '../components/VaultResonanceWidget';
+import { useVaultMetrics } from '../hooks/useVaultMetrics';
 import '../styles/fluidCrypto.css';
 
 type ViewMode = 'list' | 'chat';
@@ -44,6 +50,8 @@ export default function Conversations() {
   const navigate = useNavigate();
   const session = useAuthStore((state) => state.session);
   const clearSession = useAuthStore((state) => state.clearSession);
+  const linkedVault = session?.user?.linkedVault;
+  const vaultMetrics = useVaultMetrics();
 
   // WebSocket connection with auto-refresh
   const { socket, connected } = useSocketWithRefresh();
@@ -146,6 +154,7 @@ export default function Conversations() {
     isPeerOnline,
     isInitialized: isP2PInitialized,
     connectToPeer,
+    manager: p2pManager,
   } = useP2P({
     signalingUrls: SIGNALING_SERVERS,
     onMessage: handleP2PMessage,
@@ -153,6 +162,29 @@ export default function Conversations() {
       debugLogger.debug(`🔄 [P2P] Switched signaling server: ${oldUrl} -> ${newUrl}`);
     },
   });
+
+  const {
+    callState,
+    startCall,
+    acceptCall,
+    declineCall,
+    endCall,
+    toggleMute,
+    toggleVideo,
+  } = useConversationCall(
+    p2pManager,
+    useCallback(
+      (peerId: string, conversationId: string) => {
+        const conversation = conversations.find((conv) => conv.id === conversationId);
+        if (conversation?.otherParticipant.id === peerId) {
+          return conversation.otherParticipant.username;
+        }
+        const fallback = conversations.find((conv) => conv.otherParticipant.id === peerId);
+        return fallback?.otherParticipant.username ?? null;
+      },
+      [conversations]
+    )
+  );
 
   // Load conversations on mount AND when session becomes available
   // Check if user has e2ee-v2 keys
@@ -171,10 +203,8 @@ export default function Conversations() {
   useEffect(() => {
     if (session?.accessToken) {
       // Clear encryption key cache to regenerate with new logic
-      import('../lib/encryption').then(({ clearKeyCache }) => {
-        clearKeyCache();
-        // SECURITY: Sensitive log removed
-      });
+      clearKeyCache();
+      // SECURITY: Sensitive log removed
       loadConversations();
     }
   }, [session?.accessToken]); // ✅ Re-run when session/token changes
@@ -1307,6 +1337,37 @@ export default function Conversations() {
   // ============================================================================
 
   const selectedConv = conversations?.find(c => c.id === selectedConvId);
+  const activeCallConversation = callState.conversationId
+    ? conversations.find(c => c.id === callState.conversationId)
+    : null;
+  const activeCallPeerLabel = activeCallConversation?.otherParticipant.username || 'Contact';
+
+  useEffect(() => {
+    if (callState.conversationId && callState.phase === 'incoming' && callState.conversationId !== selectedConvId) {
+      setSelectedConvId(callState.conversationId);
+      setViewMode('chat');
+    }
+  }, [callState.conversationId, callState.phase, selectedConvId]);
+
+  const handleStartAudioCall = useCallback(async () => {
+    if (!selectedConv) return;
+    await startCall(
+      selectedConv.otherParticipant.id,
+      selectedConv.otherParticipant.username,
+      selectedConv.id,
+      'audio'
+    );
+  }, [selectedConv, startCall]);
+
+  const handleStartVideoCall = useCallback(async () => {
+    if (!selectedConv) return;
+    await startCall(
+      selectedConv.otherParticipant.id,
+      selectedConv.otherParticipant.username,
+      selectedConv.id,
+      'video'
+    );
+  }, [selectedConv, startCall]);
 
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -1334,67 +1395,106 @@ export default function Conversations() {
   // Garde supplémentaire au cas où la route serait atteinte sans token
   if (!session?.accessToken) {
     return (
-      <div className="dark-matter-bg min-h-screen flex items-center justify-center">
+      <div className="cosmic-scene min-h-screen flex items-center justify-center relative overflow-hidden">
+        <div className="cosmic-nebula" aria-hidden="true" />
+        <div className="cosmic-stars" aria-hidden="true" />
+        <div className="cosmic-p2p-grid" aria-hidden="true" />
         <p className="text-soft-grey">{t('auth.session_expired_message')}</p>
       </div>
     );
   }
 
   return (
-    <div className="dark-matter-bg min-h-screen flex flex-col">
+    <div className="cosmic-scene min-h-screen flex flex-col relative overflow-hidden">
+      <div className="cosmic-nebula" aria-hidden="true" />
+      <div className="cosmic-stars" aria-hidden="true" />
+      <div className="cosmic-p2p-grid" aria-hidden="true" />
+      <div className="cosmic-volumetric" aria-hidden="true" />
       {/* Screen-reader live region */}
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {srAnnouncement}
       </div>
 
       {/* Header */}
-      <header className="glass-card border-b border-quantum-cyan/20 p-4">
+      <header className="border-b border-[rgba(0,240,255,0.12)] p-4 bg-[rgba(6,12,26,0.88)] backdrop-blur-xl relative z-10">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
-            <h1 className="text-xl md:text-2xl font-black glow-text-cyan whitespace-nowrap">
-              🔐 <span className="hidden sm:inline">Cipher Pulse</span>
+          <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0 overflow-hidden">
+            <div className="shrink-0 [&_svg]:!w-7 [&_svg]:!h-7 [&_svg]:!m-0 md:[&_svg]:!w-8 md:[&_svg]:!h-8">
+              <CosmicConstellationLogo />
+            </div>
+            <h1 className="text-lg md:text-2xl font-black whitespace-nowrap shrink-0">
+              <span className="cosmic-title-cipher">Cipher</span>
             </h1>
-            <span className="text-sm text-soft-grey truncate hidden sm:inline">
-              @{session.user.username}
+            <span className="text-sm text-soft-grey truncate hidden md:inline">
+              @{linkedVault?.vaultName || session.user.username}
             </span>
 
             {/* Connection status */}
             <div className={`
-              text-xs px-2 py-1 rounded-full whitespace-nowrap
+              text-xs px-2 py-1 rounded-full whitespace-nowrap shrink-0
               ${connected ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}
             `}>
               {connected ? '●' : '○'} <span className="hidden sm:inline">{connected ? 'En ligne' : 'Hors ligne'}</span>
             </div>
+
+            {/* Vault resonance orb — live data from Eidolon */}
+            {linkedVault && vaultMetrics && (
+              <div className="hidden md:block shrink-0">
+                <VaultResonanceWidget
+                  metrics={{
+                    resonance: vaultMetrics.resonance,
+                    entropy: vaultMetrics.entropy,
+                    rosettaBonus: vaultMetrics.rosettaBonus,
+                    dailyYield: vaultMetrics.dailyYield,
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/settings')}
-              className="btn btn-ghost p-2 md:px-4 flex items-center"
+              className="cosmic-btn-ghost p-2 md:px-4 flex items-center"
               title={t('settings.title')}
             >
-              <span className="text-lg">⚙️</span>
               <span className="hidden md:inline ml-2">{t('settings.title')}</span>
+              <span className="md:hidden">{t('settings.title')}</span>
             </button>
             <button
               onClick={handleLogout}
-              className="btn btn-ghost p-2 md:px-4 flex items-center text-error-glow"
+              className="cosmic-btn-ghost p-2 md:px-4 flex items-center text-error-glow"
               title={t('settings.security_settings.logout')}
             >
-              <span className="text-lg">🚪</span>
               <span className="hidden md:inline ml-2">{t('settings.security_settings.logout')}</span>
+              <span className="md:hidden">{t('settings.security_settings.logout')}</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden relative">
-        <div className={`${viewMode === 'list' ? 'flex' : 'hidden md:flex'} flex-col w-full md:w-80 border-r border-quantum-cyan/20 bg-dark-matter`}>
+      <div className="flex-1 flex overflow-hidden relative z-10">
+        <div className={`${viewMode === 'list' ? 'flex' : 'hidden md:flex'} flex-col w-full md:w-80 border-r border-[rgba(0,240,255,0.12)] bg-[rgba(6,12,26,0.84)] backdrop-blur-xl`}>
           {/* Conversation Requests */}
           <div className="p-4 overflow-y-auto">
             <ConversationRequests onRequestAccepted={loadConversations} />
           </div>
+
+          {/* Vault resonance — mobile visible */}
+          {linkedVault && vaultMetrics && (
+            <div className="md:hidden px-4 pb-2">
+              <VaultResonanceWidget
+                metrics={{
+                  resonance: vaultMetrics.resonance,
+                  entropy: vaultMetrics.entropy,
+                  rosettaBonus: vaultMetrics.rosettaBonus,
+                  dailyYield: vaultMetrics.dailyYield,
+                }}
+                compact={false}
+              />
+            </div>
+          )}
 
           {/* Conversation List */}
           <div className="flex-1 overflow-hidden">
@@ -1424,6 +1524,10 @@ export default function Conversations() {
                 onlineUsers={onlineUsers}
                 onBackToList={() => setViewMode('list')}
                 connectionMode={connectionModes.get(selectedConvId!) || (onlineUsers.has(selectedConv.otherParticipant.id) ? 'connecting' : 'relayed')}
+                callState={callState}
+                onStartAudioCall={handleStartAudioCall}
+                onStartVideoCall={handleStartVideoCall}
+                onEndCall={() => endCall('user-ended')}
               />
 
               {/* Archived messages indicator */}
@@ -1484,9 +1588,11 @@ export default function Conversations() {
             </>
           ) : (
             /* No conversation selected */
-            <div className="flex-1 flex items-center justify-center text-center">
-              <div>
-                <div className="text-6xl mb-4">💬</div>
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <div className="flex flex-col items-center">
+                <div className="mb-6 [&_svg]:!w-24 [&_svg]:!h-24 [&_svg]:!m-0 opacity-50">
+                  <CosmicConstellationLogo />
+                </div>
                 <p className="text-soft-grey text-lg">
                   {t('conversations.select_conversation')}
                 </p>
@@ -1498,6 +1604,18 @@ export default function Conversations() {
           )}
         </div>
       </div>
+
+      <CallOverlay
+        callState={callState}
+        peerLabel={activeCallPeerLabel}
+        onAccept={() => {
+          void acceptCall();
+        }}
+        onDecline={() => declineCall('declined')}
+        onEnd={() => endCall('user-ended')}
+        onToggleMute={toggleMute}
+        onToggleVideo={toggleVideo}
+      />
 
       {/* New Conversation Modal - User Search */}
       <AnimatePresence>

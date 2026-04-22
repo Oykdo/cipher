@@ -64,7 +64,7 @@ export async function stripeRoutes(app: FastifyInstance) {
             currency,
             unit_amount: amountCents,
             product_data: {
-              name: 'Cipher Pulse — Contribution',
+              name: 'Cipher — Contribution',
             },
           },
         },

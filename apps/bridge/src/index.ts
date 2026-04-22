@@ -1,4 +1,6 @@
-import 'dotenv/config';
+// Side-effect import so env vars are loaded before any downstream module
+// evaluates (db, routes, etc.). `.env.production` wins on conflicts.
+import './env.js';
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
@@ -15,6 +17,9 @@ import { fileURLToPath } from 'url';
 import { getDatabase } from "./db/database.js";
 import { createRateLimiter } from "./middleware/rateLimiter.js";
 import { authRoutes } from './routes/auth.js';
+import { genesisRoutes } from './routes/genesis.js';
+import { vaultViewerRoutes } from './routes/vaultViewer.js';
+import { vaultKeybundleRoutes } from './routes/vaultKeybundle.js';
 import { conversationRoutes } from './routes/conversations.js';
 import { messageRoutes } from './routes/messages.js';
 import { healthRoutes } from './routes/health.js';
@@ -190,7 +195,7 @@ await app.register(cors, {
         return cb(null, false);
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
 });
 
@@ -241,7 +246,15 @@ app.setErrorHandler((err: any, request, reply) => {
 app.decorate('authenticate', async (request: any, reply: any) => {
     try {
         await request.jwtVerify();
-    } catch (error) {
+    } catch (error: any) {
+        const authHeader = request.headers.authorization;
+        app.log.warn({
+            url: request.url,
+            method: request.method,
+            hasAuth: !!authHeader,
+            authPreview: authHeader ? authHeader.substring(0, 30) + '...' : 'NONE',
+            error: error.message,
+        }, 'JWT authentication failed');
         reply.code(401);
         throw error;
     }
@@ -281,6 +294,9 @@ async function logAuthAction(userId: string, action: string, request: any, sever
 // Routes Registration
 app.get('/api/csrf-token', csrfTokenRoute);
 await app.register(authRoutes);
+await app.register(genesisRoutes);
+await app.register(vaultViewerRoutes);
+await app.register(vaultKeybundleRoutes);
 await app.register(conversationRoutes);
 await app.register(messageRoutes);
 await app.register(healthRoutes);
@@ -397,7 +413,18 @@ app.post<{ Body: { data?: string; filename?: string } }>("/api/backup/import", {
         let isValid = false;
         if (isJson) {
             try {
-                JSON.parse(backupData.toString('utf-8'));
+                const parsed = JSON.parse(backupData.toString('utf-8'));
+                // Cross-account guard: the plaintext payload sent by the frontend
+                // already has user.id set (see dataExport.ts). Reject if it does
+                // not match the authenticated caller — otherwise Bob's export
+                // would restore into Alice's account once she sends it here.
+                const ownerId =
+                    parsed?.user?.id ?? parsed?.userId ?? null;
+                if (ownerId && ownerId !== userId) {
+                    unlinkSync(restorePath);
+                    reply.code(403);
+                    return { error: "Ce backup appartient à un autre compte." };
+                }
                 isValid = true;
             } catch (e) {
                 app.log.error({ error: e }, 'Invalid JSON backup file');
@@ -419,12 +446,27 @@ app.post<{ Body: { data?: string; filename?: string } }>("/api/backup/import", {
         logAuthAction(userId, 'BACKUP_RESTORED', request, 'WARNING');
 
         if (isJson) {
-            return {
-                success: true,
-                message: "Backup JSON reçu. La restauration automatique n'est pas encore supportée.",
-                restorePath: restoreFileName,
-                note: "Veuillez contacter le support pour restaurer ce fichier."
-            };
+            // Parse again (we already validated the bytes + ownership above)
+            // and hand off to the DB restore path. We deliberately do NOT
+            // delete the on-disk copy here — it stays under config.paths.restore
+            // as an audit trail in case restoration needs to be re-run.
+            try {
+                const parsed = JSON.parse(backupData.toString('utf-8'));
+                const stats = await (db as any).restoreUserData(userId, parsed);
+                return {
+                    success: true,
+                    message: "Backup restored.",
+                    restorePath: restoreFileName,
+                    stats,
+                };
+            } catch (restoreErr: any) {
+                app.log.error({ error: restoreErr, userId }, 'Backup restore failed');
+                reply.code(500);
+                return {
+                    error: restoreErr?.message || "La restauration a échoué.",
+                    restorePath: restoreFileName,
+                };
+            }
         }
 
         return {

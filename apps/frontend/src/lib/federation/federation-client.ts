@@ -236,7 +236,7 @@ export class FederationClient {
 
     // Try to discover via well-known endpoint
     try {
-      const response = await fetch(`https://${domain}/.well-known/cipher-pulse-federation`);
+      const response = await fetch(`https://${domain}/.well-known/cipher-federation`);
       if (response.ok) {
         const announcement = await response.json() as ServerAnnouncement;
         
