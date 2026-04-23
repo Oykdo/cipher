@@ -141,13 +141,21 @@ export class CallManager {
       return;
     }
 
+    // Same ownership-transfer pattern as acceptIncomingCall(): hold the
+    // acquired MediaStream in a local until it's assigned to
+    // this.localStream. handleMediaError → cleanup() only stops tracks
+    // on this.localStream, so a throw between acquireLocalStream() and
+    // the assignment would otherwise leak mic/camera tracks.
+    let pendingStream: MediaStream | null = null;
+
     try {
-      const stream = await this.acquireLocalStream(mediaType);
+      pendingStream = await this.acquireLocalStream(mediaType);
       const callSecret = crypto.getRandomValues(new Uint8Array(32));
       const encryptedCallKey = await this.encryptCallSecretForPeer(peerUsername, callSecret);
 
       this.currentSession = { peerId, peerUsername, conversationId, mediaType, encryptedCallKey };
-      this.localStream = stream;
+      this.localStream = pendingStream;
+      pendingStream = null; // ownership transferred — cleanup() will stop the tracks
       this.remoteStream = new MediaStream();
       this.pendingInvite = null;
       this.queuedIceCandidates = [];
@@ -158,7 +166,7 @@ export class CallManager {
         peerId,
         conversationId,
         mediaType,
-        localStream: stream,
+        localStream: this.localStream,
         remoteStream: this.remoteStream,
         isMuted: false,
         isVideoEnabled: mediaType === 'video',
@@ -176,6 +184,7 @@ export class CallManager {
       };
       this.socket.emit('call:invite', await this.createSignedEnvelope('call:invite', invitePayload));
     } catch (error) {
+      pendingStream?.getTracks().forEach((track) => track.stop());
       this.handleMediaError(error);
     }
   }
@@ -185,7 +194,17 @@ export class CallManager {
       return;
     }
 
-    const { from, conversationId, mediaType, encryptedCallKey } = this.pendingInvite;
+    // Claim the invite immediately. acquireLocalStream() and the key
+    // exchange below each await for tens of ms; during that window an
+    // inbound `call:end`, a user-triggered decline, or even a double
+    // acceptIncomingCall() call could otherwise run against the same
+    // pendingInvite and corrupt state. Nulling it upfront makes every
+    // subsequent handler a no-op on a stale invite, and cleanup() below
+    // is idempotent on an already-null pendingInvite.
+    const invite = this.pendingInvite;
+    this.pendingInvite = null;
+
+    const { from, conversationId, mediaType, encryptedCallKey } = invite;
     const peerUsername = this.resolvePeerUsername(from, conversationId);
 
     if (!peerUsername || !encryptedCallKey) {
@@ -194,8 +213,15 @@ export class CallManager {
       return;
     }
 
+    // Keep an explicit reference to the acquired MediaStream until we
+    // transfer ownership to this.localStream. cleanup() only walks
+    // this.localStream, so a failure between acquireLocalStream() and the
+    // assignment below would otherwise leak mic/camera tracks and leave
+    // the OS recording indicator lit.
+    let pendingStream: MediaStream | null = null;
+
     try {
-      const stream = await this.acquireLocalStream(mediaType);
+      pendingStream = await this.acquireLocalStream(mediaType);
       const callSecret = await this.decryptCallSecretFromPeer(peerUsername, encryptedCallKey);
 
       this.currentSession = {
@@ -205,7 +231,8 @@ export class CallManager {
         mediaType,
         encryptedCallKey,
       };
-      this.localStream = stream;
+      this.localStream = pendingStream;
+      pendingStream = null; // ownership transferred — cleanup() will stop the tracks
       this.remoteStream = new MediaStream();
       this.queuedIceCandidates = [];
       this.mediaCipherContext = await this.createMediaCipherContext(callSecret, false);
@@ -217,7 +244,7 @@ export class CallManager {
         peerId: from,
         conversationId,
         mediaType,
-        localStream: stream,
+        localStream: this.localStream,
         remoteStream: this.remoteStream,
         isMuted: false,
         isVideoEnabled: mediaType === 'video',
@@ -233,9 +260,8 @@ export class CallManager {
         mediaType,
       };
       this.socket.emit('call:accept', await this.createSignedEnvelope('call:accept', acceptPayload));
-
-      this.pendingInvite = null;
     } catch (error) {
+      pendingStream?.getTracks().forEach((track) => track.stop());
       this.setTransientState('error', 'Impossible d etablir la cle media de bout en bout.');
       debugLogger.error('Call key exchange failed', error as Error);
       this.cleanup(false);
