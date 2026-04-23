@@ -8,6 +8,7 @@ import { TimeLockCountdown } from '../TimeLockCountdown';
 import { BurnMessage } from '../BurnMessage';
 import { AttachmentMessage } from './AttachmentMessage';
 import type { EncryptedAttachment } from '../../lib/attachment';
+import { TlockGate, looksLikeTlockCiphertext } from './TlockGate';
 
 interface MessageListProps {
   messages: MessageV2[];
@@ -76,7 +77,16 @@ export function MessageList({
           const isOwn = message.senderId === sessionUserId;
           const locked = isMessageLocked(message);
           const burned = message.isBurned;
-          const isBurnMessage = (message.scheduledBurnAt || message.burnDelay) && !locked;
+          // tlock-wrapped bodies must go through TlockGate, not BurnMessage —
+          // otherwise BurnMessage would display the raw AGE ciphertext under
+          // its "🔥 Burn After Reading" header while TlockGate's countdown
+          // never gets a chance to render.
+          const isTlockLocked =
+            !!message.unlockBlockHeight &&
+            message.unlockBlockHeight > 0 &&
+            looksLikeTlockCiphertext(message.body);
+          const isBurnMessage =
+            (message.scheduledBurnAt || message.burnDelay) && !locked && !isTlockLocked;
           const isBurning = burningMessages.has(message.id);
 
           let attachmentData: EncryptedAttachment | null = null;
@@ -169,24 +179,41 @@ export function MessageList({
                     <p className="text-sm text-muted-grey">{t('messages.message_burned')}</p>
                     {message.burnedAt && <p className="text-xs text-muted-grey mt-1">{formatTime(message.burnedAt)}</p>}
                   </div>
-                ) : locked ? (
-                  <TimeLockCountdown unlockTimestamp={message.unlockBlockHeight!} onUnlock={() => onMessageUnlock?.(message.id)} />
                 ) : (
                   <>
-                    <p className="text-pure-white whitespace-pre-wrap break-words">{message.body}</p>
-
-                    {message.scheduledBurnAt && !isOwn && !burningMessages.has(message.id) && !burned && (
-                      <div className="mt-3 p-3 bg-error-glow/10 rounded-lg border border-error-glow/30">
-                        <BurnCountdown
-                          scheduledBurnAt={message.scheduledBurnAt}
-                          onBurnComplete={() => {
-                            setBurningMessages((prev) => new Set(prev).add(message.id));
-                          }}
+                    {message.unlockBlockHeight && message.unlockBlockHeight > 0 && looksLikeTlockCiphertext(message.body) ? (
+                      <>
+                        <TlockGate
+                          body={message.body}
+                          drandRound={message.unlockBlockHeight}
+                          onUnlocked={
+                            !isOwn && message.burnDelay && !message.scheduledBurnAt
+                              ? () => acknowledgeMessage(message.id)
+                              : undefined
+                          }
                         />
-                        <button onClick={() => acknowledgeMessage(message.id)} className="mt-2 text-xs cosmic-btn-ghost w-full hover:bg-error-glow/20">
-                          {t('messages.acknowledge_read')}
-                        </button>
-                      </div>
+                        {!isOwn && (message.burnDelay || message.scheduledBurnAt) && (
+                          <div className="mt-2 flex items-center gap-2 text-[11px] text-orange-400/80">
+                            <span className="flex items-center gap-1.5">
+                              <span aria-hidden="true">🔥</span>
+                              <span>{t('messages.burn_after_reading')}</span>
+                            </span>
+                            {message.scheduledBurnAt && !burningMessages.has(message.id) && !burned && (
+                              <BurnCountdown
+                                compact
+                                scheduledBurnAt={message.scheduledBurnAt}
+                                onBurnComplete={() => {
+                                  setBurningMessages((prev) => new Set(prev).add(message.id));
+                                }}
+                              />
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : locked ? (
+                      <TimeLockCountdown unlockTimestamp={message.unlockBlockHeight!} onUnlock={() => onMessageUnlock?.(message.id)} />
+                    ) : (
+                      <p className="text-pure-white whitespace-pre-wrap break-words">{message.body}</p>
                     )}
 
                     {(message.scheduledBurnAt || message.burnDelay) && isOwn && (
@@ -207,27 +234,6 @@ export function MessageList({
 
                     <div className="flex items-center justify-between mt-2 text-xs text-muted-grey">
                       <div className="flex items-center gap-2">
-                        {message.encryptionType && (
-                          <span
-                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${
-                              message.encryptionType === 'double-ratchet-v1'
-                                ? 'bg-purple-500/20 text-purple-400'
-                                : message.encryptionType === 'nacl-box-v1'
-                                  ? 'bg-[rgba(0,240,255,0.12)] text-[var(--cosmic-cyan)]'
-                                  : 'bg-gray-500/20 text-gray-400'
-                            }`}
-                            title={
-                              message.encryptionType === 'double-ratchet-v1'
-                                ? 'Double Ratchet (PFS)'
-                                : message.encryptionType === 'nacl-box-v1'
-                                  ? 'NaCl Box E2EE'
-                                  : message.encryptionType
-                            }
-                          >
-                            {message.encryptionType === 'double-ratchet-v1' ? 'DR' : 'E2EE'}
-                          </span>
-                        )}
-
                         {message.isP2P && (
                           <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
                             P2P

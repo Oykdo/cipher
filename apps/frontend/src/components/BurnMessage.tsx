@@ -144,6 +144,17 @@ export function BurnMessage({
     onBurn?.();
   }, [onBurn]);
 
+  // Reliable fallback for the burn animation: a keyframe `onAnimationComplete`
+  // on the fire emoji is not guaranteed to fire (observed as a stuck "Message
+  // détruit" overlay in production). Once we enter the `burning` state, a
+  // plain timer of the animation's duration is the robust way to flip into
+  // `burned` and unmount.
+  useEffect(() => {
+    if (!burning) return;
+    const id = window.setTimeout(handleBurnComplete, 1500);
+    return () => window.clearTimeout(id);
+  }, [burning, handleBurnComplete]);
+
   // Generate random particles for dissolution effect
   const generateParticles = () => {
     return Array.from({ length: PARTICLE_COUNT }, (_, i) => {
@@ -243,7 +254,6 @@ export function BurnMessage({
                   times: [0, 0.2, 0.5, 0.8, 1],
                   ease: 'easeInOut',
                 }}
-                onAnimationComplete={handleBurnComplete}
               >
                 🔥
               </motion.div>

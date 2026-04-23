@@ -4,20 +4,38 @@
  * Animation spectaculaire pour la destruction d'un message
  */
 
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 interface BurnAnimationProps {
   onComplete?: () => void;
 }
 
+// Total duration of the inner animations (fire emoji + particles + text).
+// Keep in sync with the `duration: 2` transitions below.
+const BURN_ANIMATION_MS = 2000;
+
 export function BurnAnimation({ onComplete }: BurnAnimationProps) {
+  const { t } = useTranslation();
+
+  // The previous implementation relied on `onAnimationComplete` on the outer
+  // motion.div. In practice that fires after the outer opacity 0→1 tween
+  // (~0.3 s) which is *before* the inner fire/text/particles finish — and in
+  // some framer-motion versions it was not firing at all, leaving the overlay
+  // stuck with a static "Message détruit". A single scheduled timer is the
+  // reliable way to hand control back to the parent.
+  useEffect(() => {
+    const id = window.setTimeout(() => onComplete?.(), BURN_ANIMATION_MS);
+    return () => window.clearTimeout(id);
+  }, [onComplete]);
+
   return (
     <motion.div
       className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-2xl z-10"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onAnimationComplete={onComplete}
     >
       {/* Fire Emoji Animation */}
       <motion.div
@@ -69,7 +87,7 @@ export function BurnAnimation({ onComplete }: BurnAnimationProps) {
         animate={{ opacity: [0, 1, 1, 0], y: [20, 0, 0, -20] }}
         transition={{ duration: 2, times: [0, 0.2, 0.8, 1] }}
       >
-        Message détruit
+        {t('messages.message_burned')}
       </motion.div>
     </motion.div>
   );
