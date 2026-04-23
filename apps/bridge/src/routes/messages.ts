@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'crypto';
 import { getDatabase } from '../db/database.js';
-import * as blockchain from '../services/blockchain-bitcoin.js';
 import { ConversationIdSchema } from '../validation/securitySchemas.js';
+import { config } from '../config.js';
 
 const db = getDatabase();
 
@@ -71,13 +71,15 @@ export async function messageRoutes(fastify: FastifyInstance) {
             const unlockHeight = msg.unlock_block_height;
 
             // ✅ FIX: Ne vérifier isLocked QUE si unlockHeight est défini ET supérieur à 0
-            // Messages standards ont unlockHeight = null, donc isLocked = false
-            const isLocked = (unlockHeight && unlockHeight > 0)
-              ? !(await blockchain.canUnlock(unlockHeight))
-              : false;
+            // Time-lock is now enforced client-side via tlock/drand (the body
+            // is cryptographically unreadable until the drand round arrives).
+            // The server no longer gates the body — it just passes
+            // `unlockBlockHeight` (now a drand round number) through, and the
+            // client handles the countdown + decryption.
+            const isLocked = false;
 
             const senderPlaintext =
-              msg.sender_id === userId && !isLocked
+              msg.sender_id === userId
                 ? (msg.sender_plaintext ?? undefined)
                 : undefined;
 
@@ -107,7 +109,7 @@ export async function messageRoutes(fastify: FastifyInstance) {
               id: msg.id,
               conversationId: msg.conversation_id,
               senderId: msg.sender_id,
-              body: isLocked ? '[Message verrouillé]' : msg.body,
+              body: msg.body,
               sender_plaintext: senderPlaintext,
               createdAt: msg.created_at,
               unlockBlockHeight: unlockHeight || undefined,
@@ -192,24 +194,43 @@ export async function messageRoutes(fastify: FastifyInstance) {
         return { error: 'Format conversationId invalide', details: validationResult.error.issues };
       }
 
-      // Validate unlock height
+      // Time-lock: the field historically carried a Bitcoin block height
+      // but now holds a drand round number (tlock migration). The server
+      // passes it through — the cryptographic lock is enforced client-side.
       if (unlockBlockHeight !== undefined) {
-        if (typeof unlockBlockHeight !== 'number' || unlockBlockHeight < 0) {
-          reply.code(400);
-          return { error: 'unlockBlockHeight doit être un nombre positif' };
+        if (!config.timelockEnabled) {
+          reply.code(403);
+          return {
+            error:
+              'Time-locked messages are temporarily disabled. Enable TIMELOCK_ENABLED once the drand/tlock integration is validated.',
+          };
         }
-
-        if (!blockchain.validateUnlockHeight(unlockBlockHeight)) {
+        if (
+          typeof unlockBlockHeight !== 'number' ||
+          !Number.isInteger(unlockBlockHeight) ||
+          unlockBlockHeight <= 0
+        ) {
           reply.code(400);
-          return { error: 'unlockBlockHeight invalide (doit être futur, max 1 an)' };
+          return { error: 'unlockBlockHeight must be a positive integer (drand round)' };
         }
       }
 
       // Validate burn delay (for Burn-After-Reading)
+      // Max aligned with the frontend BurnDelaySelector (7 days = 604800 s) and
+      // with the scheduledBurnAt cap below, so the UI presets (1h / 24h / 7j)
+      // all reach the server without a 400.
       if (burnDelay !== undefined) {
-        if (typeof burnDelay !== 'number' || burnDelay < 1 || burnDelay > 3600) {
+        const MAX_BURN_DELAY_SECONDS = 7 * 24 * 60 * 60; // 604800
+        if (
+          typeof burnDelay !== 'number' ||
+          !Number.isFinite(burnDelay) ||
+          burnDelay < 1 ||
+          burnDelay > MAX_BURN_DELAY_SECONDS
+        ) {
           reply.code(400);
-          return { error: 'burnDelay doit être entre 1 et 3600 secondes' };
+          return {
+            error: `burnDelay doit être entre 1 et ${MAX_BURN_DELAY_SECONDS} secondes (7 jours)`,
+          };
         }
       }
 
@@ -268,15 +289,21 @@ export async function messageRoutes(fastify: FastifyInstance) {
         burnScheduler.schedule(messageId, conversationId, scheduledBurnAt);
       }
 
-      const isLocked = unlockBlockHeight ? !(await blockchain.canUnlock(unlockBlockHeight)) : false;
+      // Time-lock is now enforced client-side via tlock/drand (see GET
+      // /messages handler above). The server no longer substitutes the body
+      // with a placeholder — it passes the tlock ciphertext through and the
+      // client decrypts it when the drand round is published. `isLocked` is
+      // kept in the payload for backward compatibility with the frontend
+      // shape but always false.
+      const isLocked = false;
 
       const message = {
         id: dbMessage.id,
         conversationId: dbMessage.conversation_id,
         senderId: dbMessage.sender_id,
-        body: isLocked ? '[Message verrouillé]' : dbMessage.body,
-        createdAt: typeof dbMessage.created_at === 'object' 
-          ? new Date(dbMessage.created_at).getTime() 
+        body: dbMessage.body,
+        createdAt: typeof dbMessage.created_at === 'object'
+          ? new Date(dbMessage.created_at).getTime()
           : dbMessage.created_at,
         unlockBlockHeight: unlockBlockHeight,
         isLocked,
@@ -307,7 +334,7 @@ export async function messageRoutes(fastify: FastifyInstance) {
         message: {
           id: message.id,
           senderId: message.senderId,
-          body: isLocked ? '[Message verrouillé]' : dbMessage.body,
+          body: dbMessage.body,
           createdAt: message.createdAt,
           unlockBlockHeight: message.unlockBlockHeight,
           scheduledBurnAt: scheduledBurnAt,

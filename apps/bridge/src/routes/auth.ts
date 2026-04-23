@@ -10,6 +10,7 @@ import { logAuthAction } from '../utils/auditLog.js';
 import { generateAuthResponse } from '../utils/authResponse.js';
 import { UsernameSchema, AvatarHashSchema, UserIdSchema } from '../validation/securitySchemas.js';
 import { buildPsnxEnrollmentPayload, buildPsnxLoginProof } from '../utils/psnxAuth.js';
+import { config } from '../config.js';
 
 const db = getDatabase();
 
@@ -421,6 +422,14 @@ export async function authRoutes(fastify: FastifyInstance) {
 
       const hasConnectSession = typeof connectSessionId === 'string' && connectSessionId.trim();
 
+      if (hasConnectSession && !config.eidolonConnectEnabled) {
+        reply.code(503);
+        return {
+          error:
+            'Eidolon Connect is not yet available. Set EIDOLON_CONNECT_ENABLED=true once the Eidolon ecosystem is released.',
+        };
+      }
+
       if (hasConnectSession) {
         // --- Path A: Full Connect session exchange (mobile / remote) ---
         const bridgeIdentityHint = hintedVaultId ? buildEidolonBridgeIdentity(hintedVaultId) : null;
@@ -755,7 +764,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   // Refresh token endpoint
   fastify.post<{ Body: { refreshToken: string } }>(
-    '/auth/refresh',
+    '/api/v2/auth/refresh',
     async (request, reply) => {
       const { refreshToken } = request.body;
 
@@ -794,7 +803,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   // Logout endpoint
   fastify.post<{ Body: { refreshToken: string } }>(
-    '/auth/logout',
+    '/api/v2/auth/logout',
     {
       preHandler: fastify.authenticate as any,
     },
@@ -817,7 +826,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   // Logout all devices
   fastify.post(
-    '/auth/logout-all',
+    '/api/v2/auth/logout-all',
     {
       preHandler: fastify.authenticate as any,
     },
@@ -1117,6 +1126,14 @@ export async function authRoutes(fastify: FastifyInstance) {
       created_at?: string;
     };
   }>('/api/v2/auth/eidolon-connect/session', async (request, reply) => {
+    if (!config.eidolonConnectEnabled) {
+      reply.code(503);
+      return {
+        error:
+          'Eidolon Connect is not yet available. Set EIDOLON_CONNECT_ENABLED=true once the Eidolon ecosystem is released.',
+      };
+    }
+
     const { vault_id, vault_number, vault_name, source, created_at } = request.body;
     const app_id = request.body.app_id || DEFAULT_EIDOLON_CONNECT_APP_ID;
 

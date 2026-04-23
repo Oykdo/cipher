@@ -210,7 +210,18 @@ const cspConfig = {
     ...DEFAULT_CSP_CONFIG,
     directives: {
         ...DEFAULT_CSP_CONFIG.directives,
-        connectSrc: ["'self'", ...config.security.allowedOrigins, "ws:", "wss:"],
+        connectSrc: [
+            "'self'",
+            ...config.security.allowedOrigins,
+            "ws:",
+            "wss:",
+            // drand beacon endpoints — required by tlock time-locked messaging
+            // (client fetches round signatures to decrypt when unlock time passes).
+            'https://api.drand.sh',
+            'https://api2.drand.sh',
+            'https://api3.drand.sh',
+            'https://drand.cloudflare.com',
+        ],
     },
 };
 

@@ -80,7 +80,18 @@ export const config = {
         login: { windowMs: 15 * 60 * 1000, max: 10 },
         message: { windowMs: 60 * 1000, max: 60 },
         upload: { windowMs: 5 * 60 * 1000, max: 20 },
-    }
+    },
+
+    // Eidolon Connect integration is gated until the Eidolon ecosystem is
+    // publicly released. When false, routes that reach out to the Eidolon
+    // API (port 8000) refuse the request rather than attempting a fetch.
+    eidolonConnectEnabled: process.env.EIDOLON_CONNECT_ENABLED === 'true',
+
+    // Legacy time-lock feature is disabled until the drand/tlock migration
+    // ships a truly trustless timelock (current implementation only gates
+    // on server-side block-height checks, which is breakable by a modified
+    // client or a compromised server — flagged by external review).
+    timelockEnabled: process.env.TIMELOCK_ENABLED === 'true',
 };
 
 // ============================================================================

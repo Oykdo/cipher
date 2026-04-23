@@ -116,7 +116,16 @@ export const DEFAULT_CSP_CONFIG: CspConfig = {
     styleSrcElem: ["'self'", "'unsafe-inline'"],
     styleSrcAttr: ["'unsafe-inline'"],
     imgSrc: ["'self'", 'data:', 'blob:'], // data: for base64 images, blob: for generated images
-    connectSrc: ["'self'", 'ws:', 'wss:'],
+    connectSrc: [
+      "'self'",
+      'ws:',
+      'wss:',
+      // drand beacon endpoints — required by tlock time-locked messaging
+      'https://api.drand.sh',
+      'https://api2.drand.sh',
+      'https://api3.drand.sh',
+      'https://drand.cloudflare.com',
+    ],
     fontSrc: ["'self'", 'data:'], // data: for inline fonts if needed
     objectSrc: ["'none'"], // Block plugins (Flash, Java, etc.)
     mediaSrc: ["'self'", 'blob:'], // blob: for media attachments

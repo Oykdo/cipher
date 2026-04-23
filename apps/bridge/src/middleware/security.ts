@@ -24,7 +24,7 @@ export const SECURITY_HEADERS = {
     "style-src 'self'",
     "img-src 'self' data: https:",
     "font-src 'self'",
-    "connect-src 'self' ws: wss:",
+    "connect-src 'self' ws: wss: https://api.drand.sh https://api2.drand.sh https://api3.drand.sh https://drand.cloudflare.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
