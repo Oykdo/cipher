@@ -74,7 +74,7 @@ export interface ArchivedMessage {
   id: string;
   timestamp: number;
   sender: string;
-  /** 
+  /**
    * Content encrypted with BEK (XChaCha20-Poly1305)
    * Format: { nonce: base64, ciphertext: base64 }
    */
@@ -84,6 +84,14 @@ export interface ArchivedMessage {
   };
   /** Original encryption type before re-encryption */
   originalEncryption?: 'double-ratchet-v1' | 'nacl-box-v1' | 'legacy';
+  /**
+   * drand round number the message was time-locked to, if any. Preserved so
+   * the archived message keeps its tlock gating across export/import cycles —
+   * re-imported before the round publishes, the body stays cryptographically
+   * unreadable (it is itself a tlock AGE ciphertext wrapped by BEK). Absent
+   * for regular messages.
+   */
+  unlockBlockHeight?: number;
 }
 
 /**
@@ -96,6 +104,8 @@ export interface DecryptedArchivedMessage {
   body: string;
   isArchived: true;
   originalEncryption?: string;
+  /** See ArchivedMessage.unlockBlockHeight. */
+  unlockBlockHeight?: number;
 }
 
 /**

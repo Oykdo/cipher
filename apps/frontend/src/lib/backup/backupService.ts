@@ -138,6 +138,13 @@ export async function exportToBackupVault(
               sender: msg.senderId === session.user.id ? session.user.username : peerUsername,
               encryptedContent,
               originalEncryption: detectEncryptionType(msg.body),
+              // Preserve the tlock drand round so the message stays gated
+              // after import. Without this, a message whose round has not
+              // yet published would be treated as a normal plaintext on
+              // restore — a confidentiality regression.
+              ...(msg.unlockBlockHeight && msg.unlockBlockHeight > 0
+                ? { unlockBlockHeight: msg.unlockBlockHeight }
+                : {}),
             };
 
             backupConv.archivedMessages.push(archivedMsg);
@@ -322,6 +329,7 @@ export async function getArchivedMessages(
   sender: string;
   body: string;
   isArchived: true;
+  unlockBlockHeight?: number;
 }>> {
   const archived = localStorage.getItem('archivedConversations');
   if (!archived) return [];
@@ -345,6 +353,9 @@ export async function getArchivedMessages(
         sender: msg.sender,
         body,
         isArchived: true as const,
+        ...(typeof msg.unlockBlockHeight === 'number' && msg.unlockBlockHeight > 0
+          ? { unlockBlockHeight: msg.unlockBlockHeight }
+          : {}),
       });
     } catch {
       messages.push({
@@ -353,6 +364,9 @@ export async function getArchivedMessages(
         sender: msg.sender,
         body: '[Failed to decrypt archived message]',
         isArchived: true as const,
+        ...(typeof msg.unlockBlockHeight === 'number' && msg.unlockBlockHeight > 0
+          ? { unlockBlockHeight: msg.unlockBlockHeight }
+          : {}),
       });
     }
   }
