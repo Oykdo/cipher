@@ -36,6 +36,19 @@ export const EIDOLON_CONNECT_BASE_URL =
 export const EIDOLON_CONNECT_SESSION_SECRET =
   import.meta.env.VITE_EIDOLON_CONNECT_SESSION_SECRET || '';
 
+// Gate Eidolon Connect integration behind a flag until the Eidolon ecosystem
+// is publicly released. When false, the frontend skips probe/registration
+// calls and surfaces a "coming soon" state instead of error toasts.
+export const EIDOLON_CONNECT_ENABLED =
+  import.meta.env.VITE_EIDOLON_CONNECT_ENABLED === 'true';
+
+// Legacy time-lock feature (server-enforced blockchain gate) is disabled
+// until the tlock/drand migration ships a truly trustless timelock.
+// When false, the frontend hides the time-lock UI and the backend rejects
+// messages carrying unlockBlockHeight.
+export const TIMELOCK_ENABLED =
+  import.meta.env.VITE_TIMELOCK_ENABLED === 'true';
+
 export const WS_BASE_URL = import.meta.env.PROD
   ? pickProdUrl(import.meta.env.VITE_WS_BASE_URL, DEFAULT_WS_BASE_URL)
   : import.meta.env.VITE_WS_BASE_URL || DEFAULT_WS_BASE_URL;

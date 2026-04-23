@@ -48,13 +48,36 @@ export default defineConfig({
     sourcemap: true,
     target: 'esnext', // Support for modern features including WASM
     rollupOptions: {
+      // Suppress the "Rollup failed to resolve import X from .wasm" warning
+      // that vite-plugin-node-polyfills escalates to an error. The imports
+      // in question are the WASM binary's internal metadata ("a", "env",
+      // etc.), which the wasm plugin already handles — Rollup just can't
+      // parse them as JS, and shouldn't try.
+      onwarn(warning, defaultHandler) {
+        if (
+          warning.code === 'UNRESOLVED_IMPORT' &&
+          typeof warning.message === 'string' &&
+          warning.message.includes('.wasm')
+        ) {
+          return;
+        }
+        defaultHandler(warning);
+      },
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
             if (id.includes('react') || id.includes('scheduler')) return 'vendor-react';
             if (id.includes('framer-motion')) return 'vendor-motion';
             if (id.includes('i18next')) return 'vendor-i18n';
-            if (id.includes('libsodium') || id.includes('tweetnacl') || id.includes('@noble') || id.includes('secure-remote-password') || id.includes('argon2-browser')) {
+            if (
+              id.includes('libsodium') ||
+              id.includes('tweetnacl') ||
+              id.includes('@noble') ||
+              id.includes('secure-remote-password') ||
+              id.includes('argon2-browser') ||
+              id.includes('tlock-js') ||
+              id.includes('drand-client')
+            ) {
               return 'vendor-crypto';
             }
             if (id.includes('three')) return 'vendor-3d';

@@ -6,6 +6,7 @@ import { proactiveTokenRefresh } from './services/api-interceptor';
 import { useKeyInitialization } from './hooks/useKeyInitialization';
 import { AppLockOverlay } from './components/AppLockOverlay';
 import { useAppLockActivity } from './hooks/useAppLockActivity';
+import { EIDOLON_CONNECT_ENABLED } from './config';
 
 const Landing = lazy(() => import('./screens/Landing'));
 const LoginNew = lazy(() => import('./screens/LoginNew'));
@@ -49,7 +50,8 @@ function App() {
 
   // App-lock: tracks user activity + auto-locks after 30 min idle. Mounted at
   // the root so a single listener covers every screen. No-op when the PIN
-  // feature is disabled in Settings.
+  // feature is disabled in Settings, and fully gated behind the Eidolon flag
+  // (the PIN feature ships with the Eidolon release).
   useAppLockActivity();
 
   // Initialize e2ee-v2 keys automatically for logged-in users
@@ -140,7 +142,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
-      <AppLockOverlay />
+      {EIDOLON_CONNECT_ENABLED && <AppLockOverlay />}
     </ErrorBoundary>
   );
 }

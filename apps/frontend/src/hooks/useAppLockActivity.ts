@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useAppLockStore } from '../store/appLock';
+import { EIDOLON_CONNECT_ENABLED } from '../config';
 
 /**
  * Watches for user activity (mouse / keyboard / touch / focus) and resets
@@ -16,6 +17,9 @@ export function useAppLockActivity(): void {
   const pinEnabled = useAppLockStore((s) => s.pinEnabled);
 
   useEffect(() => {
+    // AppLock / PIN ships with the Eidolon release — disabled while the
+    // flag is off even if the user previously toggled it on.
+    if (!EIDOLON_CONNECT_ENABLED) return;
     if (!pinEnabled) return;
 
     const events: (keyof WindowEventMap)[] = [

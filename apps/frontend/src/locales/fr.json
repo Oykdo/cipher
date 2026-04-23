@@ -219,6 +219,21 @@
     "connect_status_generic": "Eidolon Connect : {{status}}",
     "connect_status_error": "Erreur Connect : {{error}}",
     "connect_status_unavailable": "Eidolon Connect indisponible",
+    "connect_status_coming_soon": "Eidolon Connect — bientôt disponible",
+    "mnemonic_login_title": "Se connecter avec votre phrase",
+    "mnemonic_login_subtitle": "Saisissez votre nom d'utilisateur et vos 12 ou 24 mots. Rien ne quitte votre appareil en clair.",
+    "mnemonic_login_username_label": "Nom d'utilisateur",
+    "mnemonic_login_username_placeholder": "alice_crypto",
+    "mnemonic_login_phrase_label": "Phrase de récupération",
+    "mnemonic_login_phrase_placeholder": "mot1 mot2 mot3 …",
+    "mnemonic_login_word_count": "{{count}} mots",
+    "mnemonic_login_cta": "Déverrouiller",
+    "mnemonic_login_cta_loading": "Vérification…",
+    "mnemonic_login_hint": "Votre phrase reste sur votre appareil. Seule une preuve cryptographique est envoyée au serveur.",
+    "mnemonic_login_init_error": "Impossible de démarrer la vérification.",
+    "mnemonic_login_verify_error": "Impossible de valider votre phrase de récupération.",
+    "mnemonic_login_proof_error": "Preuve du serveur rejetée. Veuillez réessayer.",
+    "mnemonic_login_generic_error": "Échec de la connexion. Vérifiez votre nom d'utilisateur et votre phrase.",
     "vault_bridge_desktop_only_error": "Le bridge vault est disponible uniquement dans l’application desktop Cipher. Installez Eidolon sur desktop, puis revenez ici.",
     "vault_bridge_open_error": "Impossible d’ouvrir le lanceur Eidolon.",
     "vault_bridge_start_error": "Impossible de démarrer le bridge Vault.",
@@ -253,7 +268,6 @@
     "timelock_description": "Messages déverrouillés par blockchain",
     "dicekey_auth": "Auth DiceKey",
     "blockchain_timelock": "Time-Lock Blockchain",
-    "badge_post_quantum": "Quantum",
     "badge_self_sovereign": "Souveraineté Numérique",
     "badge_instant": "Sync Instantanée",
     "badge_zero_knowledge": "Zero-Knowledge",
@@ -265,10 +279,10 @@
     "feature_e2e_desc": "Chiffrement de bout en bout avec Signal Protocol",
     "feature_offline_keys_title": "Clés hors ligne",
     "feature_offline_keys_desc": "Un secret que vous gardez hors du cloud",
-    "footer_tech_stack": "Open Source • Zero-Knowledge • Quantum resistant",
+    "footer_tech_stack": "Open Source • Zero-Knowledge • Chiffrement de bout en bout",
     "footer_built_with": "Built with ❤️ by Project Chimera",
     "back_to_quick_unlock": "← Retour au déverrouillage rapide",
-    "hero_tagline": "Sessions Cipher liées à des vaults Eidolon approuvés",
+    "hero_tagline": "Messagerie chiffrée de bout en bout, conçue pour la vie privée",
     "eidolon_context_trusted": "Contexte de vault Eidolon approuvé",
     "eidolon_context_continue": "Continuer avec ce vault",
     "signup_kicker": "Nouvelle session",
@@ -353,6 +367,8 @@
     "send_first_message": "Envoyez le premier message !",
     "message_burned": "Message brûlé",
     "time_capsule": "Time Capsule",
+    "tlock_preparing_short": "…",
+    "tlock_unlocking_short": "Déverrouillage…",
     "acknowledge_read": "✓ J'ai lu (confirmer la lecture)",
     "users_typing": "{{users}} est en train d'écrire...",
     "users_typing_plural": "{{users}} sont en train d'écrire...",
@@ -935,7 +951,38 @@
     "already_have_vault_title": "Vous avez déjà un vault",
     "already_have_vault_subtitle": "Votre identité est prête. Connectez-vous pour y accéder.",
     "already_have_vault_named": "Votre identité « {{name}} » est prête. Connectez-vous pour y accéder.",
-    "already_have_vault_cta": "Me connecter"
+    "already_have_vault_cta": "Me connecter",
+    "mnemonic_title": "Créez votre compte",
+    "mnemonic_subtitle": "Une phrase de récupération protège votre compte — aucun mot de passe stocké nulle part.",
+    "mnemonic_intro_username_label": "Choisissez un nom d'utilisateur",
+    "mnemonic_intro_username_placeholder": "alice_crypto",
+    "mnemonic_intro_length_label": "Longueur de la phrase de récupération",
+    "mnemonic_intro_length_12": "12 mots",
+    "mnemonic_intro_length_24": "24 mots",
+    "mnemonic_intro_cta": "Générer ma phrase de récupération",
+    "mnemonic_generating": "Génération de votre phrase de récupération…",
+    "mnemonic_reveal_title": "Votre phrase de récupération",
+    "mnemonic_reveal_warning": "Notez ces mots sur papier, dans l'ordre. C'est le SEUL moyen de récupérer votre compte — nous ne pourrons pas vous aider si vous les perdez.",
+    "mnemonic_reveal_confirm_checkbox": "J'ai noté ma phrase de récupération et je comprends que la perdre signifie perdre mon compte définitivement.",
+    "mnemonic_reveal_cta": "J'ai noté, continuer",
+    "mnemonic_verify_title": "Vérifiez votre sauvegarde",
+    "mnemonic_verify_prompt": "Saisissez le mot demandé de votre phrase de récupération pour confirmer que vous l'avez bien noté.",
+    "mnemonic_verify_word_position": "Mot n°{{position}}",
+    "mnemonic_verify_cta": "Terminer l'inscription",
+    "mnemonic_verify_error": "Ce mot ne correspond pas. Vérifiez vos notes et réessayez.",
+    "mnemonic_username_too_short": "Le nom d'utilisateur doit contenir au moins {{min}} caractères.",
+    "mnemonic_error_generic": "Impossible de créer votre compte. Veuillez réessayer.",
+    "mnemonic_stepper_step_1": "Compte",
+    "mnemonic_stepper_step_2": "Création",
+    "mnemonic_stepper_step_3": "Sauvegarde",
+    "mnemonic_stepper_step_4": "Vérification",
+    "mnemonic_intro_length_12_hint": "Rapide à sauvegarder, protection solide.",
+    "mnemonic_intro_length_24_hint": "Entropie renforcée pour le long terme.",
+    "mnemonic_reveal_warning_title": "À conserver précieusement",
+    "mnemonic_reveal_show": "Révéler",
+    "mnemonic_reveal_hide": "Masquer",
+    "mnemonic_reveal_copy": "Copier",
+    "mnemonic_reveal_copied": "Copié"
   },
   "welcome": {
     "title": "Identité Créée !",
@@ -1083,113 +1130,107 @@
   },
   "discover_public": {
     "title": "Découvrir Cipher",
-    "subtitle": "Messagerie sécurisée, chiffrée de bout en bout. Vos conversations restent privées, toujours.",
-    "overview_title": "Pourquoi Cipher",
-    "overview_paragraph": "Cipher est une messagerie pensée pour la confidentialité. Chaque message est chiffré de bout en bout avant de quitter votre appareil. Personne — pas même nos serveurs — ne peut lire vos conversations. Votre identité est protégée par un vault cryptographique personnel.",
+    "subtitle": "Messagerie privée, vraiment chiffrée.",
+    "overview_title": "Qu'est-ce que Cipher",
+    "overview_paragraph": "Cipher est une messagerie pensée pour la vie privée. Vos messages sont chiffrés sur votre appareil avant d'être envoyés — personne ne peut les lire, même pas nous. Une version résistante aux attaques quantiques est en préparation avec Eidolon.",
     "badges": [
-      "Chiffrement E2E",
-      "Zéro accès serveur",
+      "Chiffré de bout en bout",
+      "Aucun accès serveur",
       "Messages éphémères",
-      "Connexion P2P",
-      "Identité vault"
+      "Connexion directe",
+      "Sans pub, sans pistage"
     ],
     "feature_cards": [
       {
         "icon": "🔒",
         "title": "Chiffrement de bout en bout",
-        "description": "Chaque message est chiffré sur votre appareil avant d’être envoyé. Seul votre correspondant peut le déchiffrer. Aucun intermédiaire n’a accès au contenu.",
-        "panelTitle": "Ce que cela garantit",
+        "description": "Vos messages sont chiffrés sur votre appareil avant d'être envoyés. Seul votre correspondant peut les lire.",
+        "panelTitle": "Ce que ça signifie",
         "bullets": [
-          "vos messages sont illisibles en transit",
-          "aucun accès serveur au contenu",
-          "clés de chiffrement générées localement",
-          "rotation automatique des clés"
+          "Illisibles en transit",
+          "Aucun accès serveur au contenu",
+          "Les clés restent sur votre appareil"
         ],
-        "info": "Le chiffrement s’appuie sur libsodium, une bibliothèque cryptographique éprouvée et auditée."
+        "info": "Chiffrement de bout en bout standard. Aucune porte dérobée."
       },
       {
         "icon": "💬",
         "title": "Conversations privées",
-        "description": "Échangez en toute confiance : messages texte, fichiers et pièces jointes. Tout est protégé par le même niveau de chiffrement.",
-        "panelTitle": "Fonctionnalités",
+        "description": "Messages, fichiers, pièces jointes. Tout bénéficie du même niveau de protection.",
+        "panelTitle": "Ce que vous obtenez",
         "bullets": [
-          "messages texte chiffrés",
-          "envoi de fichiers sécurisé",
-          "messages éphémères avec minuteur",
-          "indicateurs de lecture optionnels"
+          "Messages et fichiers chiffrés",
+          "Messages qui s'auto-détruisent",
+          "Accusés de lecture en option"
         ],
-        "info": "Vous gardez le contrôle total sur ce que vous partagez et pendant combien de temps."
+        "info": "Vous décidez ce que vous partagez et pour combien de temps."
       },
       {
         "icon": "🌐",
-        "title": "Connexion pair-à-pair",
-        "description": "Quand c’est possible, Cipher établit une connexion directe entre vous et votre correspondant via WebRTC. Le serveur ne voit même pas passer vos données.",
-        "panelTitle": "Avantages",
+        "title": "Connexion directe",
+        "description": "Quand c'est possible, Cipher vous relie directement à votre correspondant. Vos données ne passent pas par nos serveurs.",
+        "panelTitle": "Pourquoi c'est utile",
         "bullets": [
-          "latence réduite",
-          "aucun relais serveur pour les données",
-          "connexion directe entre appareils",
-          "bascule automatique si le P2P est indisponible"
+          "Latence réduite",
+          "Aucun relais serveur",
+          "Bascule automatique si besoin"
         ],
-        "info": "Le mode P2P s’active automatiquement quand les deux appareils sont en ligne."
+        "info": "Activé automatiquement quand les deux correspondants sont en ligne."
       },
       {
         "icon": "🛡️",
-        "title": "Identité protégée par vault",
-        "description": "Votre identité repose sur un vault cryptographique personnel. Pas de mot de passe classique : votre vault est la preuve de qui vous êtes.",
-        "panelTitle": "Comment ça marche",
+        "title": "Résistance quantique : bientôt",
+        "description": "Une prochaine version, développée avec Eidolon, protégera vos messages contre les futures attaques d'ordinateurs quantiques.",
+        "panelTitle": "Ce qu'elle apportera",
         "bullets": [
-          "authentification par vault chiffré",
-          "double clé de sécurité",
-          "identité liée à votre appareil",
-          "aucun mot de passe stocké sur le serveur"
+          "Cryptographie post-quantique",
+          "Nouveau système d'identité",
+          "Même expérience de messagerie"
         ],
-        "info": "Le vault est géré par Eidolon, le système d’identité cryptographique derrière Cipher."
+        "info": "En cours de développement. Restez à l'affût."
       }
     ],
-    "architecture_title": "Comment Cipher protège vos échanges",
+    "architecture_title": "Comment vos messages restent privés",
     "architecture_cards": [
       {
         "icon": "📱",
         "title": "Sur votre appareil",
         "items": [
-          "Clés générées et stockées localement",
-          "Chiffrement avant tout envoi",
-          "Vault protégé par double clé",
-          "Données déchiffrées uniquement chez vous"
+          "Messages chiffrés localement",
+          "Clés stockées sur votre appareil",
+          "Déchiffrement uniquement chez vous"
         ],
-        "extra": "Tout le chiffrement se fait côté client. Le serveur ne reçoit que des données chiffrées."
+        "extra": "Tout se passe côté client. Le serveur ne voit que des données chiffrées."
       },
       {
         "icon": "☁️",
         "title": "En transit",
         "items": [
-          "Messages chiffrés de bout en bout",
-          "Connexion P2P quand disponible",
+          "Chiffré de bout en bout",
+          "Pair-à-pair direct quand possible",
           "TLS en couche supplémentaire",
           "Aucun contenu lisible côté serveur"
         ]
       },
       {
         "icon": "👤",
-        "title": "Votre identité",
+        "title": "Votre compte",
         "items": [
-          "Vault cryptographique personnel",
-          "Authentification sans mot de passe classique",
-          "Session continue après validation",
-          "Identité vérifiable par vos contacts"
+          "Phrase de récupération que vous seul connaissez",
+          "Aucun mot de passe stocké",
+          "Fonctionne sur tous vos appareils"
         ]
       }
     ],
     "flow_title": "Premiers pas",
     "flow_steps": [
-      "Créez votre compte ou connectez votre vault.",
-      "Trouvez vos contacts via la recherche sécurisée.",
-      "Envoyez votre premier message chiffré.",
-      "Activez les messages éphémères si vous le souhaitez.",
-      "Profitez de conversations 100 % privées."
+      "Créez un compte en moins d'une minute.",
+      "Notez votre phrase de récupération.",
+      "Trouvez vos contacts.",
+      "Envoyez votre premier message.",
+      "C'est tout. Tout est déjà chiffré."
     ],
-    "runtime_title": "L’essentiel à retenir",
+    "runtime_title": "L'essentiel",
     "runtime_rows": [
       {
         "label": "Chiffrement",
@@ -1199,17 +1240,17 @@
       {
         "label": "Vie privée",
         "value": "par défaut",
-        "detail": "Rien n’est stocké sur nos serveurs. Vos données nous sont invisibles."
+        "detail": "Rien n'est stocké, rien n'est pisté, aucune pub."
       },
       {
         "label": "Connexion",
-        "value": "pair-à-pair",
-        "detail": "Liaison directe entre appareils. Aucun intermédiaire."
+        "value": "directe",
+        "detail": "Appareil à appareil quand c'est possible."
       },
       {
-        "label": "Identité",
-        "value": "vault sécurisé",
-        "detail": "Un vault cryptographique à la place d'un mot de passe."
+        "label": "La suite",
+        "value": "avec Eidolon",
+        "detail": "Version résistante au quantique en préparation."
       }
     ],
     "cta_title": "Prêt à échanger en toute confidentialité ?",

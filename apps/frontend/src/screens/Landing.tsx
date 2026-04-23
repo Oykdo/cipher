@@ -7,6 +7,7 @@ import { readVaultBridgeContext, type VaultBridgeContext } from '../lib/vaultBri
 import '../styles/fluidCrypto.css';
 import CosmicConstellationLogo from '../components/CosmicConstellationLogo';
 import { formatVaultHandle } from '../lib/vaultHandle';
+import { EIDOLON_CONNECT_ENABLED } from '../config';
 
 export default function Landing() {
   const { t } = useTranslation();
@@ -62,7 +63,7 @@ export default function Landing() {
             <CosmicConstellationLogo />
             <motion.h1 className="cosmic-title text-7xl font-black mb-6">
               <span className="cosmic-title-cipher">Cipher</span>{' '}
-              <span className="cosmic-title-pulse">Pulse</span>
+              <span className="cosmic-title-pulse">Desktop</span>
             </motion.h1>
             <p className="cosmic-tagline mb-6">{t('landing.hero_tagline')}</p>
 
@@ -93,7 +94,7 @@ export default function Landing() {
             transition={{ delay: 0.8, duration: 0.8 }}
             className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16"
           >
-            {vaultBridge && (
+            {EIDOLON_CONNECT_ENABLED && vaultBridge && (
               <motion.button
                 whileHover={{ scale: 1.02, y: -4 }}
                 whileTap={{ scale: 0.98 }}

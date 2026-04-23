@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
-import { API_BASE_URL, EIDOLON_CONNECT_APP_ID } from '../config';
+import { API_BASE_URL, EIDOLON_CONNECT_APP_ID, EIDOLON_CONNECT_ENABLED } from '../config';
 import { saveKnownAccount, clearPasswordCache } from '../lib/localStorage';
 import { createEidolonConnectSession, ensureEidolonConnectRegistration } from '../lib/eidolonConnect';
 import { readVaultBridgeContext, type VaultBridgeContext } from '../lib/vaultBridge';
@@ -36,12 +36,20 @@ import '../styles/fluidCrypto.css';
 import CosmicLoader from '../components/CosmicLoader';
 import CosmicConstellationLogo from '../components/CosmicConstellationLogo';
 import { CosmicActionButton, CosmicGhostButton } from '../components/CosmicAuthPrimitives';
+import LoginMnemonic from './LoginMnemonic';
 
 
 export default function LoginNew() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const setSession = useAuthStore((state) => state.setSession);
+
+  // While the Eidolon ecosystem is still pre-release, fall back to the
+  // BIP-39 mnemonic login. Flipping VITE_EIDOLON_CONNECT_ENABLED=true at
+  // launch time restores the vault bridge flow unchanged.
+  if (!EIDOLON_CONNECT_ENABLED) {
+    return <LoginMnemonic onBack={() => navigate('/')} />;
+  }
 
   // Vault is the only login method — no more multi-method selector.
   const [vaultError, setVaultError] = useState('');
@@ -75,11 +83,11 @@ export default function LoginNew() {
     };
   }, []);
 
-  // Trigger Eidolon Connect registration probe in the background. We no longer
-  // surface its status in-UI (the old `connectStatus` display belonged to the
-  // removed MethodChoice screen), but keeping the probe wired means the Connect
-  // session cache stays fresh for the vault login path.
+  // Background Eidolon Connect probe — gated behind EIDOLON_CONNECT_ENABLED.
+  // While the ecosystem is pre-release the flag is off, the probe is skipped
+  // entirely (no network fetch, no console noise).
   useEffect(() => {
+    if (!EIDOLON_CONNECT_ENABLED) return;
     if (!vaultContext?.vault_id) return;
     let cancelled = false;
     void (async () => {

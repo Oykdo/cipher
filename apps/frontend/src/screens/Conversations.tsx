@@ -33,7 +33,8 @@ import { hasArchivedMessages } from '../lib/backup';
 import ConversationRequests from '../components/ConversationRequests';
 import { useP2P } from '../hooks/useP2P';
 import { useConversationCall } from '../hooks/useConversationCall';
-import { P2P_CONFIG, SIGNALING_SERVERS } from '../config';
+import { P2P_CONFIG, SIGNALING_SERVERS, TIMELOCK_ENABLED } from '../config';
+import { encryptKeyToRound, scheduleLockAt } from '../lib/tlock';
 import { debugLogger } from "../lib/debugLogger";
 import { encryptAttachment, type EncryptedAttachment, type SecurityMode } from '../lib/attachment';
 import { base64ToBytes } from '../shared/crypto';
@@ -248,6 +249,14 @@ export default function Conversations() {
   useSocketEvent(socket, 'new_message', async (data) => {
     if (!session) return;
 
+    console.log('[tlock/recv] new_message', {
+      id: data.message.id,
+      senderId: data.message.senderId,
+      unlockBlockHeight: data.message.unlockBlockHeight,
+      bodyLen: typeof data.message.body === 'string' ? data.message.body.length : 0,
+      bodyHead: typeof data.message.body === 'string' ? data.message.body.slice(0, 32) : null,
+    });
+
     // SECURITY: Check if message is time-locked BEFORE decryption
     const isTimeLocked = data.message.unlockBlockHeight && Date.now() < data.message.unlockBlockHeight;
 
@@ -291,6 +300,10 @@ export default function Conversations() {
       if (peerUsername) {
         try {
           const result = await decryptReceivedMessage(peerUsername, data.message.body, undefined, true);
+          console.log('[tlock/recv] after E2EE decrypt', {
+            textLen: result.text?.length ?? 0,
+            textHead: result.text?.slice(0, 32),
+          });
           if (result.text && !result.text.startsWith('[')) {
             plaintext = result.text;
           } else {
@@ -823,6 +836,15 @@ export default function Conversations() {
     if (!session?.accessToken || !selectedConvId) return;
     if (!messageBody.trim() && !selectedFile) return;
 
+    console.log('[tlock/send] entry', {
+      TIMELOCK_ENABLED,
+      timeLockEnabled,
+      timeLockDate,
+      timeLockTime,
+      burnAfterReading,
+      hasFile: !!selectedFile,
+    });
+
     // Store plaintext for local display
     const plaintextBody = messageBody;
     const attachmentFile = selectedFile;
@@ -949,6 +971,44 @@ export default function Conversations() {
       // Fallback to server relay (also required for burn/time-lock features and attachments)
       updateConnectionMode(selectedConvId, 'relayed');
 
+      // Time-lock (tlock/drand): when the user sets a future unlock time, wrap
+      // the plaintext with tlock BEFORE the E2EE layer. The resulting AGE-format
+      // ciphertext is what gets E2EE-encrypted. The recipient E2EE-decrypts to
+      // recover the tlock ciphertext, and can only decrypt it once the drand
+      // round signature is published. Nothing server-side gates this — the
+      // guarantee is cryptographic.
+      let effectiveTextBody = plaintextBody;
+      let drandUnlockRound: number | undefined;
+      console.log('[tlock] send path state', {
+        TIMELOCK_ENABLED,
+        timeLockEnabled,
+        timeLockDate,
+        timeLockTime,
+      });
+      if (TIMELOCK_ENABLED && timeLockEnabled && timeLockDate && timeLockTime) {
+        try {
+          const unlockAtMs = new Date(`${timeLockDate}T${timeLockTime}`).getTime();
+          console.log('[tlock] target unlock timestamp', new Date(unlockAtMs).toISOString());
+          if (Number.isFinite(unlockAtMs) && unlockAtMs > Date.now()) {
+            const schedule = await scheduleLockAt(unlockAtMs);
+            drandUnlockRound = schedule.round;
+            console.log('[tlock] drand round scheduled', {
+              round: schedule.round,
+              estimatedUnlock: new Date(schedule.estimatedUnlockMs).toISOString(),
+            });
+            const bytes = new TextEncoder().encode(plaintextBody);
+            effectiveTextBody = await encryptKeyToRound(bytes, schedule.round);
+            console.log('[tlock] plaintext wrapped, ciphertext length', effectiveTextBody.length);
+          } else {
+            console.warn('[tlock] unlock time is in the past or invalid, skipping wrap');
+          }
+        } catch (tlockErr) {
+          console.error('[tlock] failed to wrap plaintext, sending without time-lock:', tlockErr);
+          drandUnlockRound = undefined;
+          effectiveTextBody = plaintextBody;
+        }
+      }
+
       let encryptedBody: string;
 
       // ENCRYPTION: Try e2ee-v2 first, fallback to e2ee-v1
@@ -1038,14 +1098,14 @@ export default function Conversations() {
           
           // Encrypt with e2ee-v2
           const encrypted = await encryptSelfEncryptingMessage(
-            plaintextBody,
+            effectiveTextBody,
             participantKeys.map(p => ({
               userId: p.userId,
               publicKey: p.publicKey,
             })),
             messageType
           );
-          
+
           encryptedBody = JSON.stringify(encrypted);
           console.log('✅ [E2EE-v2] Message encrypted successfully');
         } catch (e2eev2Error) {
@@ -1055,11 +1115,11 @@ export default function Conversations() {
           } else {
             console.warn('⚠️ [E2EE-v2] Encryption failed, falling back to e2ee-v1:', e2eev2Error);
           }
-          
+
           // Fallback to e2ee-v1
           encryptedBody = await encryptMessageForSending(
             peerUsername,
-            plaintextBody,
+            effectiveTextBody,
             async (text) => await encryptMessage(selectedConvId, text)
           );
         }
@@ -1068,13 +1128,13 @@ export default function Conversations() {
         console.log('🔐 [E2EE-v1] Using e2ee-v1 encryption');
         encryptedBody = await encryptMessageForSending(
           peerUsername,
-          plaintextBody,
+          effectiveTextBody,
           async (text) => await encryptMessage(selectedConvId, text)
         );
       } else {
         // Legacy encryption (no username)
         console.warn('⚠️ [E2EE] No peer username, using legacy encryption');
-        const encrypted = await encryptMessage(selectedConvId, plaintextBody);
+        const encrypted = await encryptMessage(selectedConvId, effectiveTextBody);
         encryptedBody = JSON.stringify(encrypted);
       }
 
@@ -1087,9 +1147,11 @@ export default function Conversations() {
         options.burnDelay = burnDelay; // Store delay in seconds
       }
 
-      if (timeLockEnabled && timeLockDate && timeLockTime) {
-        const unlockDate = new Date(`${timeLockDate}T${timeLockTime}`);
-        options.unlockBlockHeight = unlockDate.getTime();
+      if (drandUnlockRound !== undefined) {
+        // Repurposed field: server now just passes the drand round through.
+        // The actual lock is enforced by tlock/drand client-side — no chain
+        // check needed server-side.
+        options.unlockBlockHeight = drandUnlockRound;
       }
 
       // MESSAGE_WORKFLOW.md (Problème 1): send a plaintext copy for the sender so they can re-read after reconnect

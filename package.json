@@ -5,7 +5,8 @@
   "main": "main.js",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:lock\" \"npm run dev:api\" \"npm run dev:bridge\" \"npm run dev:frontend\" \"npm run dev:electron\"",
+    "dev": "concurrently \"npm run dev:bridge\" \"npm run dev:frontend\" \"npm run dev:electron\"",
+    "dev:with-eidolon": "concurrently \"npm run dev:lock\" \"npm run dev:api\" \"npm run dev:bridge\" \"npm run dev:frontend\" \"npm run dev:electron\"",
     "dev:lock": "cd ../Eidolon && python scripts/public/run_lock_server.py",
     "dev:api": "cd ../Eidolon && python -m src.api.server",
     "dev:bridge": "cd apps/bridge && npm run dev",

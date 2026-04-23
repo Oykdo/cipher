@@ -26,7 +26,7 @@ interface UserSearchProps {
   error?: string;
 }
 
-export default function UserSearch({ onSelectUser, onCancel, loading: externalLoading, error: externalError }: UserSearchProps) {
+export default function UserSearch({ onSelectUser, onCancel, loading: _externalLoading, error: externalError }: UserSearchProps) {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -125,7 +125,7 @@ export default function UserSearch({ onSelectUser, onCancel, loading: externalLo
               className="input w-full pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400"
             />
             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-grey">
-              {(searching || externalLoading) && (
+              {searching && (
                 <AtomLoader size="sm" />
               )}
             </div>

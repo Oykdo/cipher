@@ -2,7 +2,11 @@ import {
   API_BASE_URL,
   EIDOLON_CONNECT_APP_ID,
   EIDOLON_CONNECT_BASE_URL,
+  EIDOLON_CONNECT_ENABLED,
 } from '../config';
+
+const CONNECT_DISABLED_ERROR =
+  'Eidolon Connect is not yet available. Enable VITE_EIDOLON_CONNECT_ENABLED when the ecosystem is released.';
 
 export interface EidolonConnectCapabilities {
   schema_version: string;
@@ -114,6 +118,14 @@ async function probeConnectAtBaseUrl(
 export async function ensureEidolonConnectRegistration(
   appId: string = EIDOLON_CONNECT_APP_ID
 ): Promise<EidolonConnectProbeResult> {
+  if (!EIDOLON_CONNECT_ENABLED) {
+    return {
+      ok: false,
+      baseUrl: EIDOLON_CONNECT_BASE_URL,
+      error: CONNECT_DISABLED_ERROR,
+    };
+  }
+
   if (window.electron?.probeEidolonConnect) {
     const result = await window.electron.probeEidolonConnect({
       baseUrl: EIDOLON_CONNECT_BASE_URL,
@@ -173,6 +185,14 @@ export async function createEidolonConnectSession(input: {
   source?: string;
   createdAt?: string;
 }): Promise<{ ok: boolean; baseUrl: string; session?: EidolonConnectSession; error?: string }> {
+  if (!EIDOLON_CONNECT_ENABLED) {
+    return {
+      ok: false,
+      baseUrl: EIDOLON_CONNECT_BASE_URL,
+      error: CONNECT_DISABLED_ERROR,
+    };
+  }
+
   const appId = input.appId || EIDOLON_CONNECT_APP_ID;
 
   if (window.electron?.createEidolonConnectSession) {

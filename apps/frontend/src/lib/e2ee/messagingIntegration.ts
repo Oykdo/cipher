@@ -235,7 +235,11 @@ export async function decryptReceivedMessage(
   try {
     parsed = JSON.parse(encryptedBody);
   } catch (e) {
-    console.error('[E2EE] Invalid JSON in message body');
+    const preview =
+      typeof encryptedBody === 'string' ? encryptedBody.slice(0, 60) : typeof encryptedBody;
+    console.warn(
+      `[E2EE] Invalid JSON in message body (len=${encryptedBody?.length ?? 0}, preview=${JSON.stringify(preview)}) — likely a legacy or unstructured message, falling back to placeholder`
+    );
     return makeResult('[Invalid message format]');
   }
 

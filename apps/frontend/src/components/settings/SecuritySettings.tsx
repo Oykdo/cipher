@@ -4,6 +4,7 @@ import { useSettings } from "../../hooks/useSettings";
 import { useAuthStore } from "../../store/auth";
 import { AppLockSection } from "./AppLockSection";
 import { formatVaultHandle } from "../../lib/vaultHandle";
+import { EIDOLON_CONNECT_ENABLED } from "../../config";
 
 export function SecuritySettings() {
     const { t } = useTranslation();
@@ -76,7 +77,7 @@ export function SecuritySettings() {
                 </div>
             </div>
 
-            <AppLockSection />
+            {EIDOLON_CONNECT_ENABLED && <AppLockSection />}
 
             {/* Privacy — one actionable toggle. */}
             <div className="cosmic-glass-card rounded-3xl border border-violet-400/12 p-6 shadow-[0_12px_40px_rgba(88,28,135,0.14)]">

@@ -61,6 +61,8 @@ data/
 # INTERNAL DOCUMENTATION (NOT PUBLISHED)
 # =============================================================================
 Documentation/
+ECOSYSTEM_GATING.md
+FORUM_REPLY_TIMELOCK.md
 
 # =============================================================================
 # LOGS

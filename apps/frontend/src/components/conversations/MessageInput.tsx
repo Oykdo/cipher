@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BurnDelaySelector } from '../BurnDelaySelector';
 import { AttachmentInput } from './AttachmentInput';
 import { EmojiPicker } from './EmojiPicker';
+import { TIMELOCK_ENABLED } from '../../config';
 
 interface MessageInputProps {
   messageBody: string;
@@ -132,6 +133,7 @@ export function MessageInput({
           <span className="opacity-50 text-[10px] leading-none">▾</span>
         </button>
 
+        {TIMELOCK_ENABLED && (
         <button
           onClick={() => setOpenMenu(openMenu === 'time' ? null : 'time')}
           className={`group inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-all duration-200 ${
@@ -160,6 +162,7 @@ export function MessageInput({
           <span>{timeActive ? 'Lock actif' : 'Time-Lock'}</span>
           <span className="opacity-50 text-[10px] leading-none">▾</span>
         </button>
+        )}
       </div>
 
       {/* Absolute popover above the composer */}

@@ -17,7 +17,12 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
-import { API_BASE_URL, API_SUPPORTS_LOCAL_PSNX, EIDOLON_CONNECT_APP_ID } from '../config';
+import {
+  API_BASE_URL,
+  API_SUPPORTS_LOCAL_PSNX,
+  EIDOLON_CONNECT_APP_ID,
+  EIDOLON_CONNECT_ENABLED,
+} from '../config';
 import { createEidolonConnectSession, ensureEidolonConnectRegistration } from '../lib/eidolonConnect';
 import { readVaultBridgeContext, type VaultBridgeContext } from '../lib/vaultBridge';
 import {
@@ -28,11 +33,19 @@ import '../styles/fluidCrypto.css';
 import CosmicConstellationLogo from '../components/CosmicConstellationLogo';
 import MouseGlowCard from '../components/MouseGlowCard';
 import { getErrorMessage } from '../lib/errors';
+import SignupMnemonic from './SignupMnemonic';
 
 export default function SignupFluid() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const setSession = useAuthStore((state) => state.setSession);
+
+  // While the Eidolon ecosystem is still pre-release, fall back to the
+  // BIP-39 mnemonic signup. Flipping VITE_EIDOLON_CONNECT_ENABLED=true at
+  // launch time swaps the vault flow back in without code changes.
+  if (!EIDOLON_CONNECT_ENABLED) {
+    return <SignupMnemonic />;
+  }
 
   // Post-Genesis-ceremony auto-connect: the ceremony navigates here with
   // ?auto=connect once it has written eidolon_cipher_bridge.json. This
@@ -63,6 +76,14 @@ export default function SignupFluid() {
   }, []);
 
   useEffect(() => {
+    // When the Eidolon ecosystem is still pre-release we skip the probe
+    // entirely and surface a single "coming soon" status instead of
+    // attempting the registration handshake.
+    if (!EIDOLON_CONNECT_ENABLED) {
+      setConnectStatus(t('auth.connect_status_coming_soon'));
+      return;
+    }
+
     let cancelled = false;
     const probeConnect = async () => {
       if (!vaultContext?.vault_id) {

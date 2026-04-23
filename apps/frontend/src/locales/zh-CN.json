@@ -204,6 +204,21 @@
     "connect_status_generic": "Eidolon Connect：{{status}}",
     "connect_status_error": "Connect 错误：{{error}}",
     "connect_status_unavailable": "Eidolon Connect 不可用",
+    "connect_status_coming_soon": "Eidolon Connect — 即将推出",
+    "mnemonic_login_title": "使用恢复短语登录",
+    "mnemonic_login_subtitle": "输入您的用户名和 12 或 24 个单词。任何内容都不会以明文形式离开您的设备。",
+    "mnemonic_login_username_label": "用户名",
+    "mnemonic_login_username_placeholder": "alice_crypto",
+    "mnemonic_login_phrase_label": "恢复短语",
+    "mnemonic_login_phrase_placeholder": "单词1 单词2 单词3 …",
+    "mnemonic_login_word_count": "{{count}} 个单词",
+    "mnemonic_login_cta": "解锁",
+    "mnemonic_login_cta_loading": "验证中…",
+    "mnemonic_login_hint": "您的短语留在您的设备上，仅向服务器发送加密证明。",
+    "mnemonic_login_init_error": "无法启动握手。",
+    "mnemonic_login_verify_error": "无法验证您的恢复短语。",
+    "mnemonic_login_proof_error": "服务器证明被拒。请重试。",
+    "mnemonic_login_generic_error": "登录失败。请检查您的用户名和恢复短语。",
     "vault_bridge_desktop_only_error": "Vault bridge 仅在 Cipher 桌面应用中可用。请先在桌面安装 Eidolon，然后返回这里。",
     "vault_bridge_open_error": "无法打开 Eidolon 启动器。",
     "vault_bridge_start_error": "无法启动 Vault bridge。",
@@ -237,7 +252,6 @@
     "timelock_description": "通过区块链解锁的消息",
     "dicekey_auth": "DiceKey 验证",
     "blockchain_timelock": "区块链时间锁",
-    "badge_post_quantum": "量子",
     "badge_self_sovereign": "自主权",
     "badge_instant": "即时同步",
     "badge_zero_knowledge": "零知识",
@@ -249,10 +263,10 @@
     "feature_e2e_desc": "使用 Signal 协议的端到端加密",
     "feature_offline_keys_title": "离线密钥",
     "feature_offline_keys_desc": "您保存在云端之外的秘密",
-    "footer_tech_stack": "Open Source • Zero-Knowledge • Quantum resistant",
+    "footer_tech_stack": "Open Source • Zero-Knowledge • 端到端加密",
     "footer_built_with": "Built with ❤️ by Project Chimera",
     "back_to_quick_unlock": "← 返回快速解锁",
-    "hero_tagline": "与受信任 Eidolon vault 关联的 Cipher 会话",
+    "hero_tagline": "端到端加密消息，为隐私而生",
     "eidolon_context_trusted": "受信任的 Eidolon vault 上下文",
     "eidolon_context_continue": "使用此金库继续",
     "signup_kicker": "新会话",
@@ -335,6 +349,8 @@
     "send_first_message": "发送第一条消息！",
     "message_burned": "消息已销毁",
     "time_capsule": "时间胶囊",
+    "tlock_preparing_short": "…",
+    "tlock_unlocking_short": "解锁中…",
     "acknowledge_read": "✓ 已读（确认阅读）",
     "users_typing": "{{users}} 正在输入...",
     "users_typing_plural": "{{users}} 正在输入...",
@@ -900,7 +916,38 @@
     "already_have_vault_title": "您已有一个 vault",
     "already_have_vault_subtitle": "您的身份已就绪。请登录以使用。",
     "already_have_vault_named": "您的身份「{{name}}」已就绪。请登录以使用。",
-    "already_have_vault_cta": "登录"
+    "already_have_vault_cta": "登录",
+    "mnemonic_title": "创建你的账户",
+    "mnemonic_subtitle": "恢复短语保护你的账户——不在任何地方存储密码。",
+    "mnemonic_intro_username_label": "选择一个用户名",
+    "mnemonic_intro_username_placeholder": "alice_crypto",
+    "mnemonic_intro_length_label": "恢复短语长度",
+    "mnemonic_intro_length_12": "12 个单词",
+    "mnemonic_intro_length_24": "24 个单词",
+    "mnemonic_intro_cta": "生成我的恢复短语",
+    "mnemonic_generating": "正在生成你的恢复短语…",
+    "mnemonic_reveal_title": "你的恢复短语",
+    "mnemonic_reveal_warning": "请按顺序将这些单词抄写在纸上。这是恢复账户的唯一方法——一旦丢失，我们也无法帮你。",
+    "mnemonic_reveal_confirm_checkbox": "我已抄写恢复短语，并理解丢失它将永久失去我的账户。",
+    "mnemonic_reveal_cta": "我已保存，继续",
+    "mnemonic_verify_title": "验证你的备份",
+    "mnemonic_verify_prompt": "输入恢复短语中的指定单词，以确认你已抄写下来。",
+    "mnemonic_verify_word_position": "第 {{position}} 个单词",
+    "mnemonic_verify_cta": "完成注册",
+    "mnemonic_verify_error": "该单词不匹配。请检查你的笔记并重试。",
+    "mnemonic_username_too_short": "用户名至少需要 {{min}} 个字符。",
+    "mnemonic_error_generic": "无法创建账户，请重试。",
+    "mnemonic_stepper_step_1": "账户",
+    "mnemonic_stepper_step_2": "创建中",
+    "mnemonic_stepper_step_3": "备份",
+    "mnemonic_stepper_step_4": "验证",
+    "mnemonic_intro_length_12_hint": "备份快速，保护强大。",
+    "mnemonic_intro_length_24_hint": "额外熵，适合长期备份。",
+    "mnemonic_reveal_warning_title": "妥善保管",
+    "mnemonic_reveal_show": "显示",
+    "mnemonic_reveal_hide": "隐藏",
+    "mnemonic_reveal_copy": "复制",
+    "mnemonic_reveal_copied": "已复制"
   },
   "welcome": {
     "title": "身份已创建！",
@@ -1087,133 +1134,127 @@
   },
   "discover_public": {
     "title": "探索 Cipher",
-    "subtitle": "安全的端到端加密通讯。您的对话始终保持私密。",
-    "overview_title": "为什么选择 Cipher",
-    "overview_paragraph": "Cipher 是一款专为隐私打造的通讯应用。每条消息在离开您的设备前都经过端到端加密。没有人——甚至我们的服务器——能够读取您的对话。您的身份由个人加密保险库保护。",
+    "subtitle": "真正加密的私密通讯。",
+    "overview_title": "什么是 Cipher",
+    "overview_paragraph": "Cipher 是一款专为隐私打造的通讯应用。您的消息在离开设备前就在本地加密——没有人能读取，我们也不能。抗量子攻击的版本正在与 Eidolon 合作开发中。",
     "badges": [
-      "E2E 加密",
-      "服务器零访问",
+      "端到端加密",
+      "无服务器访问",
       "阅后即焚",
-      "P2P 连接",
-      "保险库身份"
+      "直接连接",
+      "无广告、无追踪"
     ],
     "feature_cards": [
       {
         "icon": "🔒",
         "title": "端到端加密",
-        "description": "每条消息在发送前都会在您的设备上加密。只有收件人才能解密。没有中间人能访问内容。",
-        "panelTitle": "保障内容",
+        "description": "您的消息在发送前就在设备上加密。只有收件人能阅读。",
+        "panelTitle": "含义",
         "bullets": [
-          "消息在传输中不可读",
-          "服务器端无法访问内容",
-          "加密密钥在本地生成",
-          "自动密钥轮换"
+          "传输中不可读",
+          "服务器端无访问权限",
+          "密钥保留在您的设备上"
         ],
-        "info": "加密基于 libsodium，一个经过实战验证和审计的密码学库。"
+        "info": "标准的端到端加密。没有后门。"
       },
       {
         "icon": "💬",
         "title": "私密对话",
-        "description": "自信地交流：文字消息、文件和附件。所有内容都受到同等级别的加密保护。",
-        "panelTitle": "功能",
+        "description": "文字、文件、附件。所有内容都享有同等级别的保护。",
+        "panelTitle": "您得到什么",
         "bullets": [
-          "加密文字消息",
-          "安全文件传输",
-          "带定时器的阅后即焚消息",
+          "加密的文字与文件",
+          "阅后即焚消息",
           "可选的已读回执"
         ],
-        "info": "您完全控制分享的内容和时长。"
+        "info": "您决定分享什么，分享多久。"
       },
       {
         "icon": "🌐",
-        "title": "点对点连接",
-        "description": "在条件允许时，Cipher 通过 WebRTC 在您和联系人之间建立直接连接。服务器甚至看不到您的数据。",
-        "panelTitle": "优势",
+        "title": "直接连接",
+        "description": "条件允许时，Cipher 会将您与联系人直接相连。您的数据不经过我们的服务器。",
+        "panelTitle": "为什么重要",
         "bullets": [
           "更低延迟",
-          "数据不经过服务器中转",
-          "设备间直接连接",
-          "P2P 不可用时自动切换"
+          "无服务器中转",
+          "需要时自动回退"
         ],
-        "info": "当双方设备都在线时，P2P 模式会自动激活。"
+        "info": "双方在线时自动启用。"
       },
       {
         "icon": "🛡️",
-        "title": "保险库保护身份",
-        "description": "您的身份基于个人加密保险库。没有传统密码：您的保险库就是您身份的证明。",
-        "panelTitle": "工作原理",
+        "title": "抗量子：即将推出",
+        "description": "下一版本将与 Eidolon 联合开发，保护您的消息免受未来量子计算机攻击。",
+        "panelTitle": "将带来什么",
         "bullets": [
-          "加密保险库认证",
-          "双密钥安全",
-          "身份绑定到您的设备",
-          "服务器不存储密码"
+          "后量子加密",
+          "全新身份系统",
+          "相同的通讯体验"
         ],
-        "info": "保险库由 Eidolon 管理，这是 Cipher 背后的加密身份系统。"
+        "info": "正在开发中，敬请期待。"
       }
     ],
-    "architecture_title": "Cipher 如何保护您的通讯",
+    "architecture_title": "您的消息如何保持私密",
     "architecture_cards": [
       {
         "icon": "📱",
         "title": "在您的设备上",
         "items": [
-          "密钥在本地生成和存储",
-          "发送前加密",
-          "保险库由双密钥保护",
-          "数据仅在您端解密"
+          "消息在本地加密",
+          "密钥保存在您的设备",
+          "解密仅在您这一端进行"
         ],
-        "extra": "所有加密都在客户端完成。服务器只接收加密数据。"
+        "extra": "所有操作都在客户端完成。服务器只看到加密数据。"
       },
       {
         "icon": "☁️",
         "title": "传输中",
         "items": [
-          "端到端加密消息",
-          "可用时使用 P2P 连接",
+          "端到端加密",
+          "条件允许时直接点对点",
           "TLS 作为附加层",
           "服务器端无可读内容"
         ]
       },
       {
         "icon": "👤",
-        "title": "您的身份",
+        "title": "您的账户",
         "items": [
-          "个人加密保险库",
-          "无密码认证",
-          "验证后持续会话",
-          "联系人可验证的身份"
+          "只有您知道的恢复短语",
+          "不存储任何密码",
+          "所有设备通用"
         ]
       }
     ],
     "flow_title": "开始使用",
     "flow_steps": [
-      "创建账户或连接您的保险库。",
-      "通过安全搜索找到联系人。",
-      "发送您的第一条加密消息。",
-      "如需要，启用阅后即焚消息。",
-      "享受 100% 私密的对话。"
+      "在一分钟内创建账户。",
+      "抄写您的恢复短语。",
+      "找到您的联系人。",
+      "发送第一条消息。",
+      "就是这样。一切已加密。"
     ],
-    "runtime_title": "关键要点",
+    "runtime_title": "要点",
     "runtime_rows": [
       {
         "label": "加密",
         "value": "端到端",
-        "detail": "每条消息在本地加密。只有您和收件人可以阅读。"
+        "detail": "在您的设备上加密，别人无法阅读。"
       },
       {
         "label": "隐私",
         "value": "默认开启",
-        "detail": "服务器端无法访问任何对话数据。零访问，零妥协。"
+        "detail": "不存储、不追踪、无广告。"
       },
       {
         "label": "连接",
-        "value": "点对点",
-        "detail": "P2P 模式在设备间建立直接连接，无需服务器中转。"
+        "value": "直接",
+        "detail": "条件允许时设备对设备。"
       },
       {
-        "label": "身份",
-        "value": "安全保险库",
-        "detail": "您的加密保险库用强力证明替代传统密码。"
+        "label": "下一步",
+        "value": "与 Eidolon 合作",
+        "detail": "抗量子版本正在开发中。"
       }
     ],
     "cta_title": "准备好享受完全私密的聊天了吗？",
