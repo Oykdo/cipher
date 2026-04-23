@@ -785,10 +785,34 @@ export class CallManager {
 
   private handleMediaError(error: unknown): void {
     const errorName = error instanceof DOMException ? error.name : '';
-    const message =
-      errorName === 'NotAllowedError'
-        ? 'Acces au micro ou a la camera refuse.'
-        : 'Impossible d acceder au micro ou a la camera.';
+    // Specific guidance per DOMException — previously every failure mode
+    // collapsed into a single generic message, which made support tickets
+    // unresolvable. These are the error names Chromium/Firefox actually
+    // surface from getUserMedia().
+    const message = (() => {
+      switch (errorName) {
+        case 'NotAllowedError':
+        case 'PermissionDeniedError':
+          return "Accès au micro ou à la caméra refusé. Autorisez l'accès dans les paramètres du navigateur.";
+        case 'NotFoundError':
+        case 'DevicesNotFoundError':
+          return 'Aucun micro ni caméra détecté sur cet appareil.';
+        case 'NotReadableError':
+        case 'TrackStartError':
+          return 'Micro ou caméra déjà utilisé(e) par une autre application.';
+        case 'OverconstrainedError':
+        case 'ConstraintNotSatisfiedError':
+          return 'Aucun périphérique ne correspond à la qualité demandée (caméra HD indisponible ?).';
+        case 'SecurityError':
+          return "Accès média bloqué pour raison de sécurité (HTTPS requis).";
+        case 'AbortError':
+          return 'Démarrage du périphérique média interrompu. Réessayez.';
+        case 'TypeError':
+          return 'Configuration média invalide.';
+        default:
+          return "Impossible d'accéder au micro ou à la caméra.";
+      }
+    })();
 
     this.setTransientState('error', message);
     debugLogger.error('Call media acquisition failed', error as Error);
