@@ -784,6 +784,12 @@ export function BackupSettings() {
                                 <span className="text-xs leading-relaxed text-slate-400">{t('settings.backup_settings.secure_format_desc', 'Argon2id + XChaCha20-Poly1305')}</span>
                             </div>
 
+                            {/* Wrap effect — plain-language guarantee derived from the crypto above */}
+                            <div className="flex items-start gap-2.5 rounded-2xl border border-white/8 bg-white/[0.03] px-3.5 py-2.5">
+                                <span className="mt-px shrink-0 rounded-md border border-cyan-400/25 bg-cyan-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-300">wrap</span>
+                                <span className="text-xs leading-relaxed text-slate-400">{t('settings.backup_settings.wrap_effect_desc', 'Votre clé de chiffrement est scellée par votre mot de passe — le backup reste illisible sans lui, même en cas de fuite du fichier.')}</span>
+                            </div>
+
                             <label className="flex items-center gap-3 cursor-pointer">
                                 <input
                                     type="checkbox"
