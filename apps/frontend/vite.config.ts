@@ -6,7 +6,20 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // Strip console.log / .debug / .info from production bundles. Most of the
+  // 300+ raw console calls in the codebase are dev noise, but a few include
+  // hashes, tokens, or peerIds that would leak into any production user's
+  // DevTools. `pure` marks these calls as side-effect-free so the esbuild
+  // minifier tree-shakes them away. console.warn and console.error are
+  // preserved — they carry operational signal we want available on end-user
+  // machines when things go wrong.
+  esbuild: {
+    pure:
+      mode === 'production'
+        ? ['console.log', 'console.debug', 'console.info']
+        : [],
+  },
   plugins: [
     wasm(), // WASM support for argon2-browser
     topLevelAwait(), // Top-level await support
@@ -102,4 +115,4 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
-});
+}));
