@@ -232,7 +232,13 @@ export function ContributionSettings() {
                                 <h3 className="flex-1 text-lg font-semibold text-white">{crypto.name}</h3>
                             </div>
 
-                            {crypto.note && <p className="text-xs text-slate-400">{crypto.note}</p>}
+                            {/* Reserve a constant two-line note slot so cards
+                                with a note (ETH) and cards without (BTC/SOL/XRP/PI)
+                                align their address fields on the same baseline
+                                when rendered side-by-side in the 2-col grid. */}
+                            <p className="min-h-[2.25rem] text-xs leading-[1.1rem] text-slate-400">
+                                {crypto.note ?? ' '}
+                            </p>
 
                             <div className="space-y-2">
                                 <label className="text-xs uppercase tracking-[0.24em] text-slate-400">
