@@ -400,19 +400,17 @@ export async function encryptAttachment(
       return bytesToBase64(chunk);
     });
 
-    // Encrypt or encode fileKey based on security mode
-    let processedFileKey: string;
-
-    if (securityMode === 'timeLock') {
-      if (!timeLockEpoch) {
-        throw new Error('timeLockEpoch is required for timeLock mode');
-      }
-      processedFileKey = await encryptFileKeyWithTimeLock(fileKey, timeLockEpoch);
-    } else {
-      // For 'none' and 'burnAfterReading', store key in plain (Base64)
-      // Burn After Reading relies on lifecycle management, not key encryption
-      processedFileKey = bytesToBase64(fileKey);
+    // fileKey handling: timeLockEpoch, when present, wraps the key with the
+    // timelock envelope regardless of securityMode. This lets a burn-after-
+    // reading attachment also be time-locked (the two layers compose). For
+    // pure burnAfterReading or 'none', we Base64-encode the raw key.
+    if (securityMode === 'timeLock' && !timeLockEpoch) {
+      throw new Error('timeLockEpoch is required for timeLock mode');
     }
+
+    const processedFileKey: string = timeLockEpoch
+      ? await encryptFileKeyWithTimeLock(fileKey, timeLockEpoch)
+      : bytesToBase64(fileKey);
 
     // Build encrypted attachment
     const encryptedAttachment: EncryptedAttachment = {
@@ -460,15 +458,19 @@ export async function decryptAttachment(
 ): Promise<AttachmentDecryptResult> {
   const { payload } = encryptedAttachment;
 
-  // Decrypt file key based on security mode
+  // Decrypt file key — the shape of payload.fileKey is self-describing
+  // (JSON envelope = timelock-wrapped, plain base64 = unwrapped). This lets
+  // us honor a timelock on a burnAfterReading attachment without having to
+  // rely on securityMode === 'timeLock'.
   let fileKey: Uint8Array;
 
+  const looksTimeLockWrapped =
+    typeof payload.fileKey === 'string' && payload.fileKey.startsWith('{');
+
   try {
-    if (payload.securityMode === 'timeLock') {
-      // Check time lock and decrypt key
+    if (looksTimeLockWrapped) {
       fileKey = await decryptFileKeyWithTimeLock(payload.fileKey);
     } else {
-      // Plain Base64-encoded key
       fileKey = base64ToBytes(payload.fileKey);
     }
 
@@ -585,13 +587,12 @@ export async function sendBurnAcknowledgment(
 // ============================================================================
 
 /**
- * Check if attachment is time-locked
+ * Check if attachment is time-locked. timeLockEpoch is authoritative — the
+ * securityMode field is orthogonal, so a burnAfterReading attachment can
+ * still carry a timelock (the two layers compose: the file stays locked
+ * until the deadline, then the burn lifecycle kicks in).
  */
 export function isAttachmentLocked(attachment: EncryptedAttachment): boolean {
-  if (attachment.payload.securityMode !== 'timeLock') {
-    return false;
-  }
-
   if (!attachment.payload.timeLockEpoch) {
     return false;
   }

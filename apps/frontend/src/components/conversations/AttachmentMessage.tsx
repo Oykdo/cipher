@@ -223,18 +223,20 @@ export function AttachmentMessage({
         </p>
       )}
 
-      {/* Security mode indicator */}
-      {attachment.payload.securityMode !== 'none' && (
-        <div className="mt-3 text-xs">
-          {attachment.payload.securityMode === 'timeLock' && (
+      {/* Security layer indicators — the two layers can stack. isLocked is
+          based on timeLockEpoch regardless of securityMode, so a burn +
+          time-locked attachment shows both badges. */}
+      {(isLocked || isBurnMode) && (
+        <div className="mt-3 flex flex-col gap-1.5 text-xs">
+          {isLocked && (
             <div className="flex items-center gap-2 text-quantum-cyan">
-              <span>🔒</span>
+              <span aria-hidden="true">🔒</span>
               <span>{t('attachments.time_locked')}</span>
             </div>
           )}
-          {attachment.payload.securityMode === 'burnAfterReading' && (
+          {isBurnMode && (
             <div className="flex items-center gap-2 text-error-glow">
-              <span>🔥</span>
+              <span aria-hidden="true">🔥</span>
               <span>{t('attachments.burn_after_reading')}</span>
             </div>
           )}

@@ -885,16 +885,26 @@ export default function Conversations() {
       let encryptedAttachment: EncryptedAttachment | null = null;
       
       if (attachmentFile) {
-        // Determine security mode
+        // timeLockEpoch and burnAfterReading are independent layers and must
+        // be able to coexist. Previously burn "won" via an else-if and the
+        // recipient silently lost the timelock (reported bug : destinataire
+        // ne voyait que la couche burn). Now we set both independently.
         let securityMode: SecurityMode = 'none';
         let timeLockEpoch: number | undefined;
 
-        if (burnAfterReading) {
-          securityMode = 'burnAfterReading';
-        } else if (timeLockEnabled && timeLockDate && timeLockTime) {
-          securityMode = 'timeLock';
+        if (timeLockEnabled && timeLockDate && timeLockTime) {
           const unlockDate = new Date(`${timeLockDate}T${timeLockTime}`);
           timeLockEpoch = unlockDate.getTime();
+          // Keep legacy 'timeLock' mode when there is no burn, so existing
+          // clients (including older builds) still detect the lock via the
+          // historical securityMode check.
+          securityMode = 'timeLock';
+        }
+        if (burnAfterReading) {
+          // Burn takes precedence for the storage/lifecycle mode, but
+          // timeLockEpoch above is preserved — attachmentService now gates
+          // the download on timeLockEpoch independently of securityMode.
+          securityMode = 'burnAfterReading';
         }
 
         // Encrypt attachment
