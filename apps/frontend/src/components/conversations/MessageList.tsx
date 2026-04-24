@@ -220,12 +220,9 @@ export function MessageList({
                       <motion.div
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="mt-3 p-2 bg-gradient-to-r from-orange-500/10 via-red-500/10 to-orange-500/10 rounded-lg border border-orange-500/30"
+                        className="mt-3 p-2 bg-gradient-to-r from-orange-500/10 via-red-500/10 to-orange-500/10 rounded-lg border border-orange-500/30 text-center"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="cosmic-badge-violet">BURN</span>
-                          <span className="text-xs font-medium text-orange-400">{t('messages.burn_mode_active')}</span>
-                        </div>
+                        <div className="text-xs font-medium text-orange-400">{t('messages.burn_mode_active')}</div>
                         <div className="mt-1 text-[10px] text-orange-400/70">
                           {message.burnDelay ? t('messages.burn_waiting_read') : t('messages.burn_countdown_active')}
                         </div>
