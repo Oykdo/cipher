@@ -1,13 +1,18 @@
 /**
  * i18n Configuration - react-i18next
- * 
- * Supports 6 languages:
- * - English (en) - Default
+ *
+ * Supports 8 languages:
+ * - English (en) - Default / fallback
  * - French (fr)
  * - German (de)
  * - Spanish (es)
- * - Chinese Simplified (zh-CN)
  * - Italian (it)
+ * - Chinese Simplified (zh-CN)
+ * - Portuguese (pt) — Brazilian form
+ * - Russian (ru)
+ *
+ * pt and ru were added on 2026-04-24. Keys not yet translated in either
+ * file fall back automatically to the English value (fallbackLng: 'en').
  */
 
 import i18n from 'i18next';
@@ -21,6 +26,8 @@ import de from './locales/de.json';
 import es from './locales/es.json';
 import zhCN from './locales/zh-CN.json';
 import it from './locales/it.json';
+import pt from './locales/pt.json';
+import ru from './locales/ru.json';
 
 // Language resources
 const resources = {
@@ -30,6 +37,8 @@ const resources = {
   es: { translation: es },
   'zh-CN': { translation: zhCN },
   it: { translation: it },
+  pt: { translation: pt },
+  ru: { translation: ru },
 };
 
 // Initialize i18next
@@ -42,7 +51,7 @@ i18n
     lng: localStorage.getItem('dd-lang') || 'en', // Get saved language or default to English
     
     // Supported languages
-    supportedLngs: ['fr', 'en', 'de', 'es', 'zh-CN', 'it'],
+    supportedLngs: ['fr', 'en', 'de', 'es', 'zh-CN', 'it', 'pt', 'ru'],
     
     // Namespace
     ns: ['translation'],

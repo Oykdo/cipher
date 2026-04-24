@@ -1,8 +1,9 @@
 /**
  * LanguageSelector Component
- * 
- * Modern language selector with native language names
- * Supports: French, English, German, Spanish, Chinese (Simplified), Italian
+ *
+ * Modern language selector with native language names.
+ * Supports: French, English, German, Spanish, Italian, Chinese (Simplified),
+ * Portuguese (Brazilian), Russian.
  */
 
 import { useTranslation } from 'react-i18next';
@@ -21,8 +22,10 @@ const LANGUAGES: Language[] = [
   { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧' },
   { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪' },
   { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' },
-  { code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: '简体中文', flag: '🇨🇳' },
   { code: 'it', name: 'Italian', nativeName: 'Italiano', flag: '🇮🇹' },
+  { code: 'pt', name: 'Portuguese', nativeName: 'Português', flag: '🇵🇹' },
+  { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' },
+  { code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: '简体中文', flag: '🇨🇳' },
 ];
 
 export function LanguageSelector() {
