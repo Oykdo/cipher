@@ -16,8 +16,11 @@
  */
 
 import { zxcvbnOptions, zxcvbn } from '@zxcvbn-ts/core';
-import zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
-import zxcvbnEnPackage from '@zxcvbn-ts/language-en';
+// Named imports — @zxcvbn-ts/language-* don't ship a `default` export, so a
+// `import pkg from '...'` crashes at runtime under Vite with
+// "does not provide an export named 'default'".
+import * as zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
+import * as zxcvbnEnPackage from '@zxcvbn-ts/language-en';
 
 let zxcvbnConfigured = false;
 
