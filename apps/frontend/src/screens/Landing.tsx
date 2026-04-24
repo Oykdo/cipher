@@ -104,7 +104,7 @@ export default function Landing() {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8, duration: 0.8 }}
-            className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16"
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16"
           >
             <motion.button
               whileHover={{ scale: 1.05, y: -8 }}
@@ -156,6 +156,31 @@ export default function Landing() {
               </div>
             </motion.button>
 
+            <motion.button
+              whileHover={{ scale: 1.05, y: -8 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/discover')}
+              className="cosmic-glass-card cosmic-method-card relative flex min-h-[270px] flex-col p-8 text-left cursor-pointer"
+            >
+              <div className="cosmic-glow-border" aria-hidden="true" />
+              <div className="mb-5 text-[11px] font-semibold uppercase tracking-[0.3em] text-violet-200/60">
+                {t('landing.discover_kicker')}
+              </div>
+              <motion.h3
+                animate={{ scale: [1, 1.15, 1] }}
+                transition={{ duration: 2.5, repeat: Infinity }}
+                className="mb-4 text-4xl font-bold md:text-5xl"
+                style={{ color: 'var(--cosmic-violet)' }}
+              >
+                {t('landing.discover_title')}
+              </motion.h3>
+              <p className="max-w-sm text-soft-grey">
+                {t('landing.discover_cta_desc')}
+              </p>
+              <div className="mt-auto pt-8 text-sm font-medium text-violet-100/88">
+                {t('landing.discover_cta_footer')} →
+              </div>
+            </motion.button>
           </motion.div>
 
           <motion.div
