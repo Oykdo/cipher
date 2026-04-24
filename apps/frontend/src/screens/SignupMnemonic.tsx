@@ -379,6 +379,7 @@ function IntroStep({
               />
             </div>
           </label>
+          <InMemoriamBen username={username} />
         </div>
 
         <div>
@@ -744,5 +745,59 @@ function UserIcon({ className }: { className?: string }) {
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </svg>
+  );
+}
+
+/**
+ * In memoriam — easter egg. Apparaît discrètement quand l'utilisateur
+ * tape "ben" ou "benjamin" comme nom d'utilisateur, juste avant
+ * validation. Hommage à un ami du développeur disparu ; texte gardé en
+ * français, non traduit (une dédicace personnelle ne change pas de
+ * langue selon la locale). Non bloquant : l'utilisateur peut valider
+ * ce nom si c'est effectivement le sien.
+ */
+function InMemoriamBen({ username }: { username: string }) {
+  const normalized = username.trim().toLowerCase();
+  const matches = normalized === 'ben' || normalized === 'benjamin';
+
+  return (
+    <AnimatePresence>
+      {matches && (
+        <motion.div
+          key="in-memoriam-ben"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.9, ease: 'easeOut' }}
+          className="mt-3 flex items-center justify-center gap-3 select-none"
+          aria-label="In memoriam"
+        >
+          <span
+            aria-hidden="true"
+            className="h-px w-10 bg-gradient-to-r from-transparent via-[rgba(233,200,122,0.55)] to-transparent"
+          />
+          <span
+            className="italic text-lg tracking-wide"
+            style={{
+              fontFamily: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
+              color: '#e9c87a',
+              textShadow:
+                '0 0 10px rgba(233, 200, 122, 0.55), 0 0 24px rgba(233, 200, 122, 0.22), 0 1px 0 rgba(0, 0, 0, 0.35)',
+              backgroundImage:
+                'linear-gradient(180deg, #f5d98a 0%, #e9c87a 45%, #b98b3a 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
+          >
+            Pour Ben
+          </span>
+          <span
+            aria-hidden="true"
+            className="h-px w-10 bg-gradient-to-r from-[rgba(233,200,122,0.55)] via-[rgba(233,200,122,0.55)] to-transparent"
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
