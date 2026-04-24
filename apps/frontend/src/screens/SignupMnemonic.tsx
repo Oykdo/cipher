@@ -238,6 +238,17 @@ export default function SignupMnemonic() {
         quickUnlockEnabled: true,
       });
 
+      if (import.meta.env.DEV) {
+        // Dev-only check — confirms both keys landed in localStorage. If
+        // users report the Quick Unlock banner not appearing, ask them to
+        // check this log before digging further.
+        console.log('[signup-mnemonic] Quick-unlock state persisted', {
+          pwdKey: `pwd_${normalizedUsername}`,
+          hasPwd: !!localStorage.getItem(`pwd_${normalizedUsername}`),
+          hasKnownAccounts: !!localStorage.getItem('cipher_pulse_known_accounts'),
+        });
+      }
+
       setSession({
         user: {
           id: response.id,

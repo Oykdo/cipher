@@ -28,13 +28,41 @@ export default function Landing() {
   // Detect a returning user : if a known account exists on this device
   // AND it was provisioned with a quick-unlock password (pwd_<username>
   // present), show the Quick Unlock banner above the usual entry points.
+  //
+  // We re-run the probe on `focus` (user comes back to the window — e.g.
+  // after completing signup in the same process) and on `storage` events
+  // (another tab updated localStorage). This fixes a class of timing bugs
+  // where Landing was mounted with a stale "no account" state and never
+  // re-checked after the password step of signup wrote its entries.
   useEffect(() => {
-    const account = getLastUsedAccount();
-    if (account && hasLocalPassword(account.username)) {
-      setQuickAccount(account);
-    } else {
-      setQuickAccount(null);
-    }
+    const refresh = () => {
+      const account = getLastUsedAccount();
+      const hasPwd = account ? hasLocalPassword(account.username) : false;
+
+      if (import.meta.env.DEV) {
+        // Dev-only diagnostic : makes it trivial to see why the banner is or
+        // isn't showing by inspecting the console once. No sensitive data.
+        console.log('[Landing] Quick Unlock probe', {
+          hasAccount: !!account,
+          username: account?.username,
+          hasPwd,
+        });
+      }
+
+      if (account && hasPwd) {
+        setQuickAccount(account);
+      } else {
+        setQuickAccount(null);
+      }
+    };
+
+    refresh();
+    window.addEventListener('focus', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('storage', refresh);
+    };
   }, []);
 
   return (
