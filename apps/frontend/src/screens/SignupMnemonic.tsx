@@ -22,7 +22,7 @@ import '../styles/fluidCrypto.css';
 import CosmicConstellationLogo from '../components/CosmicConstellationLogo';
 import MouseGlowCard from '../components/MouseGlowCard';
 import { getErrorMessage } from '../lib/errors';
-import { computeSrpSeedSetup } from '../lib/srpSeed';
+import { computeSrpSeedSetup, computeSrpPasswordSetup } from '../lib/srpSeed';
 import { getE2EEVault, getKeyVault } from '../lib/keyVault';
 import { setSessionMasterKey } from '../lib/masterKeyResolver';
 import { setTemporaryMasterKey } from '../lib/secureKeyAccess';
@@ -229,6 +229,28 @@ export default function SignupMnemonic() {
         await vault.storeData(`masterKey:${normalizedUsername}`, response.masterKeyHex);
       } catch (vaultErr) {
         throw new Error(getErrorMessage(vaultErr, t('signup.mnemonic_password_vault_error')));
+      }
+
+      // Register classic SRP credentials derived from the quick-unlock
+      // password, so `/api/v2/auth/srp/login/init` can authenticate the
+      // user at the next Quick Connect. Without this, the user has only
+      // SRP-seed (mnemonic) credentials on the server and the unlock path
+      // hits a 401. The accessToken from signup is used as Bearer.
+      try {
+        const srpCreds = computeSrpPasswordSetup(response.username, password);
+        const srpSetupResp = await fetch(`${API_BASE_URL}/api/v2/auth/srp/setup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${response.accessToken}`,
+          },
+          body: JSON.stringify(srpCreds),
+        });
+        if (!srpSetupResp.ok) {
+          console.warn('[signup-mnemonic] /srp/setup returned', srpSetupResp.status);
+        }
+      } catch (srpErr) {
+        console.warn('[signup-mnemonic] SRP password setup failed', srpErr);
       }
 
       // Register the account so Landing can surface the Quick Unlock banner.

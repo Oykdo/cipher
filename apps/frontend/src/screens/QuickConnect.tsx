@@ -47,6 +47,7 @@ import {
   deriveMasterKeyFromMnemonic,
   startSrpSeedLogin,
   continueSrpSeedLogin,
+  computeSrpPasswordSetup,
 } from '../lib/srpSeed';
 import { getErrorMessage } from '../lib/errors';
 
@@ -425,6 +426,28 @@ function ProvisionForm({ account }: { account: LocalAccount }) {
         securityTier: verifyData.user.securityTier,
         quickUnlockEnabled: true,
       });
+
+      // Register classic SRP server-side so future Quick Unlock (which
+      // calls /srp/login/init) can authenticate the user with the password
+      // alone. The accessToken from the srp-seed verify response is used
+      // as Bearer. If this fails, the unlock flow will keep 401-ing and
+      // the user will fall back to provision mode next time — safe.
+      try {
+        const srpCreds = computeSrpPasswordSetup(verifyData.user.username, password);
+        const srpSetupResp = await fetch(`${API_BASE_URL}/api/v2/auth/srp/setup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${verifyData.accessToken}`,
+          },
+          body: JSON.stringify(srpCreds),
+        });
+        if (!srpSetupResp.ok) {
+          console.warn('[quick-connect] /srp/setup returned', srpSetupResp.status);
+        }
+      } catch (srpErr) {
+        console.warn('[quick-connect] SRP password setup failed', srpErr);
+      }
 
       setSession({
         user: {

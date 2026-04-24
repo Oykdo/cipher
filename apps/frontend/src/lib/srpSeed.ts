@@ -66,6 +66,26 @@ export function computeSrpSeedSetup(
 }
 
 /**
+ * Compute classic SRP credentials from a device password. Used by the
+ * quick-unlock flow so that /api/v2/auth/srp/login/init can verify the
+ * user's password against srp_salt / srp_verifier stored server-side.
+ *
+ * Unlike computeSrpSeedSetup which normalizes its input as a BIP-39
+ * mnemonic (lowercased, spaces collapsed), this one takes the password
+ * verbatim — case and whitespace matter in a password.
+ */
+export function computeSrpPasswordSetup(
+  username: string,
+  password: string
+): SrpSeedSetupCredentials {
+  const user = normalizeUsername(username);
+  const srpSalt = srpClient.generateSalt();
+  const privateKey = srpClient.derivePrivateKey(srpSalt, user, password);
+  const srpVerifier = srpClient.deriveVerifier(privateKey);
+  return { srpSalt, srpVerifier };
+}
+
+/**
  * Login dance, step 1 — generate the client ephemeral. Returns a handle
  * that the caller must pass back into `finishSrpSeedLogin` with the
  * server response from /srp-seed/login/init.
