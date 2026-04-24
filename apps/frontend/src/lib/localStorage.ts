@@ -195,6 +195,37 @@ export function hasAnyLocalAccount(): boolean {
 }
 
 /**
+ * Return any known account on this device (even ones without a quick-unlock
+ * password yet) — used by the landing banner to offer a redirect to the
+ * QuickConnect screen, where the user can either unlock or provision
+ * their quick-unlock password.
+ *
+ * Unlike `getLastUsedAccount()`, this one does NOT filter on
+ * `quickUnlockEnabled`, so accounts that only went through a mnemonic
+ * login before the password step existed still surface here.
+ */
+export function getLastKnownAccount(): LocalAccount | null {
+  const known = getKnownAccounts();
+  if (known.length === 0) return null;
+
+  try {
+    const authStorage = localStorage.getItem('cipher-pulse-auth');
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      const lastUsername = parsed?.state?.session?.user?.username;
+      if (lastUsername) {
+        const match = known.find((a) => a.username === lastUsername);
+        if (match) return match;
+      }
+    }
+  } catch {
+    // fall through to lastUsed-sort
+  }
+
+  return [...known].sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0))[0] ?? null;
+}
+
+/**
  * Clear QuickConnect cache for all users
  * This will force users to use full login instead of quick unlock
  * BUT keeps the users in the list (known_accounts)

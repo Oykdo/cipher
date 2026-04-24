@@ -9,6 +9,7 @@ import { useAppLockActivity } from './hooks/useAppLockActivity';
 import { EIDOLON_CONNECT_ENABLED } from './config';
 
 const Landing = lazy(() => import('./screens/Landing'));
+const QuickConnect = lazy(() => import('./screens/QuickConnect'));
 const LoginNew = lazy(() => import('./screens/LoginNew'));
 const Welcome = lazy(() => import('./screens/Welcome'));
 const SignupFluid = lazy(() => import('./screens/SignupFluid'));
@@ -91,6 +92,9 @@ function App() {
 
           {/* Discover Page */}
           <Route path="/discover" element={<Discover />} />
+
+          {/* Quick Connect — returning-user entry point (unlock or provision) */}
+          <Route path="/quick-connect" element={<QuickConnect />} />
 
           {/* Auth Routes */}
           <Route path="/login" element={<LoginNew />} />
