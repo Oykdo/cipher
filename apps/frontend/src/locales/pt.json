@@ -981,6 +981,7 @@
     "unlock_section_title": "Desbloquear com sua senha",
     "provision_section_title": "Configurar acesso rápido",
     "provision_desc": "Esta conta ainda não tem uma senha de acesso rápido neste dispositivo. Digite sua frase de recuperação e escolha uma nova senha de dispositivo — no próximo retorno bastará a senha.",
+    "provision_desc_migration": "Sua senha precisa ser re-verificada uma vez com sua frase de recuperação. Digite a frase e a mesma senha de dispositivo — isso configura corretamente o acesso rápido para os próximos retornos.",
     "password_label": "Senha",
     "password_placeholder": "Sua senha do dispositivo",
     "new_password_label": "Nova senha do dispositivo",

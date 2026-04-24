@@ -816,6 +816,7 @@
     "unlock_section_title": "Desbloquear con su contraseña",
     "provision_section_title": "Configurar acceso rápido",
     "provision_desc": "Esta cuenta aún no tiene contraseña de acceso rápido en este dispositivo. Introduzca su frase de recuperación y elija una nueva contraseña de dispositivo — en el próximo regreso bastará con la contraseña.",
+    "provision_desc_migration": "Su contraseña necesita una re-verificación única con su frase de recuperación. Introduzca su frase y la misma contraseña de dispositivo — esto configurará correctamente el acceso rápido para los próximos inicios.",
     "password_label": "Contraseña",
     "password_placeholder": "Su contraseña del dispositivo",
     "new_password_label": "Nueva contraseña del dispositivo",

@@ -816,6 +816,7 @@
     "unlock_section_title": "使用密码解锁",
     "provision_section_title": "设置快速解锁",
     "provision_desc": "此账户在当前设备上尚未设置快速解锁密码。请输入您的恢复短语并设置新的设备密码——下次返回时只需输入密码即可。",
+    "provision_desc_migration": "您的密码需要使用恢复短语进行一次重新验证。请输入恢复短语和相同的设备密码——这将为以后的返回正确配置快速解锁。",
     "password_label": "密码",
     "password_placeholder": "您的设备密码",
     "new_password_label": "新的设备密码",

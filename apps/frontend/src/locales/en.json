@@ -981,6 +981,7 @@
     "unlock_section_title": "Unlock with your password",
     "provision_section_title": "Set up quick unlock",
     "provision_desc": "This account does not have a quick-unlock password on this device yet. Enter your recovery phrase and choose a new device password — next return you will just need the password.",
+    "provision_desc_migration": "Your password needs to be re-verified with your recovery phrase once. Enter your recovery phrase and the same device password — this sets up quick unlock properly for future returns.",
     "password_label": "Password",
     "password_placeholder": "Your device password",
     "new_password_label": "New device password",

@@ -851,6 +851,7 @@
     "unlock_section_title": "Déverrouiller avec votre mot de passe",
     "provision_section_title": "Activer l'accès rapide",
     "provision_desc": "Ce compte n'a pas encore de mot de passe d'accès rapide sur cet appareil. Saisissez votre phrase de récupération et choisissez un nouveau mot de passe de périphérique — au prochain retour, seul le mot de passe suffira.",
+    "provision_desc_migration": "Votre mot de passe doit être re-vérifié une fois avec votre phrase de récupération. Saisissez votre phrase et le même mot de passe d'appareil — cela configure correctement l'accès rapide pour les prochaines fois.",
     "password_label": "Mot de passe",
     "password_placeholder": "Votre mot de passe d'appareil",
     "new_password_label": "Nouveau mot de passe d'appareil",

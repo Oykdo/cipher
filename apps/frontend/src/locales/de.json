@@ -816,6 +816,7 @@
     "unlock_section_title": "Mit Passwort entsperren",
     "provision_section_title": "Schnellzugriff einrichten",
     "provision_desc": "Für dieses Konto ist auf diesem Gerät noch kein Schnellzugriffs-Passwort eingerichtet. Geben Sie Ihre Wiederherstellungsphrase ein und wählen Sie ein neues Gerätepasswort — beim nächsten Besuch genügt dann das Passwort.",
+    "provision_desc_migration": "Ihr Passwort muss einmal mit Ihrer Wiederherstellungsphrase neu verifiziert werden. Geben Sie die Phrase und dasselbe Gerätepasswort ein — so wird der Schnellzugriff für zukünftige Besuche korrekt eingerichtet.",
     "password_label": "Passwort",
     "password_placeholder": "Ihr Gerätepasswort",
     "new_password_label": "Neues Gerätepasswort",

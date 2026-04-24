@@ -77,10 +77,18 @@ export default function QuickConnect() {
     [accounts, selectedUsername]
   );
 
+  // Force-provision flag : lets the UnlockForm bubble up a 401 from the server
+  // (account has a local pwd_ hash but the server never received its classic
+  // SRP credentials — e.g. legacy accounts created before the `/srp/setup` call
+  // was added). We fall back to provision mode which will call `/srp/setup`.
+  const [forceProvision, setForceProvision] = useState<string | null>(null);
+
   const mode: 'unlock' | 'provision' | 'empty' = selectedAccount
-    ? hasLocalPassword(selectedAccount.username)
-      ? 'unlock'
-      : 'provision'
+    ? forceProvision === selectedAccount.username
+      ? 'provision'
+      : hasLocalPassword(selectedAccount.username)
+        ? 'unlock'
+        : 'provision'
     : 'empty';
 
   return (
@@ -118,11 +126,17 @@ export default function QuickConnect() {
           )}
 
           {mode === 'unlock' && selectedAccount && (
-            <UnlockForm account={selectedAccount} />
+            <UnlockForm
+              account={selectedAccount}
+              onNeedsProvision={() => setForceProvision(selectedAccount.username)}
+            />
           )}
 
           {mode === 'provision' && selectedAccount && (
-            <ProvisionForm account={selectedAccount} />
+            <ProvisionForm
+              account={selectedAccount}
+              forced={forceProvision === selectedAccount.username}
+            />
           )}
 
           <div className="mt-6 flex items-center justify-between text-xs text-soft-grey">
@@ -199,7 +213,13 @@ function AccountPicker({
 // Unlock form — account has pwd_<username>, standard password flow.
 // ============================================================================
 
-function UnlockForm({ account }: { account: LocalAccount }) {
+function UnlockForm({
+  account,
+  onNeedsProvision,
+}: {
+  account: LocalAccount;
+  onNeedsProvision: () => void;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
@@ -243,7 +263,19 @@ function UnlockForm({ account }: { account: LocalAccount }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: normalizedUsername, A: ephemeral.public }),
       });
-      if (!initResp.ok) throw new Error(t('quick_connect.error_server'));
+      if (!initResp.ok) {
+        // 401 here means the account has a local pwd_ hash but no classic
+        // SRP credentials server-side (legacy account or `/srp/setup` call
+        // dropped earlier). The user needs to re-provision : enter their
+        // mnemonic + same password so /srp/setup is called with a fresh
+        // JWT from the srp-seed login. Bubble up to the parent to switch
+        // modes.
+        if (initResp.status === 401) {
+          onNeedsProvision();
+          return;
+        }
+        throw new Error(t('quick_connect.error_server'));
+      }
       const { salt, B, sessionId } = await initResp.json();
       const privateKey = srp.derivePrivateKey(salt, normalizedUsername, password);
       const session = srp.deriveSession(ephemeral.secret, B, salt, normalizedUsername, privateKey);
@@ -253,7 +285,13 @@ function UnlockForm({ account }: { account: LocalAccount }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: normalizedUsername, M1: session.proof, sessionId }),
       });
-      if (!verifyResp.ok) throw new Error(t('quick_connect.error_wrong_password'));
+      if (!verifyResp.ok) {
+        if (verifyResp.status === 401) {
+          onNeedsProvision();
+          return;
+        }
+        throw new Error(t('quick_connect.error_wrong_password'));
+      }
       const data = await verifyResp.json();
 
       try { await initializeE2EE(data.user.username); } catch { /* non-blocking */ }
@@ -340,7 +378,13 @@ function UnlockForm({ account }: { account: LocalAccount }) {
 // KeyVault so next return lands in unlock mode.
 // ============================================================================
 
-function ProvisionForm({ account }: { account: LocalAccount }) {
+function ProvisionForm({
+  account,
+  forced = false,
+}: {
+  account: LocalAccount;
+  forced?: boolean;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
@@ -491,7 +535,7 @@ function ProvisionForm({ account }: { account: LocalAccount }) {
         <AccountHeader account={account} />
 
         <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100/90">
-          {t('quick_connect.provision_desc')}
+          {forced ? t('quick_connect.provision_desc_migration') : t('quick_connect.provision_desc')}
         </div>
 
         <div>
