@@ -23,12 +23,19 @@ import CosmicConstellationLogo from '../components/CosmicConstellationLogo';
 import MouseGlowCard from '../components/MouseGlowCard';
 import { getErrorMessage } from '../lib/errors';
 import { computeSrpSeedSetup } from '../lib/srpSeed';
-import { getE2EEVault } from '../lib/keyVault';
+import { getE2EEVault, getKeyVault } from '../lib/keyVault';
 import { setSessionMasterKey } from '../lib/masterKeyResolver';
 import { setTemporaryMasterKey } from '../lib/secureKeyAccess';
 import { initializeE2EE, publishKeyBundleToServer } from '../lib/e2ee/e2eeService';
+import { saveKnownAccount } from '../lib/localStorage';
+import {
+  evaluatePassword,
+  hashPassword,
+  MIN_PASSWORD_LENGTH,
+  type PasswordStrength,
+} from '../lib/passwordPolicy';
 
-type Step = 'intro' | 'generating' | 'reveal' | 'verify';
+type Step = 'intro' | 'generating' | 'reveal' | 'verify' | 'password';
 
 interface SignupResponse {
   id: string;
@@ -41,7 +48,7 @@ interface SignupResponse {
 }
 
 const MIN_USERNAME_LENGTH = 3;
-const STEP_ORDER: Step[] = ['intro', 'generating', 'reveal', 'verify'];
+const STEP_ORDER: Step[] = ['intro', 'generating', 'reveal', 'verify', 'password'];
 
 export default function SignupMnemonic() {
   const { t } = useTranslation();
@@ -68,6 +75,15 @@ export default function SignupMnemonic() {
   // (protects against a passer-by shoulder-surfing the screen).
   const [mnemonicHidden, setMnemonicHidden] = useState(true);
   const [copied, setCopied] = useState(false);
+
+  // Quick-unlock password — created at the very end of signup after
+  // mnemonic confirmation. Seals the device-local KeyVault and lets the
+  // user log back in on this device with username + password instead of
+  // retyping the mnemonic each time.
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   const handleGenerate = useCallback(async () => {
     const trimmed = username.trim();
@@ -158,7 +174,7 @@ export default function SignupMnemonic() {
     setStep('verify');
   }, [response, backupConfirmed]);
 
-  const handleVerify = useCallback(async () => {
+  const handleVerify = useCallback(() => {
     if (!response) return;
     const expected1 = response.mnemonic[verifyIndex].trim().toLowerCase();
     const expected2 = response.mnemonic[verifyIndex2].trim().toLowerCase();
@@ -168,37 +184,97 @@ export default function SignupMnemonic() {
       setVerifyError(t('signup.mnemonic_verify_error'));
       return;
     }
+    // Verification succeeded : we don't open the session yet — the user
+    // must first create a device-local quick-unlock password.
+    setPassword('');
+    setPasswordConfirm('');
+    setPasswordError('');
+    setStep('password');
+  }, [response, verifyIndex, verifyIndex2, verifyInput, verifyInput2, t]);
 
-    setSession({
-      user: {
-        id: response.id,
-        username: response.username,
-        securityTier: response.securityTier,
-      },
-      accessToken: response.accessToken,
-      refreshToken: response.refreshToken,
-    });
+  /**
+   * Final submit — runs after the user has chosen their quick-unlock
+   * password. Seals the device KeyVault with that password, persists the
+   * PBKDF2 hash in localStorage, registers the account as known for this
+   * device, opens the session, then redirects to the conversations screen.
+   */
+  const handlePasswordSubmit = useCallback(async () => {
+    if (!response || passwordSubmitting) return;
 
-    // Initialize E2EE + publish key bundle to server. This must happen AFTER
-    // setSession so the access token is available for the publish API call.
-    // Without this, other users can't send encrypted messages to us
-    // ("No public key for <username>"). We await an explicit second publish
-    // because the one triggered inside initializeE2EE is fire-and-forget
-    // (silent on failure).
-    try {
-      await initializeE2EE(response.username);
-      try {
-        await publishKeyBundleToServer();
-        console.log('✅ [signup-mnemonic] Key bundle published to server');
-      } catch (pubErr) {
-        console.error('❌ [signup-mnemonic] Key bundle publish failed', pubErr);
-      }
-    } catch (e2eeErr) {
-      console.warn('[signup-mnemonic] E2EE init failed', e2eeErr);
+    const strength = evaluatePassword(password, [response.username]);
+    if (!strength.acceptable) {
+      setPasswordError(t('signup.mnemonic_password_too_weak'));
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setPasswordError(t('signup.mnemonic_password_mismatch'));
+      return;
     }
 
-    navigate('/conversations');
-  }, [response, verifyIndex, verifyIndex2, verifyInput, verifyInput2, setSession, navigate, t]);
+    setPasswordSubmitting(true);
+    setPasswordError('');
+    try {
+      const normalizedUsername = response.username.toLowerCase();
+
+      // Persist the verification hash (`pwd_<username>`) that QuickUnlock
+      // checks before trying SRP login. Salted on the lowercased username
+      // so a user logging in on a second device can rebuild this locally.
+      const storedHash = await hashPassword(password, normalizedUsername);
+      localStorage.setItem(`pwd_${normalizedUsername}`, storedHash);
+
+      // Seal the KeyVault with the password and stash the master key inside.
+      // QuickUnlock reads exactly this entry on subsequent launches.
+      try {
+        const vault = await getKeyVault(password);
+        await vault.storeData(`masterKey:${normalizedUsername}`, response.masterKeyHex);
+      } catch (vaultErr) {
+        throw new Error(getErrorMessage(vaultErr, t('signup.mnemonic_password_vault_error')));
+      }
+
+      // Register the account so Landing can surface the Quick Unlock banner.
+      saveKnownAccount({
+        username: response.username,
+        securityTier: response.securityTier,
+        quickUnlockEnabled: true,
+      });
+
+      setSession({
+        user: {
+          id: response.id,
+          username: response.username,
+          securityTier: response.securityTier,
+        },
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
+      });
+
+      try {
+        await initializeE2EE(response.username);
+        try {
+          await publishKeyBundleToServer();
+          console.log('✅ [signup-mnemonic] Key bundle published to server');
+        } catch (pubErr) {
+          console.error('❌ [signup-mnemonic] Key bundle publish failed', pubErr);
+        }
+      } catch (e2eeErr) {
+        console.warn('[signup-mnemonic] E2EE init failed', e2eeErr);
+      }
+
+      navigate('/conversations');
+    } catch (err) {
+      setPasswordError(getErrorMessage(err, t('signup.mnemonic_password_vault_error')));
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  }, [
+    response,
+    password,
+    passwordConfirm,
+    passwordSubmitting,
+    setSession,
+    navigate,
+    t,
+  ]);
 
   const handleCopy = useCallback(async () => {
     if (!response) return;
@@ -290,6 +366,27 @@ export default function SignupMnemonic() {
                 onBack={() => setStep('reveal')}
               />
             )}
+
+            {step === 'password' && response && (
+              <PasswordStep
+                key="password"
+                username={response.username}
+                password={password}
+                passwordConfirm={passwordConfirm}
+                onPasswordChange={(v) => {
+                  setPassword(v);
+                  if (passwordError) setPasswordError('');
+                }}
+                onPasswordConfirmChange={(v) => {
+                  setPasswordConfirm(v);
+                  if (passwordError) setPasswordError('');
+                }}
+                submitting={passwordSubmitting}
+                error={passwordError}
+                onSubmit={handlePasswordSubmit}
+                onBack={() => setStep('verify')}
+              />
+            )}
           </AnimatePresence>
         </div>
       </div>
@@ -308,6 +405,7 @@ function Stepper({ currentIndex }: { currentIndex: number }) {
     t('signup.mnemonic_stepper_step_2'),
     t('signup.mnemonic_stepper_step_3'),
     t('signup.mnemonic_stepper_step_4'),
+    t('signup.mnemonic_stepper_step_5'),
   ];
   return (
     <div className="cosmic-stepper mb-6" aria-label="Signup progress">
@@ -745,6 +843,206 @@ function UserIcon({ className }: { className?: string }) {
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </svg>
+  );
+}
+
+// ============================================================================
+// PasswordStep — quick-unlock password creation
+// ============================================================================
+
+function PasswordStep({
+  username,
+  password,
+  passwordConfirm,
+  onPasswordChange,
+  onPasswordConfirmChange,
+  submitting,
+  error,
+  onSubmit,
+  onBack,
+}: {
+  username: string;
+  password: string;
+  passwordConfirm: string;
+  onPasswordChange: (value: string) => void;
+  onPasswordConfirmChange: (value: string) => void;
+  submitting: boolean;
+  error: string;
+  onSubmit: () => void;
+  onBack: () => void;
+}) {
+  const { t } = useTranslation();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const strength: PasswordStrength = useMemo(
+    () => evaluatePassword(password, [username]),
+    [password, username]
+  );
+  const confirmMismatch = passwordConfirm.length > 0 && passwordConfirm !== password;
+  const canSubmit =
+    strength.acceptable && password === passwordConfirm && !submitting;
+
+  const strengthLabel = t(`signup.mnemonic_password_strength_${strength.level}`);
+  const strengthColor =
+    strength.level === 'strong'
+      ? '#10b981'
+      : strength.level === 'good'
+        ? '#22d3ee'
+        : strength.level === 'fair'
+          ? '#f59e0b'
+          : '#ef4444';
+
+  const issueHint = strength.issue
+    ? t(`signup.mnemonic_password_issue_${strength.issue}`, { min: MIN_PASSWORD_LENGTH })
+    : null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="cosmic-glass-card relative"
+    >
+      <div className="cosmic-glow-border" aria-hidden="true" />
+      <MouseGlowCard className="p-6 md:p-8 space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold text-pure-white mb-2">
+            {t('signup.mnemonic_password_title')}
+          </h2>
+          <p className="text-sm text-soft-grey leading-relaxed">
+            {t('signup.mnemonic_password_subtitle')}
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <label className="block">
+            <span className="text-sm text-soft-grey mb-2 block">
+              {t('signup.mnemonic_password_label')}
+            </span>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => onPasswordChange(e.target.value)}
+                placeholder={t('signup.mnemonic_password_placeholder')}
+                className="cosmic-input cosmic-input-plain w-full pr-16"
+                autoComplete="new-password"
+                autoFocus
+                disabled={submitting}
+                onKeyDown={(e) => { if (e.key === 'Enter' && canSubmit) onSubmit(); }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold uppercase tracking-[0.18em] text-soft-grey hover:text-pure-white transition-colors"
+                disabled={submitting}
+                aria-label={showPassword ? t('common.hide_password') : t('common.show_password')}
+              >
+                {showPassword ? t('common.hide') : t('common.show')}
+              </button>
+            </div>
+          </label>
+
+          {/* Strength meter */}
+          {password.length > 0 && (
+            <div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ backgroundColor: strengthColor }}
+                  initial={false}
+                  animate={{ width: `${Math.round(strength.progress * 100)}%` }}
+                  transition={{ duration: 0.25 }}
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-[11px]">
+                <span
+                  className="uppercase tracking-[0.22em] font-semibold"
+                  style={{ color: strengthColor }}
+                >
+                  {strengthLabel}
+                </span>
+                {issueHint && (
+                  <span className="text-soft-grey">{issueHint}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          <label className="block">
+            <span className="text-sm text-soft-grey mb-2 block">
+              {t('signup.mnemonic_password_confirm_label')}
+            </span>
+            <div className="relative">
+              <input
+                type={showConfirm ? 'text' : 'password'}
+                value={passwordConfirm}
+                onChange={(e) => onPasswordConfirmChange(e.target.value)}
+                placeholder={t('signup.mnemonic_password_confirm_placeholder')}
+                className="cosmic-input cosmic-input-plain w-full pr-16"
+                autoComplete="new-password"
+                disabled={submitting}
+                onKeyDown={(e) => { if (e.key === 'Enter' && canSubmit) onSubmit(); }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold uppercase tracking-[0.18em] text-soft-grey hover:text-pure-white transition-colors"
+                disabled={submitting}
+                aria-label={showConfirm ? t('common.hide_password') : t('common.show_password')}
+              >
+                {showConfirm ? t('common.hide') : t('common.show')}
+              </button>
+            </div>
+            {confirmMismatch && (
+              <p className="mt-2 text-xs text-red-400">
+                {t('signup.mnemonic_password_mismatch')}
+              </p>
+            )}
+          </label>
+        </div>
+
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+              role="alert"
+              aria-live="polite"
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="cosmic-btn-ghost text-sm"
+            disabled={submitting}
+          >
+            {t('common.back')}
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={!canSubmit}
+            className="cosmic-cta text-sm"
+          >
+            <span>
+              {submitting
+                ? t('signup.mnemonic_password_submitting')
+                : t('signup.mnemonic_password_submit')}
+            </span>
+            <div className="cosmic-cta-glow" aria-hidden="true" />
+          </button>
+        </div>
+      </MouseGlowCard>
+    </motion.div>
   );
 }
 

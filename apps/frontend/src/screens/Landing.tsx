@@ -1,19 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { readVaultBridgeContext, type VaultBridgeContext } from '../lib/vaultBridge';
 import '../styles/fluidCrypto.css';
 import CosmicConstellationLogo from '../components/CosmicConstellationLogo';
 import { formatVaultHandle } from '../lib/vaultHandle';
-import { EIDOLON_CONNECT_ENABLED } from '../config';
+import { EIDOLON_CONNECT_ENABLED, API_BASE_URL } from '../config';
+import {
+  getLastUsedAccount,
+  hasLocalPassword,
+  type LocalAccount,
+} from '../lib/localStorage';
+import { hashPassword } from '../lib/passwordPolicy';
+import { getE2EEVault, getKeyVault } from '../lib/keyVault';
+import { setSessionMasterKey } from '../lib/masterKeyResolver';
+import { setTemporaryMasterKey } from '../lib/secureKeyAccess';
+import { initializeE2EE } from '../lib/e2ee/e2eeService';
+import { useAuthStore } from '../store/auth';
+import * as srp from 'secure-remote-password/client';
 
 export default function Landing() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [vaultBridge, setVaultBridge] = useState<VaultBridgeContext | null>(null);
+  const [quickAccount, setQuickAccount] = useState<LocalAccount | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -30,6 +43,18 @@ export default function Landing() {
       mounted = false;
       window.removeEventListener('focus', loadVaultBridge);
     };
+  }, []);
+
+  // Detect a returning user : if a known account exists on this device
+  // AND it was provisioned with a quick-unlock password (pwd_<username>
+  // present), show the Quick Unlock banner above the usual entry points.
+  useEffect(() => {
+    const account = getLastUsedAccount();
+    if (account && hasLocalPassword(account.username)) {
+      setQuickAccount(account);
+    } else {
+      setQuickAccount(null);
+    }
   }, []);
 
   return (
@@ -87,6 +112,13 @@ export default function Landing() {
               {t('landing.hero_description_2')}
             </motion.p>
           </motion.div>
+
+          {quickAccount && (
+            <QuickUnlockBandeau
+              account={quickAccount}
+              onSwitchAccount={() => setQuickAccount(null)}
+            />
+          )}
 
           <motion.div
             initial={{ opacity: 0, y: 50 }}
@@ -237,5 +269,190 @@ function FeatureCard({ title, description }: { title: string; description: strin
       <h4 className="text-xl md:text-2xl font-bold mb-3 cosmic-title-pulse">{title}</h4>
       <p className="text-xs text-soft-grey">{description}</p>
     </motion.div>
+  );
+}
+
+// ============================================================================
+// QuickUnlockBandeau — returning-user entry point on the landing page.
+// Kept elegant and pastille-free: just an avatar, the username, one password
+// field and an unlock button. "Switch account" lets the user fall back to the
+// standard signup/login grid below.
+// ============================================================================
+
+function QuickUnlockBandeau({
+  account,
+  onSwitchAccount,
+}: {
+  account: LocalAccount;
+  onSwitchAccount: () => void;
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const setSession = useAuthStore((s) => s.setSession);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+  const [error, setError] = useState('');
+
+  const normalizedUsername = useMemo(() => account.username.toLowerCase(), [account.username]);
+  const avatarInitial = account.username.charAt(0).toUpperCase();
+
+  const handleUnlock = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (unlocking || !password) return;
+    setUnlocking(true);
+    setError('');
+    try {
+      // 1. Verify the local PBKDF2 hash first — avoids hitting the server
+      //    on a typo and keeps the error fast.
+      const storedHash =
+        localStorage.getItem(`pwd_${normalizedUsername}`) ??
+        localStorage.getItem(`pwd_${account.username}`);
+      if (!storedHash) throw new Error(t('landing.quick_unlock_error_not_provisioned'));
+
+      const candidateHash = await hashPassword(password, normalizedUsername);
+      if (candidateHash !== storedHash) {
+        throw new Error(t('landing.quick_unlock_error_wrong_password'));
+      }
+
+      // 2. Unseal KeyVault → recover masterKey for E2EE + caches.
+      const vault = await getKeyVault(password);
+      const masterKey =
+        (await vault.getData(`masterKey:${normalizedUsername}`)) ??
+        (await vault.getData(`masterKey:${account.username}`));
+      if (!masterKey) throw new Error(t('landing.quick_unlock_error_no_masterkey'));
+
+      await setSessionMasterKey(masterKey);
+      try { await setTemporaryMasterKey(masterKey); } catch { /* non-blocking */ }
+      try { await getE2EEVault(masterKey); } catch { /* non-blocking */ }
+
+      // 3. SRP login against the server to obtain a fresh JWT.
+      const ephemeral = srp.generateEphemeral();
+      const initResp = await fetch(`${API_BASE_URL}/api/v2/auth/srp/login/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: normalizedUsername, A: ephemeral.public }),
+      });
+      if (!initResp.ok) {
+        throw new Error(t('landing.quick_unlock_error_server'));
+      }
+      const { salt, B, sessionId } = await initResp.json();
+      const privateKey = srp.derivePrivateKey(salt, normalizedUsername, password);
+      const session = srp.deriveSession(ephemeral.secret, B, salt, normalizedUsername, privateKey);
+
+      const verifyResp = await fetch(`${API_BASE_URL}/api/v2/auth/srp/login/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: normalizedUsername, M1: session.proof, sessionId }),
+      });
+      if (!verifyResp.ok) {
+        throw new Error(t('landing.quick_unlock_error_wrong_password'));
+      }
+      const data = await verifyResp.json();
+
+      try { await initializeE2EE(data.user.username); } catch { /* non-blocking */ }
+
+      setSession({
+        user: {
+          id: data.user.id,
+          username: data.user.username,
+          securityTier: data.user.securityTier,
+        },
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+      });
+
+      navigate('/conversations');
+    } catch (err: any) {
+      setError(err?.message ?? t('landing.quick_unlock_error_generic'));
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
+  return (
+    <motion.form
+      onSubmit={handleUnlock}
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+      className="cosmic-glass-card relative mx-auto mb-10 flex w-full max-w-2xl flex-col gap-4 overflow-hidden rounded-[22px] border border-[rgba(0,240,255,0.22)] px-6 py-5 md:flex-row md:items-center"
+      aria-label={t('landing.quick_unlock_title')}
+    >
+      <div className="cosmic-glow-border rounded-[22px]" aria-hidden="true" />
+
+      <div className="flex items-center gap-3 md:flex-1">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400/70 to-violet-500/70 text-lg font-bold text-white shadow-[0_0_18px_rgba(0,240,255,0.25)]">
+          {avatarInitial}
+        </div>
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-200/70">
+            {t('landing.quick_unlock_title')}
+          </p>
+          <p className="truncate text-base font-semibold text-pure-white">@{account.username}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-1 items-center gap-2">
+        <div className="relative flex-1">
+          <input
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => { setPassword(e.target.value); if (error) setError(''); }}
+            placeholder={t('landing.quick_unlock_password_placeholder')}
+            className="cosmic-input cosmic-input-plain w-full pr-14"
+            autoComplete="current-password"
+            disabled={unlocking}
+            aria-label={t('landing.quick_unlock_password_label')}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold uppercase tracking-[0.18em] text-soft-grey hover:text-pure-white transition-colors"
+            disabled={unlocking}
+            aria-label={showPassword ? t('common.hide_password') : t('common.show_password')}
+          >
+            {showPassword ? t('common.hide') : t('common.show')}
+          </button>
+        </div>
+        <button
+          type="submit"
+          disabled={!password || unlocking}
+          className="cosmic-cta whitespace-nowrap text-sm"
+        >
+          <span>
+            {unlocking
+              ? t('landing.quick_unlock_unlocking')
+              : t('landing.quick_unlock_unlock_button')}
+          </span>
+          <div className="cosmic-cta-glow" aria-hidden="true" />
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={onSwitchAccount}
+        className="cosmic-btn-ghost shrink-0 text-xs"
+        disabled={unlocking}
+      >
+        {t('landing.quick_unlock_switch_account')}
+      </button>
+
+      <AnimatePresence>
+        {error && (
+          <motion.p
+            key="qu-error"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="w-full text-center text-xs text-red-300 md:text-right"
+            role="alert"
+            aria-live="polite"
+          >
+            {error}
+          </motion.p>
+        )}
+      </AnimatePresence>
+    </motion.form>
   );
 }
