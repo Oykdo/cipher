@@ -845,133 +845,133 @@
     "cta_login": "Log in 🔑"
   },
   "discover_public": {
-    "title": "Discover Cipher",
-    "subtitle": "Private messaging, truly encrypted.",
-    "overview_title": "What is Cipher",
-    "overview_paragraph": "Cipher is a messaging app built for privacy. Your messages are encrypted on your device before they leave — nobody else can read them, not even us. A quantum-resistant version is in development with Eidolon.",
+    "title": "Descubra o Cipher",
+    "subtitle": "Mensagens privadas, verdadeiramente criptografadas.",
+    "overview_title": "O que é o Cipher",
+    "overview_paragraph": "Cipher é um app de mensagens feito para a privacidade. Suas mensagens são criptografadas no seu dispositivo antes de sair — ninguém mais pode lê-las, nem mesmo nós. Uma versão resistente a quantum está em desenvolvimento com a Eidolon.",
     "badges": [
-      "End-to-end encrypted",
-      "No server access",
-      "Self-destructing messages",
-      "Direct connection",
-      "No ads, no tracking"
+      "Criptografado ponta a ponta",
+      "Sem acesso do servidor",
+      "Mensagens autodestrutivas",
+      "Conexão direta",
+      "Sem anúncios, sem rastreamento"
     ],
     "feature_cards": [
       {
         "icon": "🔒",
-        "title": "End-to-end encryption",
-        "description": "Your messages are encrypted on your device before being sent. Only your recipient can read them.",
-        "panelTitle": "What it means",
+        "title": "Criptografia ponta a ponta",
+        "description": "Suas mensagens são criptografadas no seu dispositivo antes de serem enviadas. Apenas o destinatário pode lê-las.",
+        "panelTitle": "O que isso significa",
         "bullets": [
-          "Unreadable in transit",
-          "No server-side access",
-          "Keys stay on your device"
+          "Ilegíveis em trânsito",
+          "Sem acesso pelo servidor",
+          "As chaves ficam no seu dispositivo"
         ],
-        "info": "Standard end-to-end encryption. No backdoor."
+        "info": "Criptografia ponta a ponta padrão. Sem backdoor."
       },
       {
         "icon": "💬",
-        "title": "Private conversations",
-        "description": "Chat, send files, share attachments. Everything gets the same level of protection.",
-        "panelTitle": "What you get",
+        "title": "Conversas privadas",
+        "description": "Converse, envie arquivos, compartilhe anexos. Tudo recebe o mesmo nível de proteção.",
+        "panelTitle": "O que você ganha",
         "bullets": [
-          "Encrypted texts and files",
-          "Self-destructing messages",
-          "Optional read receipts"
+          "Textos e arquivos criptografados",
+          "Mensagens autodestrutivas",
+          "Confirmações de leitura opcionais"
         ],
-        "info": "You decide what you share and for how long."
+        "info": "Você decide o que compartilha e por quanto tempo."
       },
       {
         "icon": "🌐",
-        "title": "Direct connection",
-        "description": "When possible, Cipher links you directly to your contact. Your data does not pass through our servers.",
-        "panelTitle": "Why it matters",
+        "title": "Conexão direta",
+        "description": "Quando possível, o Cipher te conecta diretamente ao seu contato. Seus dados não passam pelos nossos servidores.",
+        "panelTitle": "Por que isso importa",
         "bullets": [
-          "Lower latency",
-          "No server relay",
-          "Automatic fallback if needed"
+          "Menor latência",
+          "Sem relay no servidor",
+          "Fallback automático se necessário"
         ],
-        "info": "Activated automatically when both contacts are online."
+        "info": "Ativado automaticamente quando ambos os contatos estão online."
       },
       {
         "icon": "🛡️",
-        "title": "Quantum-resistant: coming soon",
-        "description": "A next version, built with Eidolon, will protect your messages against future quantum-computer attacks.",
-        "panelTitle": "What it will bring",
+        "title": "Resistente a quantum: em breve",
+        "description": "Uma próxima versão, desenvolvida com a Eidolon, protegerá suas mensagens contra futuros ataques de computadores quânticos.",
+        "panelTitle": "O que ela trará",
         "bullets": [
-          "Post-quantum cryptography",
-          "New identity system",
-          "Same messaging experience"
+          "Criptografia pós-quântica",
+          "Novo sistema de identidade",
+          "Mesma experiência de mensagens"
         ],
-        "info": "Currently in development. Stay tuned."
+        "info": "Atualmente em desenvolvimento. Fique atento."
       }
     ],
-    "architecture_title": "How your messages stay private",
+    "architecture_title": "Como suas mensagens permanecem privadas",
     "architecture_cards": [
       {
         "icon": "📱",
-        "title": "On your device",
+        "title": "No seu dispositivo",
         "items": [
-          "Messages encrypted locally",
-          "Keys stored on your device",
-          "Decryption happens only on your end"
+          "Mensagens criptografadas localmente",
+          "Chaves armazenadas no seu dispositivo",
+          "A descriptografia acontece apenas do seu lado"
         ],
-        "extra": "Everything happens client-side. The server only sees encrypted data."
+        "extra": "Tudo acontece do lado do cliente. O servidor só vê dados criptografados."
       },
       {
         "icon": "☁️",
-        "title": "In transit",
+        "title": "Em trânsito",
         "items": [
-          "End-to-end encrypted",
-          "Direct peer-to-peer when possible",
-          "TLS as an extra layer",
-          "No readable content server-side"
+          "Criptografado ponta a ponta",
+          "Peer-to-peer direto quando possível",
+          "TLS como camada adicional",
+          "Nenhum conteúdo legível no servidor"
         ]
       },
       {
         "icon": "👤",
-        "title": "Your account",
+        "title": "Sua conta",
         "items": [
-          "Recovery phrase only you know",
-          "No password stored anywhere",
-          "Works across all your devices"
+          "Frase de recuperação que só você conhece",
+          "Nenhuma senha armazenada em lugar algum",
+          "Funciona em todos os seus dispositivos"
         ]
       }
     ],
-    "flow_title": "Getting started",
+    "flow_title": "Primeiros passos",
     "flow_steps": [
-      "Create an account in under a minute.",
-      "Write down your recovery phrase.",
-      "Find your contacts.",
-      "Send your first message.",
-      "That is it. Everything is already encrypted."
+      "Crie uma conta em menos de um minuto.",
+      "Anote sua frase de recuperação.",
+      "Encontre seus contatos.",
+      "Envie sua primeira mensagem.",
+      "Pronto. Tudo já está criptografado."
     ],
-    "runtime_title": "Key points",
+    "runtime_title": "Pontos-chave",
     "runtime_rows": [
       {
-        "label": "Encryption",
-        "value": "end-to-end",
-        "detail": "Encrypted on your device. No one else can read it."
+        "label": "Criptografia",
+        "value": "ponta a ponta",
+        "detail": "Criptografada no seu dispositivo. Ninguém mais pode ler."
       },
       {
-        "label": "Privacy",
-        "value": "by default",
-        "detail": "Nothing stored, nothing tracked, no ads."
+        "label": "Privacidade",
+        "value": "por padrão",
+        "detail": "Nada armazenado, nada rastreado, sem anúncios."
       },
       {
-        "label": "Connection",
-        "value": "direct",
-        "detail": "Device-to-device when possible."
+        "label": "Conexão",
+        "value": "direta",
+        "detail": "Dispositivo a dispositivo quando possível."
       },
       {
-        "label": "Next step",
-        "value": "with Eidolon",
-        "detail": "Quantum-resistant version in development."
+        "label": "Próximo passo",
+        "value": "com a Eidolon",
+        "detail": "Versão resistente a quantum em desenvolvimento."
       }
     ],
-    "cta_title": "Ready to chat in full privacy?",
-    "cta_primary": "Sign in",
-    "cta_secondary": "Create an account"
+    "cta_title": "Pronto para conversar com privacidade total?",
+    "cta_primary": "Entrar",
+    "cta_secondary": "Criar uma conta"
   },
   "recovery": {
     "title": "Account Recovery",

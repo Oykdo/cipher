@@ -845,133 +845,133 @@
     "cta_login": "Log in 🔑"
   },
   "discover_public": {
-    "title": "Discover Cipher",
-    "subtitle": "Private messaging, truly encrypted.",
-    "overview_title": "What is Cipher",
-    "overview_paragraph": "Cipher is a messaging app built for privacy. Your messages are encrypted on your device before they leave — nobody else can read them, not even us. A quantum-resistant version is in development with Eidolon.",
+    "title": "Знакомство с Cipher",
+    "subtitle": "Приватные сообщения, действительно зашифрованные.",
+    "overview_title": "Что такое Cipher",
+    "overview_paragraph": "Cipher — это мессенджер, созданный ради приватности. Ваши сообщения шифруются на вашем устройстве перед отправкой — никто, включая нас, не может их прочитать. Квантово-устойчивая версия разрабатывается совместно с Eidolon.",
     "badges": [
-      "End-to-end encrypted",
-      "No server access",
-      "Self-destructing messages",
-      "Direct connection",
-      "No ads, no tracking"
+      "Сквозное шифрование",
+      "Нет доступа у сервера",
+      "Самоуничтожающиеся сообщения",
+      "Прямое соединение",
+      "Без рекламы и отслеживания"
     ],
     "feature_cards": [
       {
         "icon": "🔒",
-        "title": "End-to-end encryption",
-        "description": "Your messages are encrypted on your device before being sent. Only your recipient can read them.",
-        "panelTitle": "What it means",
+        "title": "Сквозное шифрование",
+        "description": "Ваши сообщения шифруются на вашем устройстве перед отправкой. Прочитать их может только ваш собеседник.",
+        "panelTitle": "Что это значит",
         "bullets": [
-          "Unreadable in transit",
-          "No server-side access",
-          "Keys stay on your device"
+          "Нечитаемы при передаче",
+          "Сервер не имеет доступа",
+          "Ключи остаются на вашем устройстве"
         ],
-        "info": "Standard end-to-end encryption. No backdoor."
+        "info": "Стандартное сквозное шифрование. Без бэкдора."
       },
       {
         "icon": "💬",
-        "title": "Private conversations",
-        "description": "Chat, send files, share attachments. Everything gets the same level of protection.",
-        "panelTitle": "What you get",
+        "title": "Приватные разговоры",
+        "description": "Переписывайтесь, отправляйте файлы и вложения. Всё получает тот же уровень защиты.",
+        "panelTitle": "Что вы получаете",
         "bullets": [
-          "Encrypted texts and files",
-          "Self-destructing messages",
-          "Optional read receipts"
+          "Зашифрованные тексты и файлы",
+          "Самоуничтожающиеся сообщения",
+          "Опциональные уведомления о прочтении"
         ],
-        "info": "You decide what you share and for how long."
+        "info": "Вы решаете, чем делиться и как долго."
       },
       {
         "icon": "🌐",
-        "title": "Direct connection",
-        "description": "When possible, Cipher links you directly to your contact. Your data does not pass through our servers.",
-        "panelTitle": "Why it matters",
+        "title": "Прямое соединение",
+        "description": "Когда это возможно, Cipher соединяет вас напрямую с собеседником. Ваши данные не проходят через наши серверы.",
+        "panelTitle": "Почему это важно",
         "bullets": [
-          "Lower latency",
-          "No server relay",
-          "Automatic fallback if needed"
+          "Меньшая задержка",
+          "Без серверного ретранслятора",
+          "Автоматический резерв при необходимости"
         ],
-        "info": "Activated automatically when both contacts are online."
+        "info": "Активируется автоматически, когда оба контакта онлайн."
       },
       {
         "icon": "🛡️",
-        "title": "Quantum-resistant: coming soon",
-        "description": "A next version, built with Eidolon, will protect your messages against future quantum-computer attacks.",
-        "panelTitle": "What it will bring",
+        "title": "Квантовая устойчивость: скоро",
+        "description": "Следующая версия, создаваемая совместно с Eidolon, защитит ваши сообщения от будущих атак квантовых компьютеров.",
+        "panelTitle": "Что она принесёт",
         "bullets": [
-          "Post-quantum cryptography",
-          "New identity system",
-          "Same messaging experience"
+          "Постквантовая криптография",
+          "Новая система идентификации",
+          "Тот же опыт обмена сообщениями"
         ],
-        "info": "Currently in development. Stay tuned."
+        "info": "В разработке. Следите за новостями."
       }
     ],
-    "architecture_title": "How your messages stay private",
+    "architecture_title": "Как ваши сообщения остаются приватными",
     "architecture_cards": [
       {
         "icon": "📱",
-        "title": "On your device",
+        "title": "На вашем устройстве",
         "items": [
-          "Messages encrypted locally",
-          "Keys stored on your device",
-          "Decryption happens only on your end"
+          "Сообщения шифруются локально",
+          "Ключи хранятся на вашем устройстве",
+          "Расшифровка происходит только на вашей стороне"
         ],
-        "extra": "Everything happens client-side. The server only sees encrypted data."
+        "extra": "Всё происходит на стороне клиента. Сервер видит только зашифрованные данные."
       },
       {
         "icon": "☁️",
-        "title": "In transit",
+        "title": "В пути",
         "items": [
-          "End-to-end encrypted",
-          "Direct peer-to-peer when possible",
-          "TLS as an extra layer",
-          "No readable content server-side"
+          "Сквозное шифрование",
+          "Прямое peer-to-peer, когда это возможно",
+          "TLS как дополнительный уровень",
+          "Читаемого содержимого на сервере нет"
         ]
       },
       {
         "icon": "👤",
-        "title": "Your account",
+        "title": "Ваш аккаунт",
         "items": [
-          "Recovery phrase only you know",
-          "No password stored anywhere",
-          "Works across all your devices"
+          "Фраза восстановления, известная только вам",
+          "Пароли нигде не хранятся",
+          "Работает на всех ваших устройствах"
         ]
       }
     ],
-    "flow_title": "Getting started",
+    "flow_title": "Первые шаги",
     "flow_steps": [
-      "Create an account in under a minute.",
-      "Write down your recovery phrase.",
-      "Find your contacts.",
-      "Send your first message.",
-      "That is it. Everything is already encrypted."
+      "Создайте аккаунт менее чем за минуту.",
+      "Запишите свою фразу восстановления.",
+      "Найдите свои контакты.",
+      "Отправьте первое сообщение.",
+      "Готово. Всё уже зашифровано."
     ],
-    "runtime_title": "Key points",
+    "runtime_title": "Ключевые моменты",
     "runtime_rows": [
       {
-        "label": "Encryption",
-        "value": "end-to-end",
-        "detail": "Encrypted on your device. No one else can read it."
+        "label": "Шифрование",
+        "value": "сквозное",
+        "detail": "Шифруется на вашем устройстве. Больше никто не прочитает."
       },
       {
-        "label": "Privacy",
-        "value": "by default",
-        "detail": "Nothing stored, nothing tracked, no ads."
+        "label": "Приватность",
+        "value": "по умолчанию",
+        "detail": "Ничего не хранится, ничего не отслеживается, без рекламы."
       },
       {
-        "label": "Connection",
-        "value": "direct",
-        "detail": "Device-to-device when possible."
+        "label": "Соединение",
+        "value": "прямое",
+        "detail": "Устройство к устройству, когда это возможно."
       },
       {
-        "label": "Next step",
-        "value": "with Eidolon",
-        "detail": "Quantum-resistant version in development."
+        "label": "Следующий шаг",
+        "value": "с Eidolon",
+        "detail": "Квантово-устойчивая версия в разработке."
       }
     ],
-    "cta_title": "Ready to chat in full privacy?",
-    "cta_primary": "Sign in",
-    "cta_secondary": "Create an account"
+    "cta_title": "Готовы общаться с полной приватностью?",
+    "cta_primary": "Войти",
+    "cta_secondary": "Создать аккаунт"
   },
   "recovery": {
     "title": "Account Recovery",
