@@ -165,3 +165,6 @@ codebuff.json
 # ARCHIVE (Development logs - not for production)
 # =============================================================================
 .archive/
+
+# Release notes drafts — kept local, never published via git
+docs/UPDATE_NOTE_*.md
