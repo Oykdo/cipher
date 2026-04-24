@@ -441,6 +441,8 @@
       "important_info": "Informations importantes",
       "info_check_address": "Vérifiez toujours l'adresse avant d'envoyer",
       "info_irreversible": "Les transactions blockchain sont irréversibles",
+      "credits_title": "À propos de ce projet",
+      "credits_body": "Cipher est un projet indépendant, développé en solo. Merci à Claude (Anthropic) et à Factory.ai pour leur aide précieuse tout au long du développement.",
       "info_xrp_tag": "XRP : aucun Destination Tag n'est requis pour cette adresse",
       "info_eth_network": "L'adresse ETH fonctionne sur tous les réseaux EVM (Ethereum, Polygon, BSC, etc.)",
       "integrity_warning": "Vérification d'intégrité échouée : les adresses de contribution n'ont pas pu être vérifiées. La copie est désactivée.",

@@ -629,6 +629,8 @@
       "copy_tag": "Copia tag",
       "info_check_address": "Verifica sempre l'indirizzo prima di inviare.",
       "info_irreversible": "Le transazioni blockchain sono irreversibili.",
+      "credits_title": "Riguardo a questo progetto",
+      "credits_body": "Cipher è un progetto indipendente, sviluppato in solitaria. Grazie a Claude (Anthropic) e Factory.ai per il prezioso aiuto durante tutto lo sviluppo.",
       "info_eth_network": "L'indirizzo ETH funziona su tutte le reti EVM (Ethereum, Polygon, BSC, etc.)",
       "integrity_warning": "Verifica di integrità fallita: gli indirizzi di contribuzione non possono essere verificati. La copia è disattivata.",
       "why_contribute": "Perché contribuire?",

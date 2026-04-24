@@ -629,6 +629,8 @@
       "copy_tag": "复制标签",
       "info_check_address": "发送前请始终检查地址。",
       "info_irreversible": "区块链交易不可逆。",
+      "credits_title": "关于本项目",
+      "credits_body": "Cipher 是一个独立的个人项目。特别感谢 Claude (Anthropic) 和 Factory.ai 在整个开发过程中提供的宝贵帮助。",
       "info_eth_network": "ETH 地址适用于所有 EVM 网络（以太坊、Polygon、BSC 等）。",
       "integrity_warning": "完整性检查失败：无法验证捐赠地址。复制已被禁用。",
       "why_contribute": "为什么要贡献？",

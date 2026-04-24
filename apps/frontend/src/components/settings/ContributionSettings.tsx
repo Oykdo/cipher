@@ -308,6 +308,16 @@ export function ContributionSettings() {
                     <li>• {t("settings.contribution_settings.info_irreversible")}</li>
                 </ul>
             </div>
+
+            {/* Credits — solo-dev project + assistance shoutouts */}
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                <h4 className="text-sm font-semibold text-slate-200">
+                    {t("settings.contribution_settings.credits_title")}
+                </h4>
+                <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                    {t("settings.contribution_settings.credits_body")}
+                </p>
+            </div>
         </div>
     );
 }
