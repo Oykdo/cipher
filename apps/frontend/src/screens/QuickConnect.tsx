@@ -294,8 +294,9 @@ function UnlockForm({
       }
       const data = await verifyResp.json();
 
-      try { await initializeE2EE(data.user.username); } catch { /* non-blocking */ }
-
+      // Set the session BEFORE initializeE2EE — publishKeyBundleToServer fires
+      // inside initializeE2EE and needs session.accessToken in the store, else
+      // authFetchV2WithRefresh throws "No access token in session".
       setSession({
         user: {
           id: data.user.id,
@@ -305,6 +306,8 @@ function UnlockForm({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
       });
+
+      try { await initializeE2EE(data.user.username); } catch { /* non-blocking */ }
 
       navigate('/conversations');
     } catch (err: any) {

@@ -155,15 +155,8 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
 
       const data = await verifyResponse.json();
 
-      try {
-        debugLogger.debug('[QuickUnlock] Initializing E2EE for:', data.user.username);
-        await initializeE2EE(data.user.username);
-        debugLogger.debug('[QuickUnlock] E2EE initialized successfully');
-      } catch (e2eeError) {
-        console.error('[QuickUnlock] E2EE initialization failed:', e2eeError);
-        alert('Warning: E2EE initialization failed. Encryption may not work properly. Please try logging out and back in.');
-      }
-
+      // setSession must precede initializeE2EE — publishKeyBundleToServer fires
+      // inside it and reads session.accessToken from the auth store.
       setSession({
         user: {
           id: data.user.id,
@@ -173,6 +166,15 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
       });
+
+      try {
+        debugLogger.debug('[QuickUnlock] Initializing E2EE for:', data.user.username);
+        await initializeE2EE(data.user.username);
+        debugLogger.debug('[QuickUnlock] E2EE initialized successfully');
+      } catch (e2eeError) {
+        console.error('[QuickUnlock] E2EE initialization failed:', e2eeError);
+        alert('Warning: E2EE initialization failed. Encryption may not work properly. Please try logging out and back in.');
+      }
 
       navigate('/conversations');
     } catch (err: any) {
