@@ -896,25 +896,33 @@ export class CallManager {
     signedAt?: number
   ): Promise<boolean> {
     if (!signature || !signedAt) {
+      debugLogger.warn(`[Call] verify rejected: missing signature/signedAt (event=${eventName}, peer=${peerId})`);
       return false;
     }
 
     if (!isSignatureFresh(signedAt)) {
+      debugLogger.warn(`[Call] verify rejected: stale signature (event=${eventName}, peer=${peerId}, age=${Date.now() - signedAt}ms)`);
       return false;
     }
 
     const replayKey = `${eventName}:${peerId}:${signedAt}:${signature}`;
     if (!this.replayProtection.checkAndMark(replayKey)) {
+      debugLogger.warn(`[Call] verify rejected: replay detected (event=${eventName}, peer=${peerId})`);
       return false;
     }
 
     const publicKeyInfo = await getPublicKey(peerId);
     if (!publicKeyInfo?.signPublicKey) {
+      debugLogger.warn(`[Call] verify rejected: peer signPublicKey unavailable (event=${eventName}, peer=${peerId}, hadInfo=${!!publicKeyInfo})`);
       return false;
     }
 
     const body = this.serializeForSignature(eventName, payload, signedAt);
-    return verifySignature(body, signature, publicKeyInfo.signPublicKey);
+    const ok = verifySignature(body, signature, publicKeyInfo.signPublicKey);
+    if (!ok) {
+      debugLogger.warn(`[Call] verify rejected: signature mismatch (event=${eventName}, peer=${peerId})`);
+    }
+    return ok;
   }
 
   private serializeForSignature(

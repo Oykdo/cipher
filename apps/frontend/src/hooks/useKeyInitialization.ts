@@ -62,11 +62,26 @@ export function useKeyInitialization() {
 
         if (keysExist) {
           console.log('✅ [KeyInit] User keys already exist');
-          
+
           // Verify keys are valid
           const keys = await loadUserKeys(userId);
           if (!keys) {
             throw new Error('Keys exist but failed to load');
+          }
+
+          // Re-publish public keys to the server on every login. The PUT endpoint
+          // is idempotent, and this repairs accounts whose original signup upload
+          // silently failed (network blip, server cold-start, etc.) — without it,
+          // the peer's `signPublicKey` stays NULL on the server and every signed
+          // call event from this user fails verification on the other side.
+          try {
+            const sodium = _sodium;
+            const publicKeyB64 = sodium.to_base64(keys.publicKey);
+            const signPublicKeyB64 = sodium.to_base64(keys.signPublicKey);
+            await uploadPublicKeys(publicKeyB64, signPublicKeyB64);
+            console.log('✅ [KeyInit] Public keys re-published (idempotent refresh)');
+          } catch (uploadError) {
+            console.warn('⚠️ [KeyInit] Idempotent re-publish failed (non-fatal):', uploadError);
           }
 
           if (mounted) {
