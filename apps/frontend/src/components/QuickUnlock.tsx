@@ -40,7 +40,7 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']);
     const derivedBits = await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', salt: enc.encode(salt), iterations: 10000, hash: 'SHA-256' },
+      { name: 'PBKDF2', salt: enc.encode(salt), iterations: 600_000, hash: 'SHA-256' },
       keyMaterial,
       256
     );

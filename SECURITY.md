@@ -70,7 +70,7 @@ We request that you:
 - **Key exchange**: X3DH (Extended Triple Diffie-Hellman)
 - **Encryption**: AES-256-GCM
 - **Signatures**: Ed25519
-- **Key derivation**: PBKDF2 (100,000 iterations) + Argon2id
+- **Key derivation**: PBKDF2-SHA256 (600,000 iterations, OWASP 2024) for password seals + Argon2id (memory-hard, 64 MB / 3 passes) for master key derivation
 - **Hashing**: SHA-512
 
 ### Authentication
