@@ -333,6 +333,10 @@ export class CallManager {
   }
 
   private registerSocketHandlers(): void {
+    console.log('[CallManager] Registering socket handlers', {
+      socketId: this.socket.id,
+      connected: this.socket.connected,
+    });
     this.socket.on('call:invite', this.handleIncomingInvite);
     this.socket.on('call:accept', this.handleCallAccepted);
     this.socket.on('call:decline', this.handleCallDeclined);
@@ -342,7 +346,19 @@ export class CallManager {
   }
 
   private handleIncomingInvite = async (payload: IncomingCallPayload & SignedPayload): Promise<void> => {
+    console.log('[CallManager] handleIncomingInvite ENTERED', {
+      from: payload.from,
+      conversationId: payload.conversationId,
+      mediaType: payload.mediaType,
+      hasEncryptedCallKey: !!payload.encryptedCallKey,
+      hasSignature: !!payload.signature,
+      currentPhase: this.state.phase,
+    });
+
     if (this.state.phase !== 'idle') {
+      console.warn('[CallManager] handleIncomingInvite REJECTED: phase != idle', {
+        phase: this.state.phase,
+      });
       void this.emitSigned('call:decline', {
         to: payload.from,
         conversationId: payload.conversationId,
@@ -352,7 +368,16 @@ export class CallManager {
     }
 
     const peerUsername = this.resolvePeerUsername(payload.from, payload.conversationId);
+    console.log('[CallManager] handleIncomingInvite peer resolution', {
+      from: payload.from,
+      resolvedPeerUsername: peerUsername,
+      hasEncryptedCallKey: !!payload.encryptedCallKey,
+    });
     if (!peerUsername || !payload.encryptedCallKey) {
+      console.warn('[CallManager] handleIncomingInvite REJECTED: invalid-invite', {
+        peerUsername,
+        hasEncryptedCallKey: !!payload.encryptedCallKey,
+      });
       void this.emitSigned('call:decline', {
         to: payload.from,
         conversationId: payload.conversationId,
@@ -366,7 +391,9 @@ export class CallManager {
       mediaType: payload.mediaType,
       encryptedCallKey: payload.encryptedCallKey,
     }, payload.signature, payload.signedAt);
+    console.log('[CallManager] handleIncomingInvite signature verified?', { verified });
     if (!verified) {
+      console.warn('[CallManager] handleIncomingInvite REJECTED: invalid-signature');
       this.setState({ peerIdentityVerified: false });
       void this.emitSigned('call:decline', {
         to: payload.from,
@@ -878,7 +905,16 @@ export class CallManager {
   }
 
   private async emitSigned(eventName: string, payload: Record<string, unknown>): Promise<void> {
-    this.socket.emit(eventName, await this.createSignedEnvelope(eventName, payload));
+    try {
+      const envelope = await this.createSignedEnvelope(eventName, payload);
+      this.socket.emit(eventName, envelope);
+    } catch (err) {
+      console.error('[CallManager] emitSigned failed', {
+        eventName,
+        error: err instanceof Error ? err.message : err,
+      });
+      throw err;
+    }
   }
 
   private async createSignedEnvelope(
