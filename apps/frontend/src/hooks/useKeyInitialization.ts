@@ -40,8 +40,10 @@ export function useKeyInitialization() {
     let mounted = true;
 
     async function initializeKeys() {
-      if (!session?.user) {
-        // User not logged in
+      if (!session?.user || !session.accessToken) {
+        // User not logged in (or session restored from persist without tokens —
+        // partialize() strips accessToken/refreshToken on reload for security,
+        // so user.id alone isn't enough to hit protected endpoints).
         setState({
           initialized: false,
           loading: false,
@@ -147,7 +149,7 @@ export function useKeyInitialization() {
     return () => {
       mounted = false;
     };
-  }, [session?.user?.id, session?.user?.username]);
+  }, [session?.user?.id, session?.user?.username, session?.accessToken]);
 
   return state;
 }
