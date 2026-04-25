@@ -931,6 +931,17 @@ export class CallManager {
     const body = this.serializeForSignature(eventName, payload, signedAt);
     const signature = await signData(body, signingKeyPair.privateKey);
 
+    try {
+      const pubKeyPrefix = _sodium.to_base64(signingKeyPair.publicKey.subarray(0, 12));
+      console.log('[CallManager] signing event', {
+        eventName,
+        localSignPubKeyPrefix: pubKeyPrefix,
+        signedAt,
+      });
+    } catch {
+      // best-effort logging
+    }
+
     return {
       ...payload,
       signedAt,

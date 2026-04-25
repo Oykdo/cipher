@@ -86,6 +86,21 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
           console.warn('[PublicKeys] sign_public_key NULL for:', missing.join(', '));
         }
 
+        // Diagnostic: dump prefixes of returned keys so we can compare with
+        // what the calling client claims to be signing with. This is what we
+        // need to debug the "verify rejected" calls path.
+        console.log('[PublicKeys] POST /users/public-keys returning', {
+          requestedBy: (request.user as any)?.sub,
+          requestedUserIds: userIds,
+          returned: (publicKeys as any[]).map((k) => ({
+            userId: k.user_id,
+            username: k.username,
+            publicKeyPrefix: k.public_key ? String(k.public_key).slice(0, 12) : null,
+            signPublicKeyPrefix: k.sign_public_key ? String(k.sign_public_key).slice(0, 12) : null,
+            signPublicKeyLen: k.sign_public_key ? String(k.sign_public_key).length : 0,
+          })),
+        });
+
         // Return keys
         return {
           keys: publicKeys.map((key: any) => ({
