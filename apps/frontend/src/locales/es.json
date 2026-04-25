@@ -304,6 +304,9 @@
   },
   "conversations": {
     "title": "Conversaciones",
+    "start_audio_call": "Iniciar llamada de audio cifrada",
+    "start_video_call": "Iniciar videollamada cifrada",
+    "end_call": "Finalizar llamada cifrada",
     "connected_as": "Conectado como",
     "new_chat": "Nueva conversación",
     "search_user": "Buscar un usuario",

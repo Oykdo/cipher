@@ -330,6 +330,9 @@
   },
   "conversations": {
     "title": "Conversations",
+    "start_audio_call": "Start encrypted audio call",
+    "start_video_call": "Start encrypted video call",
+    "end_call": "End encrypted call",
     "connected_as": "Signed in as",
     "new_chat": "New conversation",
     "search_user": "Search a user",

@@ -304,6 +304,9 @@
   },
   "conversations": {
     "title": "Unterhaltungen",
+    "start_audio_call": "Verschlüsselten Audioanruf starten",
+    "start_video_call": "Verschlüsselten Videoanruf starten",
+    "end_call": "Verschlüsselten Anruf beenden",
     "connected_as": "Angemeldet als",
     "new_chat": "Neue Unterhaltung",
     "search_user": "Benutzer suchen",

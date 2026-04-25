@@ -304,6 +304,9 @@
   },
   "conversations": {
     "title": "对话",
+    "start_audio_call": "开始加密语音通话",
+    "start_video_call": "开始加密视频通话",
+    "end_call": "结束加密通话",
     "connected_as": "已连接为",
     "new_chat": "新对话",
     "search_user": "搜索用户",

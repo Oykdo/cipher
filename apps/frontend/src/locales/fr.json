@@ -320,6 +320,9 @@
   },
   "conversations": {
     "title": "Conversations",
+    "start_audio_call": "Démarrer un appel audio chiffré",
+    "start_video_call": "Démarrer un appel vidéo chiffré",
+    "end_call": "Terminer l'appel chiffré",
     "connected_as": "Connecté en tant que",
     "new_chat": "Nouvelle discussion",
     "search_user": "Rechercher un utilisateur",
