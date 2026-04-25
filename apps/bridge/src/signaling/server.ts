@@ -146,8 +146,23 @@ export class SignalingServer {
           signedAt?: number;
         }) => {
           const targetSocketId = this.onlinePeers.get(data.to);
+          console.log('📞 [SIGNALING] call:invite received', {
+            from: userId,
+            to: data.to,
+            targetOnline: !!targetSocketId,
+            targetSocketId: targetSocketId ?? null,
+            onlinePeers: Array.from(this.onlinePeers.keys()),
+            conversationId: data.conversationId,
+            mediaType: data.mediaType,
+            hasEncryptedCallKey: !!data.encryptedCallKey,
+            hasSignature: !!data.signature,
+          });
 
           if (!targetSocketId) {
+            console.log('⚠️ [SIGNALING] call:invite -> target offline, replying call:unavailable', {
+              to: data.to,
+              conversationId: data.conversationId,
+            });
             socket.emit('call:unavailable', {
               peerId: data.to,
               conversationId: data.conversationId,
@@ -155,6 +170,11 @@ export class SignalingServer {
             return;
           }
 
+          console.log('📡 [SIGNALING] Forwarding call:invite to target', {
+            from: userId,
+            to: data.to,
+            targetSocketId,
+          });
           this.io.to(targetSocketId).emit('call:invite', {
             from: userId,
             conversationId: data.conversationId,
@@ -176,6 +196,12 @@ export class SignalingServer {
           signedAt?: number;
         }) => {
           const targetSocketId = this.onlinePeers.get(data.to);
+          console.log('📞 [SIGNALING] call:accept received', {
+            from: userId,
+            to: data.to,
+            targetOnline: !!targetSocketId,
+            conversationId: data.conversationId,
+          });
 
           if (!targetSocketId) {
             socket.emit('call:unavailable', {
@@ -251,6 +277,15 @@ export class SignalingServer {
           signedAt?: number;
         }) => {
           const targetSocketId = this.onlinePeers.get(data.to);
+          const signalKind = (data.signal as any)?.description?.type
+            ?? ((data.signal as any)?.candidate ? 'ice-candidate' : 'unknown');
+          console.log('📡 [SIGNALING] call:signal received', {
+            from: userId,
+            to: data.to,
+            targetOnline: !!targetSocketId,
+            kind: signalKind,
+            conversationId: data.conversationId,
+          });
 
           if (!targetSocketId) {
             socket.emit('call:unavailable', {

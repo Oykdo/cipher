@@ -483,7 +483,20 @@ export class CallManager {
   };
 
   private handleCallUnavailable = (payload: { peerId: string; conversationId: string }): void => {
-    if (!this.matchesCurrentSession(payload.peerId, payload.conversationId)) {
+    const matches = this.matchesCurrentSession(payload.peerId, payload.conversationId);
+    console.warn('[CallManager] call:unavailable received', {
+      payload,
+      matchesCurrentSession: matches,
+      currentSession: this.currentSession
+        ? {
+            peerId: this.currentSession.peerId,
+            peerUsername: this.currentSession.peerUsername,
+            conversationId: this.currentSession.conversationId,
+          }
+        : null,
+      phase: this.state.phase,
+    });
+    if (!matches) {
       return;
     }
 
