@@ -1,4 +1,5 @@
 import type { Socket } from 'socket.io-client';
+import _sodium from 'libsodium-wrappers';
 
 import { signData, verifySignature } from '../e2ee';
 import { decryptMessageFromPeer, encryptMessageForPeer, getSigningKeyPair } from '../e2ee/e2eeService';
@@ -983,6 +984,15 @@ export class CallManager {
     const body = this.serializeForSignature(eventName, payload, signedAt);
     let ok = await verifySignature(body, signature, publicKeyInfo.signPublicKey);
 
+    const keyToBase64Prefix = (k: Uint8Array | undefined | null): string | null => {
+      if (!k) return null;
+      try {
+        return _sodium.to_base64(k.subarray(0, 12));
+      } catch {
+        return `<bytes:${Array.from(k.subarray(0, 8)).join(',')}>`;
+      }
+    };
+
     if (!ok) {
       // Mismatch: the cached signPublicKey is likely stale (peer republished
       // their bundle since we last fetched). Refresh once and retry — without
@@ -990,16 +1000,16 @@ export class CallManager {
       console.warn(`[Call] verify: signature mismatch on cached key, refetching`, {
         event: eventName,
         peer: peerId,
-        cachedPrefix: publicKeyInfo.signPublicKey.slice(0, 16),
+        cachedPrefix: keyToBase64Prefix(publicKeyInfo.signPublicKey),
       });
       const refreshed = await getPublicKey(peerId, { force: true });
-      if (refreshed?.signPublicKey && refreshed.signPublicKey !== publicKeyInfo.signPublicKey) {
+      if (refreshed?.signPublicKey) {
         ok = await verifySignature(body, signature, refreshed.signPublicKey);
         if (ok) {
           console.log(`[Call] verify: succeeded after key refresh`, {
             event: eventName,
             peer: peerId,
-            newPrefix: refreshed.signPublicKey.slice(0, 16),
+            newPrefix: keyToBase64Prefix(refreshed.signPublicKey),
           });
           return true;
         }
@@ -1007,9 +1017,12 @@ export class CallManager {
       console.warn(`[Call] verify rejected: signature mismatch (post-refresh)`, {
         event: eventName,
         peer: peerId,
-        cachedPrefix: publicKeyInfo.signPublicKey.slice(0, 16),
-        refreshedPrefix: refreshed?.signPublicKey?.slice(0, 16) ?? null,
-        signaturePrefix: signature.slice(0, 16),
+        cachedPrefix: keyToBase64Prefix(publicKeyInfo.signPublicKey),
+        refreshedPrefix: keyToBase64Prefix(refreshed?.signPublicKey ?? null),
+        sameKey: refreshed?.signPublicKey
+          ? keyToBase64Prefix(refreshed.signPublicKey) === keyToBase64Prefix(publicKeyInfo.signPublicKey)
+          : null,
+        signaturePrefix: signature.slice(0, 24),
       });
     }
     return ok;
