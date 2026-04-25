@@ -1226,13 +1226,19 @@ class DatabaseService {
 
         // Create placeholders for parameterized query
         const placeholders = userIds.map((_, i) => `$${i + 1}`).join(', ');
-        
-        // Use e2ee_key_bundles for keys
+
+        // Source of truth: users.public_key / users.sign_public_key (written by
+        // PUT /users/me/public-keys via uploadPublicKeys). Fall back to the
+        // e2ee_key_bundles row for legacy accounts that only published an X3DH
+        // bundle and never hit the simple key-upload endpoint. Without the
+        // fallback, call signature verification fails with "peer signPublicKey
+        // unavailable" because the previous query read columns that the
+        // simple-upload flow never writes to.
         const rows = await all(
             this.pool,
-            `SELECT u.id as user_id, u.username, 
-                    ekb.identity_key as public_key, 
-                    ekb.signing_key as sign_public_key 
+            `SELECT u.id as user_id, u.username,
+                    COALESCE(u.public_key, ekb.identity_key) as public_key,
+                    COALESCE(u.sign_public_key, ekb.signing_key) as sign_public_key
              FROM users u
              LEFT JOIN e2ee_key_bundles ekb ON u.id = ekb.user_id
              WHERE u.id IN (${placeholders})`,
@@ -1281,13 +1287,14 @@ class DatabaseService {
      * @returns {Promise<Array>} Array of {user_id, username, public_key, sign_public_key}
      */
     async getConversationMembersWithKeys(conversationId) {
-        // Use LEFT JOIN to get members even if they don't have keys
-        // Use e2ee_key_bundles table for keys, matching the schema
+        // Same column-source issue as getPublicKeysByUserIds: prefer
+        // users.public_key / users.sign_public_key (written by the simple
+        // upload flow) and fall back to e2ee_key_bundles for legacy accounts.
         const rows = await all(
             this.pool,
-            `SELECT u.id as user_id, u.username, 
-                    ekb.identity_key as public_key, 
-                    ekb.signing_key as sign_public_key
+            `SELECT u.id as user_id, u.username,
+                    COALESCE(u.public_key, ekb.identity_key) as public_key,
+                    COALESCE(u.sign_public_key, ekb.signing_key) as sign_public_key
              FROM conversation_members cm
              JOIN users u ON cm.user_id = u.id
              LEFT JOIN e2ee_key_bundles ekb ON u.id = ekb.user_id
