@@ -693,9 +693,13 @@ export class CallManager {
       return;
     }
 
+    // Capture the key now so a later cleanup() that nulls mediaCipherContext
+    // doesn't tear the active stream down with a null-deref. Frames may still
+    // be in flight when the call ends — we want them to fail closed silently.
+    const senderKey = this.mediaCipherContext.senderKey;
     const transform = new TransformStream<RTCEncodedFrameLike, RTCEncodedFrameLike>({
       transform: async (frame, controller) => {
-        frame.data = await this.encryptFrame(frame.data, this.mediaCipherContext!.senderKey);
+        frame.data = await this.encryptFrame(frame.data, senderKey);
         controller.enqueue(frame);
       },
     });
@@ -718,9 +722,10 @@ export class CallManager {
       return;
     }
 
+    const receiverKey = this.mediaCipherContext.receiverKey;
     const transform = new TransformStream<RTCEncodedFrameLike, RTCEncodedFrameLike>({
       transform: async (frame, controller) => {
-        frame.data = await this.decryptFrame(frame.data, this.mediaCipherContext!.receiverKey);
+        frame.data = await this.decryptFrame(frame.data, receiverKey);
         controller.enqueue(frame);
       },
     });
@@ -928,7 +933,12 @@ export class CallManager {
     }
 
     const signedAt = Date.now();
-    const body = this.serializeForSignature(eventName, payload, signedAt);
+    // `to` is routing metadata — the signaling server strips it before
+    // forwarding (replacing it with `from: userId` derived from the
+    // authenticated socket), so the receiver cannot reconstruct it for
+    // verification. Sign the rest only; otherwise every signature mismatches.
+    const { to: _to, ...signedBody } = payload;
+    const body = this.serializeForSignature(eventName, signedBody, signedAt);
     const signature = await signData(body, signingKeyPair.privateKey);
 
     // Self-verify: prove that what we just signed verifies against the public

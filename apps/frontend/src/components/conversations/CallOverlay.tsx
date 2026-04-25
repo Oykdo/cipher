@@ -118,6 +118,7 @@ export function CallOverlay({
 }: CallOverlayProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const videoStageRef = useRef<HTMLDivElement>(null);
   const isVideoCall = callState.mediaType === 'video';
   const showOverlay = callState.phase !== 'idle';
@@ -142,10 +143,14 @@ export function CallOverlay({
   }, [callState.localStream]);
 
   useEffect(() => {
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = callState.remoteStream;
+    // Audio-only calls render an <audio> element (no <video>); video calls
+    // render <video> which plays audio natively. Bind whichever element is
+    // mounted so the remote audio actually plays in both layouts.
+    const target = remoteVideoRef.current ?? remoteAudioRef.current;
+    if (target) {
+      target.srcObject = callState.remoteStream;
     }
-  }, [callState.remoteStream]);
+  }, [callState.remoteStream, isVideoCall]);
 
   useEffect(() => {
     const stream = callState.remoteStream;
@@ -330,6 +335,7 @@ export function CallOverlay({
   // ---------------------------------------------------------------------------
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-[rgba(2,6,23,0.90)] backdrop-blur-md">
+      <audio ref={remoteAudioRef} autoPlay className="hidden" />
       <div
         className="relative w-[min(92vw,440px)] overflow-hidden rounded-[28px] border border-[rgba(0,240,255,0.18)] px-8 py-10 text-center shadow-[0_25px_120px_rgba(0,0,0,0.55)]"
         style={{
