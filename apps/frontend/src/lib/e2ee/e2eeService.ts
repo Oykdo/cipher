@@ -42,7 +42,7 @@ import {
   type PublicKeyBundle,
 } from './x3dhManager';
 import { debugLogger } from '../debugLogger';
-import { apiv2 } from '../../services/api-v2';
+import { apiv2, uploadPublicKeys } from '../../services/api-v2';
 
 // ============================================================================
 // SERVICE STATE
@@ -203,6 +203,23 @@ export async function publishKeyBundleToServer(): Promise<void> {
     // SECURITY: Sensitive log removed
 
     await apiv2.publishKeyBundle(bundleToPublish);
+
+    // ALSO publish the deterministic identity + signing keys to users.public_key /
+    // users.sign_public_key. This is the source the call signature verification
+    // path reads from (commit 033d291). Until now, useKeyInitialization was
+    // publishing RANDOM keys from keyManager to that endpoint, while call events
+    // were signed with the DETERMINISTIC key from keyManagement here. The two
+    // never matched, every signed call was rejected with 'invalid-signature'.
+    try {
+      const identityKeyPubB64 = bytesToBase64(currentIdentityKeys.identityKeyPair.publicKey);
+      const signingKeyPubB64 = bytesToBase64(currentIdentityKeys.signingKeyPair.publicKey);
+      await uploadPublicKeys(identityKeyPubB64, signingKeyPubB64);
+      console.log('[E2EE Service] Published deterministic keys to users table', {
+        signPubKeyPrefix: signingKeyPubB64.slice(0, 12),
+      });
+    } catch (uploadErr) {
+      console.warn('[E2EE Service] Failed to mirror keys to users table', uploadErr);
+    }
 
     // SECURITY: Sensitive log removed
   } catch (error: any) {

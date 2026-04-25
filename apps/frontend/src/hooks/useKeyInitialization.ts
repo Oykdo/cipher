@@ -18,7 +18,6 @@ import {
   storeUserKeys,
   getPublicKeys as getLocalPublicKeys,
 } from '../lib/e2ee/keyManager';
-import { uploadPublicKeys } from '../services/api-v2';
 
 interface KeyInitializationState {
   initialized: boolean;
@@ -71,20 +70,14 @@ export function useKeyInitialization() {
             throw new Error('Keys exist but failed to load');
           }
 
-          // Re-publish public keys to the server on every login. The PUT endpoint
-          // is idempotent, and this repairs accounts whose original signup upload
-          // silently failed (network blip, server cold-start, etc.) — without it,
-          // the peer's `signPublicKey` stays NULL on the server and every signed
-          // call event from this user fails verification on the other side.
-          try {
-            const sodium = _sodium;
-            const publicKeyB64 = sodium.to_base64(keys.publicKey);
-            const signPublicKeyB64 = sodium.to_base64(keys.signPublicKey);
-            await uploadPublicKeys(publicKeyB64, signPublicKeyB64);
-            console.log('✅ [KeyInit] Public keys re-published (idempotent refresh)');
-          } catch (uploadError) {
-            console.warn('⚠️ [KeyInit] Idempotent re-publish failed (non-fatal):', uploadError);
-          }
+          // NOTE: previously we re-published `keys` (random keys from
+          // keyManager) to /users/me/public-keys here. That was the source of
+          // the call-signature mismatch: call events are signed with the
+          // DETERMINISTIC keys from keyManagement (via e2eeService), but the
+          // verification path reads from users.sign_public_key (commit
+          // 033d291) — which got overwritten with these random keys on every
+          // login. The deterministic keys are now mirrored to that table by
+          // publishKeyBundleToServer in e2eeService.ts.
 
           if (mounted) {
             setState({
@@ -106,19 +99,14 @@ export function useKeyInitialization() {
         await storeUserKeys(keys);
         console.log('✅ [KeyInit] Keys stored locally');
 
-        // Upload public keys to server
-        await _sodium.ready; // Ensure libsodium is loaded
-        const sodium = _sodium;
-        const publicKeyB64 = sodium.to_base64(keys.publicKey);
-        const signPublicKeyB64 = sodium.to_base64(keys.signPublicKey);
-
-        try {
-          await uploadPublicKeys(publicKeyB64, signPublicKeyB64);
-          console.log('✅ [KeyInit] Public keys uploaded to server');
-        } catch (uploadError) {
-          console.warn('⚠️ [KeyInit] Failed to upload public keys:', uploadError);
-          // Non-fatal: keys are stored locally, can retry upload later
-        }
+        // NOTE: do NOT upload these keyManager-random keys to
+        // /users/me/public-keys. The call-signature path reads from
+        // users.sign_public_key (commit 033d291) and the signing happens
+        // with the DETERMINISTIC keys held by e2eeService — uploading these
+        // random keys here would mask the deterministic ones and break call
+        // verification. The deterministic keys are mirrored from
+        // publishKeyBundleToServer in e2eeService.ts.
+        await _sodium.ready;
 
         if (mounted) {
           setState({
@@ -185,14 +173,10 @@ export function useManualKeyInitialization() {
         return true;
       }
 
-      // Generate keys
+      // Generate keys (local only — see comment in main hook above for why
+      // we no longer upload these keyManager keys to users.public_key).
       const keys = await generateUserKeys(userId, username);
       await storeUserKeys(keys);
-
-      // Upload to server
-      const publicKeyB64 = _sodium.to_base64(keys.publicKey);
-      const signPublicKeyB64 = _sodium.to_base64(keys.signPublicKey);
-      await uploadPublicKeys(publicKeyB64, signPublicKeyB64);
 
       console.log('✅ [ManualKeyInit] Success');
       setLoading(false);
