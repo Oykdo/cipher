@@ -75,7 +75,17 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
         
         // Get public keys from database
         const publicKeys = await getDB().getPublicKeysByUserIds(userIds);
-        
+
+        // Diagnostic: log which users came back with NULL sign_public_key —
+        // those are the accounts that will trigger "peer signPublicKey
+        // unavailable" on the call-signature verification path.
+        const missing = (publicKeys as any[])
+          .filter((k) => !k.sign_public_key)
+          .map((k) => `${k.username}(${k.user_id})`);
+        if (missing.length > 0) {
+          console.warn('[PublicKeys] sign_public_key NULL for:', missing.join(', '));
+        }
+
         // Return keys
         return {
           keys: publicKeys.map((key: any) => ({
@@ -125,8 +135,8 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
         
         // Update database
         await getDB().updateUserPublicKeys(userId, normalizedPublicKey, normalizedSignPublicKey);
-        
-        console.log(`✅ [PublicKeys] Updated public keys for user ${userId}`);
+
+        console.log(`✅ [PublicKeys] Updated public keys for user ${userId} (sign_public_key=${normalizedSignPublicKey.slice(0, 12)}...)`);
         
         return {
           success: true,
