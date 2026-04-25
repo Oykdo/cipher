@@ -255,9 +255,34 @@ export async function getOrCreateIdentityKeys(
   const masterKeyHex = await getMasterKeyHex().catch(() => null);
   if (masterKeyHex) {
     const deterministicIdentity = await generateDeterministicIdentityKeyPair(masterKeyHex);
-    if (keys && keys.identityKeyPair.fingerprint !== deterministicIdentity.fingerprint) {
-      await storeLegacyIdentityKeys(username, keys);
-      keys = null;
+    const deterministicSigning = await generateDeterministicSigningKeyPair(masterKeyHex);
+
+    if (keys) {
+      const identityMismatch =
+        keys.identityKeyPair.fingerprint !== deterministicIdentity.fingerprint;
+      // The signing key check used to be missing entirely. Without it, accounts
+      // whose identity is deterministic but whose signing key was generated
+      // BEFORE masterKey was available stay stuck with a random signing
+      // keypair — the publish ships that random signing pubkey to the server,
+      // but the legacy random privkey signs call events. The server's pubkey
+      // and the local privkey are unrelated, so every signature mismatches.
+      // We compare the public-key bytes directly because legacy entries don't
+      // carry a signing fingerprint.
+      const cachedSigning = keys.signingKeyPair.publicKey;
+      const expectedSigning = deterministicSigning.publicKey;
+      const signingMismatch =
+        cachedSigning.length !== expectedSigning.length ||
+        cachedSigning.some((byte, i) => byte !== expectedSigning[i]);
+
+      if (identityMismatch || signingMismatch) {
+        console.warn('[E2EE] Stored identity keys diverge from deterministic — rotating', {
+          username,
+          identityMismatch,
+          signingMismatch,
+        });
+        await storeLegacyIdentityKeys(username, keys);
+        keys = null;
+      }
     }
   }
 
