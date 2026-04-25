@@ -361,7 +361,7 @@ function UnlockForm({
           <button
             type="submit"
             disabled={!password || unlocking}
-            className="cosmic-cta text-sm"
+            className="cosmic-cta text-sm !w-auto !px-5 !py-2.5"
           >
             <span>
               {unlocking ? t('quick_connect.unlocking') : t('quick_connect.unlock_button')}

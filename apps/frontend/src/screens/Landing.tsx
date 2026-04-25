@@ -106,7 +106,6 @@ export default function Landing() {
             <QuickConnectBanner
               account={knownAccount}
               onClick={() => navigate('/quick-connect')}
-              onDismiss={() => setKnownAccount(null)}
             />
           )}
 
@@ -239,11 +238,9 @@ function FeatureCard({ title, description }: { title: string; description: strin
 function QuickConnectBanner({
   account,
   onClick,
-  onDismiss,
 }: {
   account: LocalAccount;
   onClick: () => void;
-  onDismiss: () => void;
 }) {
   const { t } = useTranslation();
   const avatarInitial = account.username.charAt(0).toUpperCase();
@@ -278,19 +275,10 @@ function QuickConnectBanner({
       <button
         type="button"
         onClick={onClick}
-        className="cosmic-cta whitespace-nowrap text-sm"
+        className="cosmic-cta whitespace-nowrap text-sm !w-auto !px-5 !py-2.5"
       >
         <span>{t('landing.quick_unlock_unlock_button')} →</span>
         <div className="cosmic-cta-glow" aria-hidden="true" />
-      </button>
-
-      <button
-        type="button"
-        onClick={onDismiss}
-        aria-label={t('common.close')}
-        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-xs text-soft-grey hover:text-pure-white hover:bg-white/5 transition-colors"
-      >
-        ×
       </button>
     </motion.div>
   );
