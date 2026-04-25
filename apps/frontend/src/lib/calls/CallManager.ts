@@ -960,24 +960,55 @@ export class CallManager {
       return false;
     }
 
-    const publicKeyInfo = await getPublicKey(peerId);
+    let publicKeyInfo = await getPublicKey(peerId);
     if (!publicKeyInfo?.signPublicKey) {
-      console.warn(`[Call] verify rejected: peer signPublicKey unavailable`, {
+      // First miss: cache might be empty or have a record without signPublicKey
+      // (legacy cache entry). Retry with force=true to bypass the cache.
+      console.warn(`[Call] verify: peer signPublicKey missing in cache, refetching`, {
         event: eventName,
         peer: peerId,
         hadInfo: !!publicKeyInfo,
-        publicKeyInfo,
       });
-      return false;
+      publicKeyInfo = await getPublicKey(peerId, { force: true });
+      if (!publicKeyInfo?.signPublicKey) {
+        console.warn(`[Call] verify rejected: peer signPublicKey unavailable after refetch`, {
+          event: eventName,
+          peer: peerId,
+          publicKeyInfo,
+        });
+        return false;
+      }
     }
 
     const body = this.serializeForSignature(eventName, payload, signedAt);
-    const ok = verifySignature(body, signature, publicKeyInfo.signPublicKey);
+    let ok = await verifySignature(body, signature, publicKeyInfo.signPublicKey);
+
     if (!ok) {
-      console.warn(`[Call] verify rejected: signature mismatch`, {
+      // Mismatch: the cached signPublicKey is likely stale (peer republished
+      // their bundle since we last fetched). Refresh once and retry — without
+      // this, a single rotation breaks calls until the 24h cache expiry.
+      console.warn(`[Call] verify: signature mismatch on cached key, refetching`, {
         event: eventName,
         peer: peerId,
-        signPublicKeyPrefix: publicKeyInfo.signPublicKey.slice(0, 16),
+        cachedPrefix: publicKeyInfo.signPublicKey.slice(0, 16),
+      });
+      const refreshed = await getPublicKey(peerId, { force: true });
+      if (refreshed?.signPublicKey && refreshed.signPublicKey !== publicKeyInfo.signPublicKey) {
+        ok = await verifySignature(body, signature, refreshed.signPublicKey);
+        if (ok) {
+          console.log(`[Call] verify: succeeded after key refresh`, {
+            event: eventName,
+            peer: peerId,
+            newPrefix: refreshed.signPublicKey.slice(0, 16),
+          });
+          return true;
+        }
+      }
+      console.warn(`[Call] verify rejected: signature mismatch (post-refresh)`, {
+        event: eventName,
+        peer: peerId,
+        cachedPrefix: publicKeyInfo.signPublicKey.slice(0, 16),
+        refreshedPrefix: refreshed?.signPublicKey?.slice(0, 16) ?? null,
         signaturePrefix: signature.slice(0, 16),
       });
     }
