@@ -248,6 +248,32 @@ export async function shutdownE2EE(): Promise<void> {
   debugLogger.info('✅ [E2EE Service] Shutdown complete');
 }
 
+/**
+ * DEBUG: forcibly clear the stored e2ee identity for the current username so
+ * that the next initializeE2EE() regenerates everything from masterKey. Useful
+ * to recover from accounts where signing keys drifted from the deterministic
+ * version (legacy signups). Exposed on window so it can be triggered from
+ * DevTools without a code path. Don't use in prod.
+ */
+export async function debugForceResetE2EEKeys(): Promise<void> {
+  const vault = getExistingE2EEVault();
+  if (!vault || !currentUsername) {
+    console.warn('[E2EE Debug] cannot reset — vault or username missing', {
+      hasVault: !!vault,
+      currentUsername,
+    });
+    return;
+  }
+  console.warn('[E2EE Debug] DELETING stored identity for', currentUsername);
+  await vault.removeData(`e2ee:identity:${currentUsername}`);
+  currentIdentityKeys = null;
+  console.warn('[E2EE Debug] Done. Now logout/login to regenerate.');
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).debugForceResetE2EEKeys = debugForceResetE2EEKeys;
+}
+
 // ============================================================================
 // KEY MANAGEMENT
 // ============================================================================

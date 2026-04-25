@@ -931,15 +931,26 @@ export class CallManager {
     const body = this.serializeForSignature(eventName, payload, signedAt);
     const signature = await signData(body, signingKeyPair.privateKey);
 
+    // Self-verify: prove that what we just signed verifies against the public
+    // key we are about to publicly claim as ours. If this fails, the bug is
+    // 100% in our local key state — don't even bother shipping.
     try {
+      const localOk = await verifySignature(body, signature, signingKeyPair.publicKey);
       const pubKeyPrefix = _sodium.to_base64(signingKeyPair.publicKey.subarray(0, 12));
-      console.log('[CallManager] signing event', {
-        eventName,
-        localSignPubKeyPrefix: pubKeyPrefix,
-        signedAt,
-      });
-    } catch {
-      // best-effort logging
+      if (!localOk) {
+        console.error('[CallManager] LOCAL self-verify FAILED — signing key is corrupt', {
+          eventName,
+          localSignPubKeyPrefix: pubKeyPrefix,
+        });
+      } else {
+        console.log('[CallManager] signing event (self-verify ok)', {
+          eventName,
+          localSignPubKeyPrefix: pubKeyPrefix,
+          signedAt,
+        });
+      }
+    } catch (err) {
+      console.warn('[CallManager] self-verify failed to run', err);
     }
 
     return {
