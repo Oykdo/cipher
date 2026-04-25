@@ -466,6 +466,15 @@ export default function Conversations() {
     setOnlineUsers(new Set(ids));
   });
 
+  // The server emits a presence_snapshot eagerly on connection, but on a fresh
+  // login the client's useSocketEvent handlers attach only after the re-render
+  // triggered by `connected` flipping to true — i.e. *after* that first emit.
+  // Pull the snapshot ourselves once we know we're listening.
+  useEffect(() => {
+    if (!socket || !connected) return;
+    socket.emit('request_presence_snapshot');
+  }, [socket, connected]);
+
   // Realtime: when a sent contact request is accepted, refresh conversations list for requester
   useSocketEvent(socket, 'contactRequestAccepted', (_data) => {
     void loadConversations();

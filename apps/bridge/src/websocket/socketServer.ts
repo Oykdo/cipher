@@ -237,6 +237,17 @@ export function setupSocketServer(httpServer: HTTPServer, fastify: FastifyInstan
       });
     }
 
+    // The eager presence_snapshot above can race with client-side handler
+    // registration (the client only attaches its useSocketEvent handlers after
+    // a re-render triggered by `setConnected(true)`, which fires *after* this
+    // emit on a fresh connection). Expose a pull endpoint so the client can
+    // re-request the snapshot once it knows it's ready.
+    socket.on('request_presence_snapshot', () => {
+      if (!socket.userId) return;
+      const onlineUserIds = getAllOnlineUsers().filter(id => id !== socket.userId);
+      socket.emit('presence_snapshot', { onlineUserIds });
+    });
+
     // ============================================================================
     // JOIN CONVERSATION ROOM
     // SECURITY FIX VUL-001: Validate user belongs to conversation before joining
