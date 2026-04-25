@@ -1,5 +1,5 @@
 /**
- * Dialog Component - Project Chimera
+ * Dialog Component - Project Logos
  * 
  * Modal accessible basé sur Radix UI
  * Conforme WCAG 2.1 AAA pour l'accessibilité

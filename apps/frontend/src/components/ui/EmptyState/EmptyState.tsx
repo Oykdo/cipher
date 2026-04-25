@@ -1,5 +1,5 @@
 /**
- * EmptyState Component - Project Chimera
+ * EmptyState Component - Project Logos
  * 
  * Composant pour états vides avec illustration et action
  */

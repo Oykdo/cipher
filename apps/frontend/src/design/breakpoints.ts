@@ -1,5 +1,5 @@
 /**
- * Breakpoints System - Project Chimera
+ * Breakpoints System - Project Logos
  * 
  * Gestion responsive mobile-first avec hooks React
  */

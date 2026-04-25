@@ -1,5 +1,5 @@
 /**
- * Skeleton Component - Project Chimera
+ * Skeleton Component - Project Logos
  * 
  * Composants de chargement skeleton avec effet shimmer
  * Pour indiquer le chargement de contenu

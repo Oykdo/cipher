@@ -1,5 +1,5 @@
 /**
- * Crypto Worker Hook - Project Chimera
+ * Crypto Worker Hook - Project Logos
  * 
  * Hook pour déporter les opérations crypto dans un Web Worker
  * Note: Implementation complète nécessite configuration Vite pour workers

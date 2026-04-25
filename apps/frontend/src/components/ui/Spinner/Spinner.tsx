@@ -1,5 +1,5 @@
 /**
- * Spinner Component - Project Chimera
+ * Spinner Component - Project Logos
  * 
  * Loading spinner réutilisable avec variants
  */

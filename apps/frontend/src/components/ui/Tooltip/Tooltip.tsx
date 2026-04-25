@@ -1,5 +1,5 @@
 /**
- * Tooltip Component - Project Chimera
+ * Tooltip Component - Project Logos
  * 
  * Tooltip accessible basé sur Radix UI
  * Conforme WCAG 2.1 AAA

@@ -1,5 +1,5 @@
 /**
- * UI Components - Project Chimera
+ * UI Components - Project Logos
  * 
  * Export central de tous les composants UI réutilisables
  */

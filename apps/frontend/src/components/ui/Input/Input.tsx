@@ -1,5 +1,5 @@
 /**
- * Input Component - Project Chimera
+ * Input Component - Project Logos
  * 
  * Composant input accessible avec label, erreur, helper text
  * Conforme WCAG 2.1 AA

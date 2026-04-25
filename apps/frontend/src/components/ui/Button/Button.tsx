@@ -1,5 +1,5 @@
 /**
- * Button Component - Project Chimera
+ * Button Component - Project Logos
  * 
  * Composant bouton universel avec variants, tailles, et états
  * Accessible WCAG 2.1 AA par défaut

@@ -1,5 +1,5 @@
 /**
- * Logo Component - Project Chimera
+ * Logo Component - Project Logos
  * 
  * Logo SVG Cipher avec gradient brand
  */

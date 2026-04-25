@@ -45,7 +45,7 @@ function loadBridgeEnvFile(filename) {
 loadBridgeEnvFile('.env.production');
 loadBridgeEnvFile('.env');
 const DEFAULT_EIDOLON_DOWNLOAD_URL =
-  process.env.EIDOLON_DOWNLOAD_URL || 'https://github.com/Oykdo/Project_Chimera/releases';
+  process.env.EIDOLON_DOWNLOAD_URL || 'https://github.com/Oykdo/Project_Logos/releases';
 const DEFAULT_EIDOLON_INFO_URL =
   process.env.EIDOLON_INFO_URL || DEFAULT_EIDOLON_DOWNLOAD_URL;
 const DEFAULT_EIDOLON_CONNECT_URL =

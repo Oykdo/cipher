@@ -1,5 +1,5 @@
 /**
- * Keyboard Shortcuts Hook - Project Chimera
+ * Keyboard Shortcuts Hook - Project Logos
  * 
  * Gestion des raccourcis clavier globaux de l'application
  */

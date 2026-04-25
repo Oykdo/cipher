@@ -1,5 +1,5 @@
 /**
- * Utility Functions - Project Chimera
+ * Utility Functions - Project Logos
  * 
  * Helper functions for className merging, formatting, etc.
  */

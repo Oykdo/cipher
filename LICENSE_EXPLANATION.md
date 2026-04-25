@@ -119,7 +119,7 @@ instead of mixed ISC/MIT references.
 
 #### ISC License
 ```
-Copyright (c) 2025, Project Chimera
+Copyright (c) 2025, Project Logos
 
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above

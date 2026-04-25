@@ -11,7 +11,7 @@ export type EidolonDesktopResult = {
 
 export const EIDOLON_PUBLIC_DOWNLOAD_URL =
   import.meta.env.VITE_EIDOLON_DOWNLOAD_URL ||
-  'https://github.com/Oykdo/Project_Chimera/releases';
+  'https://github.com/Oykdo/Project_Logos/releases';
 
 export const EIDOLON_PUBLIC_INFO_URL =
   import.meta.env.VITE_EIDOLON_INFO_URL || EIDOLON_PUBLIC_DOWNLOAD_URL;

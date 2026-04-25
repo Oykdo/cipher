@@ -1,5 +1,5 @@
 /**
- * Focus Trap Hook - Project Chimera
+ * Focus Trap Hook - Project Logos
  * 
  * Piège le focus clavier dans un container (pour modales, drawers)
  * Conforme WCAG 2.1 AA - Gestion du focus accessible

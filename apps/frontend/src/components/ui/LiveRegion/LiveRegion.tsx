@@ -1,5 +1,5 @@
 /**
- * Live Region Component - Project Chimera
+ * Live Region Component - Project Logos
  * 
  * Composant pour annoncer dynamiquement du contenu aux lecteurs d'écran
  * Conforme WCAG 2.1 - ARIA Live Regions

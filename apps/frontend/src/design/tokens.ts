@@ -1,5 +1,5 @@
 /**
- * Design Tokens - Project Chimera
+ * Design Tokens - Project Logos
  * 
  * Système centralisé de tokens de design pour garantir
  * la cohérence visuelle à travers toute l'application.

@@ -1,5 +1,5 @@
 /**
- * Shortcuts Modal - Project Chimera
+ * Shortcuts Modal - Project Logos
  * 
  * Modal affichant tous les raccourcis clavier disponibles
  */

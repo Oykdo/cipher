@@ -1,5 +1,5 @@
 /**
- * Konami Code Hook - Project Chimera
+ * Konami Code Hook - Project Logos
  * 
  * Easter egg pour power users
  * ↑↑↓↓←→←→BA
