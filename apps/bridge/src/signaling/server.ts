@@ -225,6 +225,14 @@ export class SignalingServer {
         'call:decline',
         (data: { to: string; conversationId: string; reason?: string; signature?: string; signedAt?: number }) => {
           const targetSocketId = this.onlinePeers.get(data.to);
+          console.log('📞 [SIGNALING] call:decline received', {
+            from: userId,
+            to: data.to,
+            targetOnline: !!targetSocketId,
+            reason: data.reason,
+            hasSignature: !!data.signature,
+            conversationId: data.conversationId,
+          });
 
           if (!targetSocketId) {
             socket.emit('call:unavailable', {
@@ -248,6 +256,13 @@ export class SignalingServer {
         'call:end',
         (data: { to: string; conversationId: string; reason?: string; signature?: string; signedAt?: number }) => {
           const targetSocketId = this.onlinePeers.get(data.to);
+          console.log('📞 [SIGNALING] call:end received', {
+            from: userId,
+            to: data.to,
+            targetOnline: !!targetSocketId,
+            reason: data.reason,
+            conversationId: data.conversationId,
+          });
 
           if (!targetSocketId) {
             socket.emit('call:unavailable', {
