@@ -121,6 +121,9 @@ export default function Conversations() {
   // View mode (responsive)
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
+  // Bumped after sending a conversation request to force ConversationRequests to reload.
+  const [requestsRefreshKey, setRequestsRefreshKey] = useState(0);
+
   // P2P connection mode per conversation
   const [connectionModes, setConnectionModes] = useState<Map<string, ConnectionMode>>(new Map());
 
@@ -748,6 +751,11 @@ export default function Conversations() {
 
       // Send a conversation request instead of creating directly
       await apiv2.sendConversationRequest(selectedUser.username);
+
+      // Force the ConversationRequests panel to reload + switch to the "sent" tab
+      // so the user immediately sees their pending invitation without having to
+      // navigate away and back.
+      setRequestsRefreshKey((k) => k + 1);
 
       // Show success message
       alert(t('conversations.request_sent'));
@@ -1550,7 +1558,11 @@ export default function Conversations() {
         <div className={`${viewMode === 'list' ? 'flex' : 'hidden md:flex'} flex-col w-full md:w-80 border-r border-[rgba(0,240,255,0.12)] bg-[rgba(6,12,26,0.84)] backdrop-blur-xl`}>
           {/* Conversation Requests */}
           <div className="p-4 overflow-y-auto">
-            <ConversationRequests onRequestAccepted={loadConversations} />
+            <ConversationRequests
+              onRequestAccepted={loadConversations}
+              onSentRequestAccepted={loadConversations}
+              refreshSignal={requestsRefreshKey}
+            />
           </div>
 
           {/* Vault resonance — mobile visible */}

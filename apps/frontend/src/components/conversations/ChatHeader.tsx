@@ -52,14 +52,6 @@ export function ChatHeader({
           </div>
         </div>
 
-        <div
-          className="shrink-0 ml-2 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[rgba(0,240,255,0.12)] border border-[rgba(0,240,255,0.28)]"
-          title={t('encryption.e2ee_active', 'End-to-End Encryption Active')}
-          style={{ color: 'var(--cosmic-cyan)' }}
-        >
-          E2EE
-        </div>
-
         <div className="shrink-0 flex items-center gap-2">
           {isThisConversationCall ? (
             <button

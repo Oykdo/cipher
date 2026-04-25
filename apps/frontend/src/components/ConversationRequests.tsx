@@ -3,7 +3,7 @@
  * Displays and manages pending conversation requests with improved UX
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
@@ -25,13 +25,22 @@ interface ConversationRequest {
 interface ConversationRequestsProps {
     onRequestAccepted: () => void;
     onNewRequest?: (request: ConversationRequest) => void;
+    /** Increment to force a reload + switch to the "sent" tab (used after sending an invitation). */
+    refreshSignal?: number;
+    /** Fired when a previously pending outgoing invitation becomes accepted (or disappears),
+     *  so the parent can refresh its conversations list without waiting for a remount. */
+    onSentRequestAccepted?: () => void;
 }
 
 type Tab = 'received' | 'sent';
 
+const BACKGROUND_POLL_INTERVAL_MS = 10_000;
+
 export default function ConversationRequests({
     onRequestAccepted,
-    onNewRequest
+    onNewRequest,
+    refreshSignal,
+    onSentRequestAccepted
 }: ConversationRequestsProps) {
     const { t } = useTranslation();
     const session = useAuthStore((state) => state.session);
@@ -49,11 +58,74 @@ export default function ConversationRequests({
         }
     }, [session?.accessToken, activeTab]);
 
+    // Reload (and surface) the sent list whenever the parent signals a new outgoing invitation.
+    useEffect(() => {
+        if (!refreshSignal) return;
+        if (activeTab !== 'sent') {
+            setActiveTab('sent'); // the [activeTab] effect will then fire loadRequests()
+        } else {
+            loadRequests();
+        }
+    }, [refreshSignal]);
+
     useEffect(() => {
         if (onNewRequest) {
             // This will be called when a WebSocket event is received
         }
     }, [onNewRequest]);
+
+    // Track the IDs of currently-pending outgoing invitations so we can detect
+    // when one of them becomes accepted between polls.
+    const pendingSentIdsRef = useRef<Set<string>>(new Set());
+    const onSentRequestAcceptedRef = useRef(onSentRequestAccepted);
+    useEffect(() => {
+        onSentRequestAcceptedRef.current = onSentRequestAccepted;
+    }, [onSentRequestAccepted]);
+
+    // Silent background refresh: fetches both lists without toggling the loading
+    // spinner. Detects pending→accepted transitions and notifies the parent so
+    // newly-accepted contacts appear in the conversations list automatically.
+    const refreshInBackground = useCallback(async () => {
+        if (!session?.accessToken) return;
+        try {
+            const [received, sent] = await Promise.all([
+                apiv2.getReceivedRequests(),
+                apiv2.getSentRequests(),
+            ]);
+            const sentList: ConversationRequest[] = sent.requests || [];
+            const receivedList: ConversationRequest[] = received.requests || [];
+
+            const currentPendingIds = new Set(
+                sentList.filter((r) => r.status === 'pending').map((r) => r.id)
+            );
+            const previousPendingIds = pendingSentIdsRef.current;
+            const someAccepted = [...previousPendingIds].some((id) => !currentPendingIds.has(id));
+            pendingSentIdsRef.current = currentPendingIds;
+
+            setSentRequests(sentList);
+            setReceivedRequests(receivedList);
+
+            if (someAccepted) {
+                onSentRequestAcceptedRef.current?.();
+            }
+        } catch {
+            // Background polling stays silent — the foreground loadRequests() surfaces real errors.
+        }
+    }, [session?.accessToken]);
+
+    // Poll while mounted, plus refresh whenever the tab/window becomes visible again.
+    useEffect(() => {
+        if (!session?.accessToken) return;
+        const interval = setInterval(refreshInBackground, BACKGROUND_POLL_INTERVAL_MS);
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') refreshInBackground();
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
+    }, [session?.accessToken, refreshInBackground]);
 
     const loadRequests = async () => {
         if (!session?.accessToken) return;
