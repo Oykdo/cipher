@@ -14,14 +14,28 @@ export async function conversationRequestRoutes(fastify: FastifyInstance) {
      * Send a conversation request
      * POST /api/v2/conversation-requests
      */
-    fastify.post<{ Body: { targetUsername: string; message?: string } }>(
+    // Privacy-l1: the optional `message` introduction field has been removed
+    // from the request body. It used to land in clear in `conversation_requests.message`,
+    // which violated the no-plaintext contract (CIPHER_PRIVACY_GUARANTEES.md).
+    // V2 may reintroduce an E2E-encrypted intro field; until then, requests
+    // are reduced to "X wants to talk to you — accept / refuse".
+    fastify.post<{ Body: { targetUsername: string } }>(
         '/api/v2/conversation-requests',
         {
             preHandler: fastify.authenticate as any,
         },
         async (request, reply) => {
             const userId = (request.user as any).sub as string;
-            const { targetUsername, message } = request.body;
+            const { targetUsername } = request.body;
+
+            // Defense in depth: reject any client that still sends a
+            // plaintext intro `message` field.
+            if ((request.body as unknown as Record<string, unknown>).message !== undefined) {
+                reply.code(400);
+                return {
+                    error: 'Champ "message" non accepté : la demande de conversation ne transporte plus de texte d\'introduction.',
+                };
+            }
 
             if (!targetUsername) {
                 reply.code(400);
@@ -63,7 +77,6 @@ export async function conversationRequestRoutes(fastify: FastifyInstance) {
                 id: requestId,
                 from_user_id: userId,
                 to_user_id: targetUser.id,
-                message,
             });
 
             const currentUser = await db.getUserById(userId);
@@ -78,7 +91,6 @@ export async function conversationRequestRoutes(fastify: FastifyInstance) {
                         username: currentUser!.username,
                         securityTier: currentUser!.security_tier,
                     },
-                    message: conversationRequest.message,
                     createdAt: conversationRequest.created_at,
                 },
             });

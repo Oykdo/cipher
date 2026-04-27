@@ -38,14 +38,14 @@ export function ContributionSettings() {
                 name: "Bitcoin",
                 symbol: "BTC",
                 address: "bc1pqu5zya672tma8q36ww9c6mzk7uryq6cuavqn04jqka43qjm6nxtqs8am6t",
-                icon: "/crypto-logos/Bitcoin.svg.webp",
+                icon: `${import.meta.env.BASE_URL}crypto-logos/Bitcoin.svg.webp`,
                 color: "from-orange-500/30 to-yellow-500/20",
             },
             eth: {
                 name: "Ethereum (EVM)",
                 symbol: "ETH",
                 address: "0x979a6093d3a1662054b89667e6dbfac001fa2617",
-                icon: "/crypto-logos/ethereum.jpg",
+                icon: `${import.meta.env.BASE_URL}crypto-logos/ethereum.jpg`,
                 color: "from-cyan-500/30 to-violet-500/20",
                 note: t("settings.contribution_settings.info_eth_network"),
             },
@@ -53,21 +53,21 @@ export function ContributionSettings() {
                 name: "Solana",
                 symbol: "SOL",
                 address: "HshrizaXzs6i6yse3YjkpDsQ4S7WjRoDALeVr6tN1yM8",
-                icon: "/crypto-logos/solana.jpg",
+                icon: `${import.meta.env.BASE_URL}crypto-logos/solana.jpg`,
                 color: "from-fuchsia-500/30 to-cyan-500/20",
             },
             xrp: {
                 name: "XRP",
                 symbol: "XRP",
                 address: "rspbrWJkPr8jSyz9wVVLwpxuSfosBM8ocM",
-                icon: "/crypto-logos/xrp-xrp-logo.png",
+                icon: `${import.meta.env.BASE_URL}crypto-logos/xrp-xrp-logo.png`,
                 color: "from-slate-400/20 to-slate-200/10",
             },
             pi: {
                 name: "Pi Network",
                 symbol: "PI",
                 address: "GCUGVJDK4TY6KTVWFYXTDH2OXRSTTFQUYPLU2CH523AHCZOPWUVEVDC6",
-                icon: "/crypto-logos/pi-network.png",
+                icon: `${import.meta.env.BASE_URL}crypto-logos/pi-network.png`,
                 color: "from-violet-500/30 to-amber-400/20",
             },
         }),
@@ -117,14 +117,19 @@ export function ContributionSettings() {
     };
 
     const startStripeCheckout = async () => {
-        try {
-            setStripeError(null);
-            setStripeRedirecting(true);
+        // Track whether we actually issued a navigation. If we did, leaving the
+        // button stuck on "Redirecting…" is correct (the page is unloading).
+        // For every other path — validation, network error, server error — we
+        // must release the lock, otherwise the input stays disabled and the
+        // user is stuck on a button that says "Redirecting…" forever.
+        let navigating = false;
+        setStripeError(null);
+        setStripeRedirecting(true);
 
+        try {
             const amountNumber = Number(stripeAmount);
             if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
                 setStripeError(t("settings.contribution_settings.card_invalid_amount"));
-                setStripeRedirecting(false);
                 return;
             }
 
@@ -139,17 +144,53 @@ export function ContributionSettings() {
                 credentials: "include",
             });
 
-            const data = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
+            const data = (await res.json().catch(() => null)) as { url?: string; error?: string; code?: string } | null;
             if (!res.ok || !data?.url) {
-                setStripeError(data?.error || t("settings.contribution_settings.card_generic_error"));
-                setStripeRedirecting(false);
+                console.warn("[Stripe] checkout failed", { status: res.status, body: data });
+                const serverMsg = data?.error
+                    ? `${data.error}${data.code ? ` (${data.code})` : ""}`
+                    : t("settings.contribution_settings.card_generic_error");
+                setStripeError(serverMsg);
                 return;
             }
 
+            console.log("[Stripe] checkout URL", data.url);
+
+            // Detect Electron — main.js installs a will-navigate hook that
+            // blocks any non-localhost navigation, so window.location.assign
+            // would silently no-op. Open the checkout in the system browser
+            // via IPC instead. Bonus: payment UI never lives inside the
+            // chromeless Electron window, so users always see a real URL bar
+            // when typing card details.
+            const electronApi = (
+                window as unknown as {
+                    electron?: {
+                        openStripeCheckout?: (url: string) => Promise<{ ok: boolean; error?: string }>;
+                    };
+                }
+            ).electron;
+
+            if (electronApi?.openStripeCheckout) {
+                const result = await electronApi.openStripeCheckout(data.url);
+                if (!result?.ok) {
+                    console.warn("[Stripe] open-checkout IPC failed", result);
+                    setStripeError(t("settings.contribution_settings.card_generic_error"));
+                    return;
+                }
+                // Stripe opened in default browser; this window stays alive.
+                // The finally block will release the redirecting lock.
+                return;
+            }
+
+            navigating = true;
             window.location.assign(data.url);
-        } catch {
+        } catch (err) {
+            console.warn("[Stripe] checkout threw", err);
             setStripeError(t("settings.contribution_settings.card_generic_error"));
-            setStripeRedirecting(false);
+        } finally {
+            if (!navigating) {
+                setStripeRedirecting(false);
+            }
         }
     };
 

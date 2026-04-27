@@ -1,3 +1,23 @@
+/**
+ * Welcome.tsx — DiceKey post-onboarding signup screen.
+ *
+ * STATUS (privacy-l1, 2026-04-27): NEEDS REFACTOR.
+ *
+ * This screen still POSTs `masterKeyHex` and `checksums` to /api/v2/auth/
+ * signup. After privacy-l1 the backend rejects those fields with HTTP 400.
+ * No active code path navigates here — it is reachable only by direct URL
+ * — so the live signup (BIP-39 via SignupMnemonic.tsx) is unaffected.
+ *
+ * To re-enable DiceKey signup, mirror the SignupMnemonic refactor:
+ *   1. Compute srpSalt + srpVerifier locally (computeSrpPasswordSetup or
+ *      a dice-key equivalent — masterKeyHex stays on the device).
+ *   2. POST signup with { username, method: 'dice-key', srpSalt,
+ *      srpVerifier, identityPublicKey, signaturePublicKey, signedPreKey,
+ *      oneTimePreKeys, avatarHash } only.
+ *   3. Initialize KeyVault locally with the masterKeyHex.
+ *
+ * Tracked as L1-T13 in the privacy-l1 sprint (see TaskList).
+ */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';

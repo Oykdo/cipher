@@ -43,7 +43,37 @@ import { config } from "./config.js";
 import { BackupService } from "./services/backupService.js";
 import { randomUUID } from "crypto";
 
-const app = Fastify({ logger: true, trustProxy: true });
+// Pino logger configuration with PII redaction.
+//
+// Privacy contract (CIPHER_PRIVACY_GUARANTEES.md): no IP / user-agent /
+// x-forwarded-for in persistent logs. We use Pino's `redact` with
+// `remove: true` so these fields are stripped entirely from the JSONL
+// output, not replaced with "[Redacted]" (which would still leak that
+// the request had one).
+//
+// `trustProxy: true` is kept because some downstream code (rate limiter,
+// SRP) reads request.ip for in-memory keying — but that derived value
+// must never make it to a persisted log line.
+const app = Fastify({
+  trustProxy: true,
+  logger: {
+    redact: {
+      paths: [
+        'req.remoteAddress',
+        'req.remotePort',
+        'req.ip',
+        'req.hostname',
+        'req.headers["user-agent"]',
+        'req.headers["x-forwarded-for"]',
+        'req.headers["x-real-ip"]',
+        'req.headers.cookie',
+        'req.headers.authorization',
+        'res.headers["set-cookie"]',
+      ],
+      remove: true,
+    },
+  },
+});
 const db = getDatabase();
 
 // Accept CSP violation reports from browsers.
@@ -289,17 +319,12 @@ const settingsLimiter = createRateLimiter(60 * 1000, 60); // 60 requests per min
 (app as any).trustStarLimiter = trustStarLimiter;
 (app as any).settingsLimiter = settingsLimiter;
 
-// Helper for Audit Logs
-async function logAuthAction(userId: string, action: string, request: any, severity: string = 'INFO'): Promise<void> {
-    await db.createAuditLog({
-        id: randomUUID(),
-        user_id: userId,
-        action,
-        table_name: 'auth',
-        ip_address: request.ip,
-        user_agent: request.headers['user-agent'],
-        severity,
-    });
+// Helper for security events. Privacy-l1: writes to the in-memory ring
+// buffer (services/security-events.ts) instead of the dropped audit_logs
+// table. PII (IP / user-agent) is intentionally not collected.
+import { recordSecurityEvent } from './services/security-events.js';
+function logAuthAction(userId: string | null, action: string, _request: any, severity: 'INFO' | 'WARNING' | 'CRITICAL' = 'INFO'): void {
+    recordSecurityEvent(action, userId, severity);
 }
 
 // Routes Registration
@@ -550,6 +575,13 @@ try {
     burnScheduler.initialize(app);
     await burnScheduler.loadPendingBurns();
     app.log.info('✅ Burn Scheduler initialized');
+
+    // Privacy-l1 retention worker (purges delivered + max-pending messages).
+    // See CIPHER_PRIVACY_GUARANTEES.md for the policy.
+    const { purgeWorker } = await import('./services/purge-worker.js');
+    purgeWorker.initialize(app);
+    purgeWorker.start();
+    app.log.info('✅ Privacy purge worker started');
 
     // P2P Signaling
     new SignalingServer({

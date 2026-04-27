@@ -14,7 +14,7 @@ export interface DbInstance {
   getUserById(id: string): Promise<any | null>;
   getUserByUsername(username: string): Promise<any | null>;
   searchUsers(query: string, currentUserId?: string | null, limit?: number): Promise<Array<{ id: string; username: string }>>;
-  verifyMasterKey(userId: string, masterKeyHex: string): Promise<boolean>;
+  // verifyMasterKey removed in privacy-l1 — login uses SRP, not masterKey verification.
   getUserDiscoverable(userId: string): Promise<boolean>;
   updateUserDiscoverable(userId: string, discoverable: boolean): Promise<void>;
   createSettingsTable(): Promise<void>;
@@ -31,8 +31,9 @@ export interface DbInstance {
   getUserConversations(userId: string): Promise<any[]>;
   conversationExists(id: string): Promise<boolean>;
 
-  // Conversation Requests
-  createConversationRequest(data: { id: string; from_user_id: string; to_user_id: string; message?: string }): Promise<any>;
+  // Conversation Requests — `message` field removed in privacy-l1
+  // (was free-text in clear; will return as E2E-encrypted in V2 if demanded).
+  createConversationRequest(data: { id: string; from_user_id: string; to_user_id: string }): Promise<any>;
   getConversationRequestById(id: string): Promise<any | null>;
   getPendingRequestsForUser(userId: string): Promise<any[]>;
   getSentRequestsForUser(userId: string): Promise<any[]>;
@@ -50,6 +51,9 @@ export interface DbInstance {
   scheduleBurn(messageId: string, when: number): Promise<void>;
   getScheduledBurnsDue(now?: number): Promise<Array<{ id: string; conversation_id: string }>>;
   getPendingBurns(): Promise<Array<{ messageId: string; conversationId: string; scheduledBurnAt: number }>>;
+  // Privacy-l1: mark messages as delivered when the recipient fetches them.
+  // Returns the number of rows newly marked (1-to-1 only for now; groups deferred).
+  markMessagesDeliveredFor(conversationId: string, recipientUserId: string): Promise<number>;
 
   // Metadata
   getMetadata(key: string): Promise<string | null>;
@@ -75,7 +79,7 @@ export interface DbInstance {
   // SRP
   updateUserSRP(userId: string, salt: string, verifier: string): Promise<void>;
 
-  // SRP seed (mnemonic/masterKey login)
+  // SRP seed (used by SRP-seed login flow)
   updateUserSRPSeed(userId: string, salt: string, verifier: string): Promise<void>;
 
   // Identity Keys
@@ -91,13 +95,11 @@ export interface DbInstance {
   // One-Time Pre-Keys
   saveOneTimePreKeys(userId: string, keys: Array<{ keyId: number; publicKey: string; privateKey?: string }>): Promise<number>;
 
-  // Audit logs
-  createAuditLog(data: any): Promise<void>;
-  getAuditLogs(options?: any): Promise<any[]>;
-  getAuditStats(): Promise<any>;
+  // Audit logs — removed in privacy-l1 (migration 004). Use the
+  // in-memory ring buffer in services/security-events.ts instead.
 
   // Utils
-  getStats(): Promise<{ users: number; conversations: number; messages: number; auditLogs: number; schemaVersion: string | null; last24h: number; bySeverity: Record<string, number>; topActions: any[]; criticalLast24h: number }>;
+  getStats(): Promise<{ users: number; conversations: number; messages: number; attachments: number; databasePath: string }>;
   clearAll(): Promise<void>;
   backupDatabase(backupPath: string): Promise<boolean>;
   exportUserData(userId: string): Promise<any>;
@@ -129,5 +131,4 @@ export type DatabaseService = DbInstance;
 
 export function getDatabase(dbPath?: string): DbInstance;
 export function closeDatabase(): void;
-export function decryptMnemonic(encryptedMnemonic: string, password: string): string;
 

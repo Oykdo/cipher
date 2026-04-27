@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:invariants": "vitest run src/__tests__/privacy-invariants.test.ts",
     "migrate:encrypt": "node --import tsx src/db/migrate-to-encrypted.js",
     "db:check-encryption": "node -e \"import { existsSync } from 'fs'; import { join } from 'path'; const keyPath = join(process.env.BRIDGE_DATA_DIR || './data', '.db.key'); console.log(existsSync(keyPath) ? '✅ Database is encrypted' : '❌ Database is NOT encrypted');\"",
     "db:clear": "node scripts/clear-database.cjs",

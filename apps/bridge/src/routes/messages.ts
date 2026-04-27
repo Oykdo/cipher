@@ -11,7 +11,7 @@ interface MessageRecord {
   conversationId: string;
   senderId: string;
   body: string;
-  sender_plaintext?: string;
+  // sender_plaintext field removed in privacy-l1.
   createdAt: number;
   unlockBlockHeight?: number;
   isLocked?: boolean;
@@ -59,6 +59,14 @@ export async function messageRoutes(fastify: FastifyInstance) {
         firstMessageId: dbMessages[0]?.id,
       }, '[MESSAGES] Messages fetched from DB');
 
+      // Privacy-l1: this fetch counts as delivery for the recipient.
+      // Marking happens once the response is built so we never deny the
+      // user their messages on a tracking failure.
+      // Fire-and-forget — purge worker tolerates eventual delivery.
+      void db.markMessagesDeliveredFor(id, userId).catch((err) =>
+        fastify.log.warn({ err, conversationId: id, userId }, '[MESSAGES] markMessagesDeliveredFor failed')
+      );
+
       // Server-side time-lock validation and filtering
       const messages = await Promise.all(
         dbMessages
@@ -78,10 +86,9 @@ export async function messageRoutes(fastify: FastifyInstance) {
             // client handles the countdown + decryption.
             const isLocked = false;
 
-            const senderPlaintext =
-              msg.sender_id === userId
-                ? (msg.sender_plaintext ?? undefined)
-                : undefined;
+            // sender_plaintext column dropped in privacy-l1. The sender now
+            // stores a self-addressed ciphertext locally — see
+            // apps/frontend/src/lib/e2ee/selfEncryptingMessage.ts.
 
             // ✅ IMPORTANT: Toujours retourner msg.body (chiffré) sauf si vraiment verrouillé
             // Ne pas retourner '[Message verrouillé]' si isLocked est false
@@ -110,7 +117,6 @@ export async function messageRoutes(fastify: FastifyInstance) {
               conversationId: msg.conversation_id,
               senderId: msg.sender_id,
               body: msg.body,
-              sender_plaintext: senderPlaintext,
               createdAt: msg.created_at,
               unlockBlockHeight: unlockHeight || undefined,
               isLocked,
@@ -151,14 +157,12 @@ export async function messageRoutes(fastify: FastifyInstance) {
       const {
         conversationId,
         body,
-        senderPlaintext,
         unlockBlockHeight,
         scheduledBurnAt,
         burnDelay,
       } = request.body as {
         conversationId?: string;
         body?: string;
-        senderPlaintext?: string;
         unlockBlockHeight?: number;
         scheduledBurnAt?: number;
         burnDelay?: number; // Burn delay in seconds (for Burn-After-Reading)
@@ -175,16 +179,15 @@ export async function messageRoutes(fastify: FastifyInstance) {
         return { error: 'Message trop long (max 100KB)' };
       }
 
-      // Sender plaintext is optional, but if provided must be reasonable
-      if (senderPlaintext !== undefined) {
-        if (typeof senderPlaintext !== 'string') {
-          reply.code(400);
-          return { error: 'senderPlaintext doit être une string' };
-        }
-        if (senderPlaintext.length > 100000) {
-          reply.code(413);
-          return { error: 'senderPlaintext trop long (max 100KB)' };
-        }
+      // Defense in depth: reject senderPlaintext if a legacy client still
+      // sends it. After privacy-l1 the sender keeps a local self-addressed
+      // ciphertext via selfEncryptingMessage.ts — never a plaintext copy
+      // on the server.
+      if ((request.body as unknown as Record<string, unknown>).senderPlaintext !== undefined) {
+        reply.code(400);
+        return {
+          error: 'senderPlaintext non accepté : utilisez selfEncryptingMessage côté client.',
+        };
       }
 
       // SECURITY FIX VUL-004: Use strict Zod schema for validation
@@ -278,7 +281,6 @@ export async function messageRoutes(fastify: FastifyInstance) {
         conversation_id: conversationId,
         sender_id: userId,
         body,
-        sender_plaintext: senderPlaintext,
         unlock_block_height: unlockBlockHeight,
         scheduled_burn_at: finalScheduledBurnAt,
       });
@@ -313,12 +315,10 @@ export async function messageRoutes(fastify: FastifyInstance) {
         burnDelay: burnDelay,
       };
 
-      // Response for sender only: include sender_plaintext so they can re-read after reconnect
-      const responseMessage = {
-        ...message,
-        sender_plaintext: senderPlaintext,
-      };
-
+      // The sender's ability to re-read their own messages on a fresh
+      // device is now provided by selfEncryptingMessage.ts (a parallel
+      // ciphertext addressed to themselves). The HTTP response contains
+      // only the public envelope — no plaintext leakage.
       const payload = {
         type: 'message' as const,
         conversationId,
@@ -352,7 +352,10 @@ export async function messageRoutes(fastify: FastifyInstance) {
         fastify.io.to(`user:${memberId}`).emit('new_message', realtimePayload);
       }
 
-      return responseMessage;
+      // Privacy-l1: response carries the public envelope only — no
+      // separate sender_plaintext (the sender's self-readable copy is
+      // baked into the ciphertext via senderCopy / e2ee-v2 keys map).
+      return message;
     }
   );
 }

@@ -1,6 +1,10 @@
--- Dead Drop Messenger - Database Schema (PostgreSQL)
--- Version: 1.2.0
--- Adapted from SQLite schema
+-- Cipher - Database Schema (PostgreSQL)
+-- Version: 2.2.0
+--
+-- Conforms to CIPHER_PRIVACY_GUARANTEES.md (root). Any column added here
+-- must be justified against the contract: secrets and PII have no place
+-- server-side. See migration 002_remove_plaintext_secrets.sql for the
+-- columns intentionally removed in v2.0.0.
 
 -- Enable UUID extension
 -- Drop existing tables to ensure clean state
@@ -23,17 +27,17 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================================================
 -- USERS TABLE
 -- ============================================================================
+-- Identity directory — public keys + ZK auth verifier only.
+-- The mnemonic, master key, and DiceKey checksums live ONLY on the user's
+-- device. They were dropped in migration 002 (see CIPHER_PRIVACY_GUARANTEES.md).
 CREATE TABLE IF NOT EXISTS users (
-  id VARCHAR(255) PRIMARY KEY,            -- ID (Legacy format)
-  username VARCHAR(255) UNIQUE NOT NULL,  -- Nom d'utilisateur (unique, lowercase)
+  id VARCHAR(255) PRIMARY KEY,            -- Internal user ID
+  username VARCHAR(255) UNIQUE NOT NULL,  -- Display handle (unique, lowercase)
   security_tier VARCHAR(50) NOT NULL,     -- 'standard' | 'dice-key'
-  mnemonic JSONB NOT NULL,                -- JSON array de mots mnémoniques
-  master_key_hex TEXT,                    -- Clé maître hex (Dice-Key seulement)
-  avatar_hash VARCHAR(255),               -- SHA-256 hash of the generated avatar .blend file
-  dicekey_checksums TEXT,                 -- Encrypted JSON array of 30 hex checksums (DiceKey only)
-  discoverable BOOLEAN DEFAULT TRUE,      -- Visible dans la recherche
-  srp_salt TEXT,                          -- SRP Salt
-  srp_verifier TEXT,                      -- SRP Verifier
+  avatar_hash VARCHAR(255),               -- SHA-256 of public avatar (served at /avatars/)
+  discoverable BOOLEAN DEFAULT TRUE,      -- User opt-in to appear in search
+  srp_salt TEXT,                          -- SRP Salt (challenge param, not a secret)
+  srp_verifier TEXT,                      -- SRP Verifier (does not reveal password)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -70,12 +74,23 @@ CREATE INDEX IF NOT EXISTS idx_conversation_members_user ON conversation_members
 -- ============================================================================
 -- MESSAGES TABLE
 -- ============================================================================
+-- Message envelopes — opaque ciphertext only. No plaintext, ever.
+-- The sender uses selfEncryptingMessage (frontend) to keep their own
+-- readable copy via a parallel ciphertext addressed to themselves; the
+-- server cannot distinguish it from a regular message.
+--
+-- Retention policy (enforced by purge-worker.ts):
+--   * delivered_at IS NOT NULL AND > 7 days old  → DELETE (post-pickup grace)
+--   * delivered_at IS NULL AND created_at > 30 days old → DELETE (max pending)
+-- Time-lock (drand) does NOT extend retention — locks are enforced
+-- client-side, so the recipient must pick the blob up within 30 days
+-- regardless of the unlock time.
 CREATE TABLE IF NOT EXISTS messages (
-  id VARCHAR(255) PRIMARY KEY,            -- ID (Legacy format)
+  id VARCHAR(255) PRIMARY KEY,
   conversation_id VARCHAR(255) NOT NULL,
   sender_id VARCHAR(255) NOT NULL,
-  body TEXT NOT NULL,                     -- Ciphertext chiffré E2E
-  sender_plaintext TEXT,                  -- Plaintext copy for the sender (see MESSAGE_WORKFLOW.md)
+  body TEXT NOT NULL,                     -- Ciphertext E2E (opaque to server)
+  delivered_at TIMESTAMP WITH TIME ZONE,  -- Set when all recipients fetched it
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   
   -- Fonctionnalités avancées
@@ -92,6 +107,9 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id
 CREATE INDEX IF NOT EXISTS idx_messages_unlock ON messages(unlock_block_height) WHERE unlock_block_height IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_messages_burned ON messages(is_burned, burned_at) WHERE is_burned = TRUE;
 CREATE INDEX IF NOT EXISTS idx_messages_scheduled_burn ON messages(scheduled_burn_at) WHERE scheduled_burn_at IS NOT NULL AND is_burned = FALSE;
+-- Purge worker indexes (privacy-l1) — partial indexes keep them small.
+CREATE INDEX IF NOT EXISTS idx_messages_purge_delivered ON messages(delivered_at) WHERE delivered_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_messages_purge_pending ON messages(created_at) WHERE delivered_at IS NULL;
 
 -- ============================================================================
 -- ATTACHMENTS TABLE
@@ -114,6 +132,7 @@ CREATE INDEX IF NOT EXISTS idx_attachments_conversation ON attachments(conversat
 -- ============================================================================
 -- REFRESH_TOKENS TABLE
 -- ============================================================================
+-- Refresh tokens — session identity only. No PII (no IP, no user-agent).
 CREATE TABLE IF NOT EXISTS refresh_tokens (
   id VARCHAR(255) PRIMARY KEY,
   user_id VARCHAR(255) NOT NULL,
@@ -123,8 +142,6 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   revoked BOOLEAN DEFAULT FALSE,
   revoked_at TIMESTAMP WITH TIME ZONE,
   last_used_at TIMESTAMP WITH TIME ZONE,
-  user_agent TEXT,
-  ip_address VARCHAR(45),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -135,26 +152,10 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens(expires_
 -- ============================================================================
 -- AUDIT_LOGS TABLE
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id VARCHAR(255) PRIMARY KEY,
-  user_id VARCHAR(255),
-  action VARCHAR(50) NOT NULL,
-  table_name VARCHAR(50) NOT NULL,
-  record_id TEXT,                         -- Peut être UUID ou VARCHAR (conversation_id)
-  old_values JSONB,
-  new_values JSONB,
-  ip_address VARCHAR(45),
-  user_agent TEXT,
-  timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  severity VARCHAR(20) DEFAULT 'INFO',
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_table ON audit_logs(table_name, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_severity ON audit_logs(severity, timestamp DESC) WHERE severity IN ('WARNING', 'CRITICAL');
+-- audit_logs table dropped in migration 004 (privacy-l1). A persistent
+-- log of authentication events is itself a metadata leak, even with PII
+-- columns stripped. Short-rotation Pino logs (with redact) cover
+-- abuse-fighting needs without a queryable DB table — see index.ts.
 
 -- ============================================================================
 -- DICEKEY TABLES
@@ -203,6 +204,8 @@ CREATE TABLE IF NOT EXISTS signed_pre_keys (
 CREATE INDEX IF NOT EXISTS idx_signed_pre_keys_user ON signed_pre_keys(user_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_signed_pre_keys_key_id ON signed_pre_keys(key_id);
 
+-- One-time pre-keys — used_by removed (leaked who-initiated-with-whom graph).
+-- used_at suffices to mark the prekey as consumed.
 CREATE TABLE IF NOT EXISTS one_time_pre_keys (
   id SERIAL PRIMARY KEY,
   user_id VARCHAR(255) NOT NULL,
@@ -210,9 +213,7 @@ CREATE TABLE IF NOT EXISTS one_time_pre_keys (
   public_key TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   used_at TIMESTAMP WITH TIME ZONE,
-  used_by VARCHAR(255),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (used_by) REFERENCES users(id) ON DELETE SET NULL,
   UNIQUE (user_id, key_id)
 );
 CREATE INDEX IF NOT EXISTS idx_one_time_pre_keys_user ON one_time_pre_keys(user_id);
@@ -222,12 +223,13 @@ CREATE INDEX IF NOT EXISTS idx_one_time_pre_keys_used ON one_time_pre_keys(used_
 -- ============================================================================
 -- CONVERSATION_REQUESTS TABLE
 -- ============================================================================
+-- Conversation requests — no plaintext intro message. Recipient sees only
+-- "X wants to talk to you" — accept/refuse. E2E intro deferred to V2.
 CREATE TABLE IF NOT EXISTS conversation_requests (
   id VARCHAR(255) PRIMARY KEY,
   from_user_id VARCHAR(255) NOT NULL,
   to_user_id VARCHAR(255) NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
-  message TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE,
   conversation_id VARCHAR(255),
@@ -257,4 +259,4 @@ CREATE TABLE IF NOT EXISTS metadata (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-INSERT INTO metadata (key, value) VALUES ('schema_version', '1.2.0') ON CONFLICT DO NOTHING;
+INSERT INTO metadata (key, value) VALUES ('schema_version', '2.2.0') ON CONFLICT DO NOTHING;

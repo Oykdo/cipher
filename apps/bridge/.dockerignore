@@ -1,0 +1,34 @@
+# Build context exclusions — keep `docker build` fast and the image clean.
+
+node_modules
+dist
+data
+backups
+public/avatars/*.blend
+public/avatars/*.glb
+*.log
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.vscode
+.idea
+coverage
+.nyc_output
+src/__tests__
+src/**/*.test.ts
+src/**/*.spec.ts
+vitest.config.ts
+*.md
+README*
+LICENSE*
+
+# Dev cruft that sneaks in
+test-*.json
+test-*.js
+test-*.ps1
+*.tsbuildinfo
+script_log.txt
+bridge.out.log
+bridge.err.log

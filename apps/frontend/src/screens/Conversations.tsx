@@ -24,7 +24,7 @@ import { MessageInput } from '../components/conversations/MessageInput';
 import { useConversationMessages } from '../hooks/useConversationMessages';
 import { encryptMessageForSending, decryptReceivedMessage } from '../lib/e2ee/messagingIntegration';
 import { getEncryptionModePreference } from '../lib/e2ee/sessionManager';
-import { getCachedDecryptedMessage, cacheDecryptedMessage, clearAllDecryptedCache } from '../lib/e2ee/decryptedMessageCache';
+import { getCachedDecryptedMessage, cacheDecryptedMessage, clearAllDecryptedCache, flushPendingWrites as flushDecryptedCacheWrites } from '../lib/e2ee/decryptedMessageCache';
 import { hasUserKeys, loadUserKeys } from '../lib/e2ee/keyManager';
 import CosmicConstellationLogo from '../components/CosmicConstellationLogo';
 import { getConversationParticipantKeys } from '../lib/e2ee/publicKeyService';
@@ -563,18 +563,10 @@ export default function Conversations() {
           //   BUT we stored plaintext locally, so check for that first
           const isOwnMessage = msg.senderId === session?.user?.id;
 
-          // MESSAGE_WORKFLOW.md (Problème 1): If backend returned sender_plaintext for our own message,
-          // use it and skip decryption entirely.
-          const backendSenderPlaintext = msg.sender_plaintext;
-          if (isOwnMessage && typeof backendSenderPlaintext === 'string' && backendSenderPlaintext.length > 0) {
-            decryptedBody = backendSenderPlaintext;
-            cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
-            decryptedMessages.push({
-              ...msg,
-              body: decryptedBody,
-            });
-            continue;
-          }
+          // Privacy-l1: the server-side `sender_plaintext` shortcut is gone.
+          // For own messages we fall through to the local cache (fast path)
+          // and then to the senderCopy / e2ee-v2 sender-key path
+          // (cryptographic re-read). Both are already wired below.
 
           // CRITICAL FIX: Check cache first to avoid re-decrypting messages
           // Double Ratchet consumes keys on each decryption - re-decrypting fails!
@@ -1166,7 +1158,7 @@ export default function Conversations() {
       }
 
       // Calculate options
-      const options: { scheduledBurnAt?: number; unlockBlockHeight?: number; burnDelay?: number; senderPlaintext?: string } = {};
+      const options: { scheduledBurnAt?: number; unlockBlockHeight?: number; burnDelay?: number } = {};
 
       if (burnAfterReading) {
         // IMPORTANT: For Burn-After-Reading, store the delay (in seconds)
@@ -1181,9 +1173,13 @@ export default function Conversations() {
         options.unlockBlockHeight = drandUnlockRound;
       }
 
-      // MESSAGE_WORKFLOW.md (Problème 1): send a plaintext copy for the sender so they can re-read after reconnect
+      // Privacy-l1: senderPlaintext is no longer sent. The sender's ability
+      // to re-read their own messages is provided by `senderCopy` (e2ee-v1)
+      // or the sender entry in `keys` (e2ee-v2) — both already in the
+      // ciphertext envelope above. `textToCache` is still kept for the
+      // local memory cache below so the message displays instantly without
+      // a round-trip through decryption.
       const textToCache = attachmentFile ? JSON.stringify(encryptedAttachment) : plaintextBody;
-      options.senderPlaintext = textToCache;
 
       // Send encrypted message via server
       const sentMessage = await apiv2.sendMessage(selectedConvId, encryptedBody, options);
@@ -1415,8 +1411,22 @@ export default function Conversations() {
       // Ignore logout flush errors.
     }
 
-    // Clear E2EE decrypted message cache
+    // Clear E2EE decrypted message cache. The sync call wipes the
+    // in-memory map immediately; flushPendingWrites awaits the vault
+    // removal queue so we don't get interrupted by the navigation
+    // below and leave stale ciphertext entries in IndexedDB that the
+    // next session would re-hydrate. Bounded to 2s — privacy-l1 logout
+    // must not hang on a flaky vault.
     clearAllDecryptedCache();
+    try {
+      await Promise.race([
+        flushDecryptedCacheWrites(),
+        new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+      ]);
+    } catch {
+      // Best-effort: any leftover entries are still sealed by the
+      // master key, which is cleared on the next line.
+    }
     clearSession();
     window.location.href = '/';
   };

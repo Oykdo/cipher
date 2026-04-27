@@ -4,6 +4,10 @@ import { handleCspReport, getRecentViolations, getViolationStats } from '../midd
 import * as psi from '../services/psi.js';
 import { createRefreshToken } from '../utils/refreshToken.js';
 import { logAuthAction } from '../utils/auditLog.js';
+import {
+  getRecentSecurityEvents,
+  getSecurityEventStats,
+} from '../services/security-events.js';
 
 const db = getDatabase();
 
@@ -130,29 +134,31 @@ export async function healthRoutes(fastify: FastifyInstance) {
   });
 
   // ============================================================================
-  // AUDIT LOGS & MONITORING
+  // SECURITY EVENTS — in-memory ring buffer (privacy-l1)
   // ============================================================================
+  //
+  // The legacy /api/audit-logs and /api/audit-stats endpoints used to
+  // serve a queryable persistent log. Migration 004 dropped the audit_logs
+  // table; the ring buffer in services/security-events.ts replaces it for
+  // active-incident debugging. The endpoints below preserve the same
+  // names so existing admin tooling keeps working — but the data they
+  // return is bounded, in-memory, lost on bridge restart, and PII-free.
 
-  // Audit Logs Query (authenticated, admin only)
   fastify.get('/api/audit-logs', { preHandler: fastify.authenticate as any }, async (request) => {
     const query = request.query as any;
-    const options = {
-      limit: parseInt(query.limit) || 100,
-      offset: parseInt(query.offset) || 0,
-      userId: query.userId,
-      tableName: query.tableName,
-      action: query.action,
-      severity: query.severity,
-      startTime: query.startTime ? parseInt(query.startTime) : undefined,
-      endTime: query.endTime ? parseInt(query.endTime) : undefined,
+    const limit = Math.min(Math.max(parseInt(query.limit) || 100, 1), 1000);
+    const events = getRecentSecurityEvents(limit);
+    return {
+      logs: events,
+      total: events.length,
+      _note: 'In-memory ring buffer (privacy-l1) — not persisted across bridge restarts.',
     };
-
-    const logs = await db.getAuditLogs(options);
-    return { logs, total: logs.length };
   });
 
-  // Audit Statistics (authenticated, admin only)
   fastify.get('/api/audit-stats', { preHandler: fastify.authenticate as any }, async () => {
-    return db.getAuditStats();
+    return {
+      ...getSecurityEventStats(),
+      _note: 'In-memory ring buffer (privacy-l1) — counts reset on bridge restart.',
+    };
   });
 }

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth";
-import { getRecoveryKeys } from "../../services/api-interceptor";
+// Privacy-l1: getRecoveryKeys + decryptWithMasterKey + scryptAsync removed —
+// the mnemonic is now read directly from the local KeyVault (no network).
 import { getKeyVault } from "../../lib/keyVault";
 import { exportUserData, importUserData, validateExportFile } from "../../lib/dataExport";
 import { getBackupExportPassword, hasBackupExportPassword, setBackupExportPassword } from "../../lib/backupPassword";
-import { scryptAsync } from "@noble/hashes/scrypt";
-import { 
+import {
     exportToBackupVault, 
     importFromBackupVault, 
     validateBackupFile,
@@ -138,10 +138,19 @@ export function BackupSettings() {
                 return;
             }
 
+            // Privacy-l1: the mnemonic is now stored locally in the vault
+            // alongside the master key (sealed by the same password) at
+            // signup time — the server has no copy. Read it here so
+            // performExport can build the recovery file without any
+            // network call.
+            const localMnemonic =
+                (await vault.getData(`mnemonic:${username.toLowerCase()}`)) ||
+                (await vault.getData(`mnemonic:${username}`));
+
             // Success - close prompt and proceed with export
             setShowPasswordPrompt(false);
             setUnlockPassword("");
-            await performExport(masterKey);
+            await performExport(masterKey, localMnemonic);
         } catch (err) {
             console.error('Vault unlock error:', err);
             setUnlockError(t('settings.backup_settings.wrong_password'));
@@ -150,84 +159,21 @@ export function BackupSettings() {
         }
     };
 
-    // Helper function to decrypt data with masterKey (matching backend encryption)
-    const decryptWithMasterKey = async (encryptedJson: unknown, masterKeyHex: string): Promise<string | null> => {
-        try {
-            if (!encryptedJson || !masterKeyHex) return null;
-            
-            // Check if it's encrypted format
-            if (typeof encryptedJson === 'string' && !encryptedJson.trim().startsWith('{')) {
-                // Plain text
-                return encryptedJson;
-            }
-
-            const data: any = typeof encryptedJson === 'string' ? JSON.parse(encryptedJson) : encryptedJson;
-            if (!data?.v || !data?.alg || !data?.s || !data?.iv || !data?.ct || !data?.tag) {
-                // Plain text or unknown format
-                return typeof encryptedJson === 'string' ? encryptedJson : JSON.stringify(encryptedJson);
-            }
-
-            // Backend uses: scryptSync(Buffer.from(masterKeyHex, 'hex'), salt, 32) + AES-256-GCM
-
-            const salt = Uint8Array.from(atob(data.s), (c) => c.charCodeAt(0));
-            const iv = Uint8Array.from(atob(data.iv), (c) => c.charCodeAt(0));
-            const ciphertext = Uint8Array.from(atob(data.ct), (c) => c.charCodeAt(0));
-            const tag = Uint8Array.from(atob(data.tag), (c) => c.charCodeAt(0));
-
-            // Combine ciphertext and tag for WebCrypto AES-GCM (expects tag appended)
-            const combined = new Uint8Array(ciphertext.length + tag.length);
-            combined.set(ciphertext);
-            combined.set(tag, ciphertext.length);
-
-            const masterKeyBytes = Uint8Array.from(masterKeyHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-            const keyBytes = await scryptAsync(masterKeyBytes, salt, { N: 16384, r: 8, p: 1, dkLen: 32 });
-
-            // Import raw key bytes into WebCrypto (ensure we have a plain ArrayBuffer-backed Uint8Array)
-            const rawKeyBytes = new Uint8Array(keyBytes);
-            const key = await crypto.subtle.importKey('raw', rawKeyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
-
-            const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, combined);
-
-            keyBytes.fill(0);
-            rawKeyBytes.fill(0);
-            masterKeyBytes.fill(0);
-
-            return new TextDecoder().decode(decrypted);
-        } catch (error) {
-            console.error('[BackupSettings] Decryption failed:', error);
-            return null;
-        }
-    };
-
-    const parseDecryptedStringArray = (value: string): string[] | null => {
-        const trimmed = value.trim();
-        if (!trimmed) return null;
-
-        // JSON array or JSON object
-        if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-            try {
-                const parsed = JSON.parse(trimmed);
-                if (Array.isArray(parsed)) {
-                    return parsed.filter(Boolean).map(String);
-                }
-                if (parsed && typeof parsed === 'object') {
-                    const maybeMnemonic = (parsed as any).mnemonic;
-                    const maybeChecksums = (parsed as any).checksums;
-                    if (Array.isArray(maybeMnemonic)) return maybeMnemonic.filter(Boolean).map(String);
-                    if (Array.isArray(maybeChecksums)) return maybeChecksums.filter(Boolean).map(String);
-                }
-            } catch {
-                // fallthrough
-            }
-        }
-
-        // Plaintext list (space/newline separated)
-        const parts = trimmed.split(/\s+/g).filter(Boolean);
-        return parts.length ? parts : null;
-    };
-
     // Perform the actual export
-    const performExport = async (masterKey: string) => {
+    //
+    // Privacy-l1: this no longer round-trips to the server. The mnemonic
+    // (for standard accounts) lives in the device-local KeyVault, sealed
+    // by the user's password — caller passes it in via `localMnemonic`.
+    // The masterKey is kept around for legacy DiceKey support that hasn't
+    // been refactored yet (L1-T13); when DiceKey is reintroduced its
+    // checksums will follow the same pattern (read from local KeyVault,
+    // not from the server).
+    //
+    // Pre-L1 accounts that signed up before the mnemonic-cache landed
+    // won't have `mnemonic:<username>` in their vault. We surface a clear
+    // error pointing them to the L1 migration path (re-import their
+    // mnemonic locally) rather than producing a half-empty export file.
+    const performExport = async (_masterKey: string, localMnemonic: string | null) => {
         const username = session?.user?.username;
         if (!username) return;
 
@@ -235,48 +181,46 @@ export function BackupSettings() {
         setMessage({ type: 'success', text: t('settings.backup_settings.retrieving_keys') });
 
         try {
-            // SECURITY: Get encrypted data from server, decrypt locally
-            const recoveryData = await getRecoveryKeys();
+            // Standard (BIP-39) accounts: read mnemonic from the local vault.
+            // No network call. No server-side copy exists by design.
+            const mnemonic: string[] | null = localMnemonic
+                ? localMnemonic.trim().split(/\s+/).filter(Boolean)
+                : null;
+            const securityTier: 'standard' | 'dice-key' = 'standard';
 
-            if (!recoveryData.success) {
-                throw new Error('Échec de la récupération des clés');
-            }
+            // DiceKey accounts pending L1-T13 refactor: checksums export
+            // is temporarily unavailable. The user still has their dice
+            // rolls — the canonical recovery path — so this is degraded
+            // UX, not a security regression.
+            const checksums: string[] | null = null;
 
-            // Decrypt mnemonic locally using masterKey
-            let mnemonic: string[] | null = null;
-            let checksums: string[] | null = null;
-
-            if (recoveryData.encryptedMnemonic) {
-                const decryptedMnemonic = await decryptWithMasterKey(recoveryData.encryptedMnemonic, masterKey);
-                if (decryptedMnemonic) {
-                    mnemonic = parseDecryptedStringArray(decryptedMnemonic);
-                    if (!mnemonic) console.warn('[BackupSettings] Failed to parse decrypted mnemonic');
-                }
-            }
-
-            if (recoveryData.encryptedChecksums) {
-                const decryptedChecksums = await decryptWithMasterKey(recoveryData.encryptedChecksums, masterKey);
-                if (decryptedChecksums) {
-                    checksums = parseDecryptedStringArray(decryptedChecksums);
-                    if (!checksums) console.warn('[BackupSettings] Failed to parse decrypted checksums');
-                }
-            }
+            // Surface accurate metadata. Created-at is unknown without a
+            // server round-trip; we omit it rather than fabricating one.
+            const accountMeta = {
+                username,
+                userId: session?.user?.id ?? username,
+                securityTier,
+            };
 
             // Generate export content with REAL recovery keys (English by default)
             let content = `═══════════════════════════════════════════════════════\n`;
             content += `  CIPHER - RECOVERY KEYS\n`;
             content += `═══════════════════════════════════════════════════════\n\n`;
             content += `⚠️  CRITICAL INFORMATION - NEVER SHARE THIS FILE\n\n`;
-            content += `Username: ${recoveryData.username}\n`;
-            content += `User ID: ${recoveryData.userId}\n`;
-            content += `Security Tier: ${recoveryData.securityTier}\n`;
-            content += `Creation Date: ${new Date(recoveryData.createdAt).toLocaleString('en-US')}\n`;
+            content += `Username: ${accountMeta.username}\n`;
+            content += `User ID: ${accountMeta.userId}\n`;
+            content += `Security Tier: ${accountMeta.securityTier}\n`;
             content += `Export Date: ${new Date().toLocaleString('en-US')}\n\n`;
             content += `───────────────────────────────────────────────────────\n\n`;
 
-            if (recoveryData.securityTier === 'standard') {
+            if (accountMeta.securityTier === 'standard') {
                 if (!mnemonic || (mnemonic.length !== 12 && mnemonic.length !== 24)) {
-                    throw new Error('Impossible de récupérer la passphrase (mnemonic) - vérifiez votre mot de passe/Quick Unlock.');
+                    throw new Error(
+                        'Aucune mnémonique trouvée dans le coffre local de cet appareil. ' +
+                        'Si vous avez créé votre compte avant la mise à jour privacy-l1, ' +
+                        'utilisez votre mnémonique d\'origine sur un autre appareil pour ' +
+                        'la déposer dans le coffre local de celui-ci.'
+                    );
                 }
                 content += `📝 MNEMONIC PHRASE (BIP-39)\n\n`;
                 content += `Keep this phrase in a safe place. It is the ONLY\n`;
@@ -284,30 +228,14 @@ export function BackupSettings() {
                 content += `${mnemonic.join(' ')}\n\n`;
                 content += `⚠️  WARNING: This phrase is unique and irreplaceable.\n`;
                 content += `    If you lose it, access to your account will be PERMANENTLY lost.\n\n`;
-            } else if (recoveryData.securityTier === 'dice-key') {
-                if (!checksums || checksums.length === 0) {
-                    throw new Error('Impossible de récupérer les checksums DiceKey - vérifiez votre mot de passe/Quick Unlock.');
-                }
-                content += `🎲 DICEKEY ACCOUNT (775 bits)\n\n`;
-                content += `Your account uses the ultra-secure DiceKey method.\n\n`;
-
-                // Display checksums if available
-                content += `📝 YOUR VERIFICATION CHECKSUMS (${checksums.length} series):\n\n`;
-                checksums.forEach((checksum: string, i: number) => {
-                    content += `  Series ${String(i + 1).padStart(2, ' ')}: ${checksum}\n`;
-                });
-                content += `\n`;
-
-                content += `🔐 HOW TO LOG IN:\n\n`;
-                content += `   Method 1: User ID + Checksums\n`;
-                content += `   Enter your User ID and all 30 checksums above.\n`;
-                content += `   This is the RECOMMENDED method for recovery.\n\n`;
-                content += `   Method 2: Re-enter 300 Dice Rolls\n`;
-                content += `   If you saved your original dice sequence, you can\n`;
-                content += `   re-enter all 300 rolls to regenerate your keys.\n\n`;
-                content += `💡 TIP: The checksums ARE your recovery keys.\n`;
-                content += `   Keep this file safe - it contains everything\n`;
-                content += `   you need to access your account.\n\n`;
+            } else if (accountMeta.securityTier === 'dice-key') {
+                // DiceKey export pending L1-T13 refactor. Keep checksums null
+                // for now — local cache for DiceKey isn't wired yet — and
+                // surface a clear message rather than producing a broken file.
+                throw new Error(
+                    'L\'export DiceKey est temporairement indisponible (refactor privacy-l1 en cours). ' +
+                    'Vos 300 lancers de dés restent votre méthode de récupération principale.'
+                );
             }
 
             content += `───────────────────────────────────────────────────────\n\n`;
@@ -326,7 +254,7 @@ export function BackupSettings() {
 
             // Create download
             const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-            const filename = `cipher-recovery-${recoveryData.username}-${Date.now()}.txt`;
+            const filename = `cipher-recovery-${accountMeta.username}-${Date.now()}.txt`;
 
             // Try File System Access API
             if (window.showSaveFilePicker) {

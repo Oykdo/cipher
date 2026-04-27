@@ -2,8 +2,6 @@ import pg from 'pg';
 import { readFileSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import argon2 from 'argon2';
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { Pool } = pg;
@@ -27,55 +25,9 @@ async function exec(pool, sql) {
     return await pool.query(sql);
 }
 
-function encryptMnemonic(mnemonicJson, masterKeyHex) {
-    try {
-        if (!masterKeyHex) {
-            return mnemonicJson;
-        }
-        const salt = randomBytes(16);
-        const key = scryptSync(Buffer.from(masterKeyHex, 'hex'), salt, 32);
-        const iv = randomBytes(12);
-        const cipher = createCipheriv('aes-256-gcm', key, iv);
-        const ct = Buffer.concat([cipher.update(mnemonicJson, 'utf8'), cipher.final()]);
-        const tag = cipher.getAuthTag();
-        return JSON.stringify({ v: 1, alg: 'AES-256-GCM', s: salt.toString('base64'), iv: iv.toString('base64'), tag: tag.toString('base64'), ct: ct.toString('base64') });
-    }
-    catch {
-        return mnemonicJson;
-    }
-}
-
-function decryptMnemonic(encryptedJson, masterKeyHex) {
-    try {
-        if (!masterKeyHex || !encryptedJson) {
-            return encryptedJson;
-        }
-        // Check if it's encrypted format
-        if (typeof encryptedJson === 'string' && !encryptedJson.startsWith('{')) {
-            return encryptedJson; // Plain text
-        }
-
-        // Handle JSONB object from Postgres
-        const data = typeof encryptedJson === 'string' ? JSON.parse(encryptedJson) : encryptedJson;
-
-        if (data.v !== 1 || data.alg !== 'AES-256-GCM') {
-            return encryptedJson; // Unknown format
-        }
-        const salt = Buffer.from(data.s, 'base64');
-        const key = scryptSync(Buffer.from(masterKeyHex, 'hex'), salt, 32);
-        const iv = Buffer.from(data.iv, 'base64');
-        const tag = Buffer.from(data.tag, 'base64');
-        const ct = Buffer.from(data.ct, 'base64');
-        const decipher = createDecipheriv('aes-256-gcm', key, iv);
-        decipher.setAuthTag(tag);
-        const decrypted = Buffer.concat([decipher.update(ct), decipher.final()]);
-        return decrypted.toString('utf8');
-    }
-    catch (error) {
-        console.error('[Database] Failed to decrypt mnemonic:', error.message);
-        return encryptedJson; // Return encrypted if decryption fails
-    }
-}
+// NOTE: encryptMnemonic / decryptMnemonic removed in privacy-l1 (2026-04-27).
+// The mnemonic and master key never leave the user's device. The server has
+// no business storing them, even encrypted — see CIPHER_PRIVACY_GUARANTEES.md.
 
 class DatabaseService {
     constructor(dbPath) {
@@ -100,7 +52,6 @@ class DatabaseService {
             ssl: connectionString?.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined
         });
 
-        this._ensureSenderPlaintextColumnPromise = null;
         this._ensureSrpSeedColumnsPromise = null;
 
         // Initialize schema (check connection)
@@ -176,41 +127,12 @@ class DatabaseService {
             )
         `);
 
-        // Ensure critical column for sender self-read is present (safe no-op if table missing)
-        await this.ensureSenderPlaintextColumn();
+        // sender_plaintext column auto-migration removed in privacy-l1.
+        // Migration 002 drops the column; re-adding it at startup would
+        // re-introduce the very plaintext leak the contract forbids.
 
-        // Ensure SRP seed auth columns exist (for mnemonic/seed login)
+        // Ensure SRP seed auth columns exist (for SRP login)
         await this.ensureSrpSeedColumns();
-    }
-
-    async ensureSenderPlaintextColumn() {
-        if (this._ensureSenderPlaintextColumnPromise) {
-            return this._ensureSenderPlaintextColumnPromise;
-        }
-
-        this._ensureSenderPlaintextColumnPromise = run(this.pool, `
-            DO $$
-            BEGIN
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.tables
-                    WHERE table_schema = 'public' AND table_name = 'messages'
-                ) THEN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM information_schema.columns
-                        WHERE table_schema = 'public'
-                          AND table_name = 'messages'
-                          AND column_name = 'sender_plaintext'
-                    ) THEN
-                        ALTER TABLE messages ADD COLUMN sender_plaintext TEXT;
-                    END IF;
-                END IF;
-            END $$;
-        `).catch((error) => {
-            // Don't crash startup if migration can't run (e.g. perms). We'll fail later on insert.
-            console.warn('[Database] Failed to ensure sender_plaintext column:', error?.message || error);
-        });
-
-        return this._ensureSenderPlaintextColumnPromise;
     }
 
     async ensureSrpSeedColumns() {
@@ -259,32 +181,31 @@ class DatabaseService {
     // ============================================================================
     // USER QUERIES
     // ============================================================================
+    /**
+     * Create a user record — public material only.
+     *
+     * Privacy contract (CIPHER_PRIVACY_GUARANTEES.md): the server stores
+     * the username, the security tier, the SRP challenge parameters
+     * (salt + verifier — non-secret), and an optional avatar hash. The
+     * mnemonic, master key, DiceKey checksums, and any private key
+     * material live exclusively on the user's device.
+     *
+     * Callers must NOT pass `mnemonic`, `master_key_hex`, or
+     * `dicekey_checksums` — those columns no longer exist (migration 002).
+     */
     async createUser(user) {
-        const mnemonicJson = JSON.stringify(typeof user.mnemonic === 'string' ? JSON.parse(user.mnemonic) : user.mnemonic);
-        const encMnemonic = encryptMnemonic(mnemonicJson, user.master_key_hex);
-
-        // Encrypt DiceKey checksums if provided
-        let encryptedChecksums = null;
-        if (user.dicekey_checksums && Array.isArray(user.dicekey_checksums)) {
-            const checksumsJson = JSON.stringify(user.dicekey_checksums);
-            encryptedChecksums = encryptMnemonic(checksumsJson, user.master_key_hex);
-        }
-
-        let hashedMasterKey = null;
-        if (user.master_key_hex) {
-            hashedMasterKey = await argon2.hash(user.master_key_hex, {
-                type: argon2.argon2id,
-                memoryCost: 65536,
-                timeCost: 3,
-                parallelism: 4
-            });
-        }
-
         await run(this.pool, `
-            INSERT INTO users (id, username, security_tier, mnemonic, master_key_hex, discoverable, srp_salt, srp_verifier, avatar_hash, dicekey_checksums)
-            VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9)
+            INSERT INTO users (id, username, security_tier, discoverable, srp_salt, srp_verifier, avatar_hash)
+            VALUES ($1, $2, $3, true, $4, $5, $6)
             ON CONFLICT (id) DO NOTHING
-        `, [user.id, user.username.toLowerCase(), user.security_tier, encMnemonic, hashedMasterKey, user.srp_salt || null, user.srp_verifier || null, user.avatar_hash || null, encryptedChecksums]);
+        `, [
+            user.id,
+            user.username.toLowerCase(),
+            user.security_tier,
+            user.srp_salt || null,
+            user.srp_verifier || null,
+            user.avatar_hash || null,
+        ]);
 
         return this.getUserById(user.id);
     }
@@ -362,19 +283,10 @@ class DatabaseService {
         return user ? (user.discoverable === true) : true;
     }
 
-    async verifyMasterKey(userId, masterKeyHex) {
-        const user = await this.getUserById(userId);
-        if (!user || !user.master_key_hex) {
-            return false;
-        }
-        try {
-            return await argon2.verify(user.master_key_hex, masterKeyHex);
-        }
-        catch (error) {
-            console.error('[Database] Master key verification failed:', error);
-            return false;
-        }
-    }
+    // verifyMasterKey removed in privacy-l1: the server no longer holds a
+    // hash of the masterKey. Login is performed via SRP (see /api/v2/auth/
+    // srp/login/init + verify), which proves possession of the password
+    // without ever transmitting it.
 
     // ============================================================================
     // CONVERSATION QUERIES
@@ -425,14 +337,17 @@ class DatabaseService {
     // CONVERSATION REQUEST QUERIES
     // ============================================================================
     async createConversationRequest(data) {
+        // Privacy-l1: the `message` (free-text intro) column was dropped
+        // in migration 002. The request is reduced to "from / to / status";
+        // any plaintext intro must be carried E2E-encrypted as a regular
+        // message after acceptance.
         await run(this.pool, `
-            INSERT INTO conversation_requests (id, from_user_id, to_user_id, message, status)
-            VALUES ($1, $2, $3, $4, 'pending')
+            INSERT INTO conversation_requests (id, from_user_id, to_user_id, status)
+            VALUES ($1, $2, $3, 'pending')
             ON CONFLICT (from_user_id, to_user_id) DO UPDATE SET
                 status = 'pending',
-                message = EXCLUDED.message,
                 created_at = NOW()
-        `, [data.id, data.from_user_id, data.to_user_id, data.message || null]);
+        `, [data.id, data.from_user_id, data.to_user_id]);
         return this.getConversationRequestById(data.id);
     }
 
@@ -480,31 +395,94 @@ class DatabaseService {
     // ============================================================================
     // MESSAGE QUERIES
     // ============================================================================
+    /**
+     * Insert a message envelope.
+     *
+     * Privacy contract: `body` is opaque ciphertext. The server has no
+     * means (and no need) to decrypt it. The sender keeps their own
+     * readable copy locally — historically this was duplicated as
+     * `sender_plaintext` on the row, but that column was dropped in
+     * migration 002 (privacy-l1). The sender now stores a self-addressed
+     * ciphertext locally via selfEncryptingMessage.ts, indistinguishable
+     * to the server from a regular message.
+     */
     async createMessage(message) {
-        await this.ensureSenderPlaintextColumn();
-
         // Convert JS timestamp (milliseconds) to PostgreSQL timestamp
-        const scheduledBurnAt = message.scheduled_burn_at 
-            ? new Date(message.scheduled_burn_at) 
+        const scheduledBurnAt = message.scheduled_burn_at
+            ? new Date(message.scheduled_burn_at)
             : null;
-        
+
         await run(this.pool, `
-            INSERT INTO messages (id, conversation_id, sender_id, body, sender_plaintext, unlock_block_height, scheduled_burn_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO messages (id, conversation_id, sender_id, body, unlock_block_height, scheduled_burn_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
         `, [
-            message.id, 
-            message.conversation_id, 
-            message.sender_id, 
-            message.body, 
-            message.sender_plaintext || null,
+            message.id,
+            message.conversation_id,
+            message.sender_id,
+            message.body,
             message.unlock_block_height || null,
-            scheduledBurnAt
+            scheduledBurnAt,
         ]);
         return this.getMessageById(message.id);
     }
 
     async getMessageById(id) {
         return await get(this.pool, 'SELECT * FROM messages WHERE id = $1', [id]);
+    }
+
+    /**
+     * Mark messages as delivered for a recipient who just fetched them.
+     * Privacy-l1 contract: once a message is marked delivered, the purge
+     * worker will drop it after BRIDGE_MESSAGE_TTL_DAYS (default 7).
+     *
+     * Strategy: for 1-to-1 conversations (the common case), mark
+     * `delivered_at = NOW()` as soon as the (single) recipient fetches.
+     * For group conversations (>2 members), per-recipient tracking is
+     * required — deferred until groups become a real product surface.
+     *
+     * Idempotent: skips messages already marked delivered.
+     * Best-effort: logs failures but never throws into the request path.
+     *
+     * @param {string} conversationId
+     * @param {string} recipientUserId   The user who just GET-ed the conversation
+     * @returns {Promise<number>}        How many messages were newly marked
+     */
+    async markMessagesDeliveredFor(conversationId, recipientUserId) {
+        try {
+            // Group support: count members. If >2, defer (per-recipient ack
+            // needed). If exactly 2, the recipient is the only "other" party
+            // and a single fetch ack-es the whole conversation worth of
+            // pending messages.
+            const memberCountRow = await get(
+                this.pool,
+                'SELECT COUNT(*)::int AS n FROM conversation_members WHERE conversation_id = $1',
+                [conversationId]
+            );
+            const memberCount = memberCountRow?.n ?? 0;
+            if (memberCount !== 2) {
+                // TODO(privacy-l1, groups): introduce a message_deliveries
+                // junction table to track per-recipient acks for groups,
+                // then set messages.delivered_at when the set covers all
+                // recipients (excluding sender).
+                return 0;
+            }
+
+            const result = await run(this.pool, `
+                UPDATE messages
+                SET delivered_at = NOW()
+                WHERE conversation_id = $1
+                  AND sender_id <> $2
+                  AND delivered_at IS NULL
+            `, [conversationId, recipientUserId]);
+
+            return result?.rowCount ?? 0;
+        } catch (error) {
+            console.warn(
+                '[Database] markMessagesDeliveredFor failed:',
+                error?.message || error
+            );
+            return 0;
+        }
     }
 
     async getConversationMessages(conversationId, limit = 100) {
@@ -692,83 +670,13 @@ class DatabaseService {
     }
 
     // ============================================================================
-    // AUDIT_LOGS QUERIES
+    // AUDIT LOGS — REMOVED in privacy-l1 (migration 004)
     // ============================================================================
-    async createAuditLog(data) {
-        await run(this.pool, `
-            INSERT INTO audit_logs (
-                id, user_id, action, table_name, record_id, 
-                old_values, new_values, ip_address, user_agent, severity
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        `, [data.id, data.user_id || null, data.action, data.table_name, data.record_id || null, data.old_values || null, data.new_values || null, data.ip_address || null, data.user_agent || null, data.severity || 'INFO']);
-    }
-
-    async getAuditLogs(options = {}) {
-        let query = 'SELECT * FROM audit_logs WHERE 1=1';
-        const params = [];
-        if (options.userId) {
-            query += ` AND user_id = $${params.length + 1}`;
-            params.push(options.userId);
-        }
-        if (options.tableName) {
-            query += ` AND table_name = $${params.length + 1}`;
-            params.push(options.tableName);
-        }
-        if (options.action) {
-            query += ` AND action = $${params.length + 1}`;
-            params.push(options.action);
-        }
-        if (options.severity) {
-            query += ` AND severity = $${params.length + 1}`;
-            params.push(options.severity);
-        }
-        if (options.startTime) {
-            query += ` AND timestamp >= $${params.length + 1}`;
-            params.push(options.startTime);
-        }
-        if (options.endTime) {
-            query += ` AND timestamp <= $${params.length + 1}`;
-            params.push(options.endTime);
-        }
-        query += ' ORDER BY timestamp DESC';
-        if (options.limit) {
-            query += ` LIMIT $${params.length + 1}`;
-            params.push(options.limit);
-            if (options.offset) {
-                query += ` OFFSET $${params.length + 1}`;
-                params.push(options.offset);
-            }
-        }
-        return await all(this.pool, query, params);
-    }
-
-    async getAuditStats() {
-        const total = await get(this.pool, 'SELECT COUNT(*) as count FROM audit_logs');
-        const last24h = await get(this.pool, `SELECT COUNT(*) as count FROM audit_logs WHERE timestamp > $1`, [new Date(Date.now() - 24 * 60 * 60 * 1000)]);
-        const bySeverityRows = await all(this.pool, `SELECT severity, COUNT(*) as count FROM audit_logs GROUP BY severity`);
-        const bySeverity = Object.fromEntries(bySeverityRows.map((s) => [s.severity, s.count]));
-        const byAction = await all(this.pool, `
-            SELECT action, COUNT(*) as count 
-            FROM audit_logs 
-            WHERE timestamp > $1
-            GROUP BY action 
-            ORDER BY count DESC 
-            LIMIT 10
-        `, [new Date(Date.now() - 24 * 60 * 60 * 1000)]);
-        const criticalRecent = await get(this.pool, `SELECT COUNT(*) as count FROM audit_logs WHERE severity = 'CRITICAL' AND timestamp > $1`, [new Date(Date.now() - 24 * 60 * 60 * 1000)]);
-
-        return {
-            users: parseInt((await get(this.pool, 'SELECT COUNT(*) as count FROM users')).count),
-            conversations: parseInt((await get(this.pool, 'SELECT COUNT(*) as count FROM conversations')).count),
-            messages: parseInt((await get(this.pool, 'SELECT COUNT(*) as count FROM messages')).count),
-            auditLogs: parseInt(total.count),
-            schemaVersion: await this.getMetadata('schema_version'),
-            last24h: parseInt(last24h.count),
-            bySeverity,
-            topActions: byAction,
-            criticalLast24h: parseInt(criticalRecent.count),
-        };
-    }
+    // The audit_logs table was dropped because a queryable persistent log
+    // of authentication events is itself a metadata leak. Operational
+    // visibility on active incidents now comes from the in-memory ring
+    // buffer in services/security-events.ts (bounded, restart-wiped,
+    // PII-free). Health/audit admin endpoints read from there.
 
     // ============================================================================
     // DICEKEY PUBLIC KEYS
@@ -989,8 +897,7 @@ class DatabaseService {
 
             // Phase 2 — replay messages, preserving every timelock-relevant
             // column. ON CONFLICT DO NOTHING makes the import idempotent.
-            await this.ensureSenderPlaintextColumn();
-            for (const msg of (data.messages || [])) {
+                for (const msg of (data.messages || [])) {
                 if (!msg || !msg.id || !msg.conversation_id) continue;
                 if (!allowedConvIds.has(msg.conversation_id)) {
                     stats.messagesSkipped++;
@@ -1003,18 +910,19 @@ class DatabaseService {
                     ? new Date(msg.created_at)
                     : null;
                 const before = stats.messagesRestored;
+                // sender_plaintext column dropped in privacy-l1 (migration 002).
+                // Old backups containing this field have it ignored on restore.
                 const result = await client.query(
                     `INSERT INTO messages
-                        (id, conversation_id, sender_id, body, sender_plaintext,
+                        (id, conversation_id, sender_id, body,
                          unlock_block_height, scheduled_burn_at, created_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, NOW()))
+                     VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::timestamptz, NOW()))
                      ON CONFLICT (id) DO NOTHING`,
                     [
                         msg.id,
                         msg.conversation_id,
                         msg.sender_id,
                         msg.body,
-                        msg.sender_plaintext || null,
                         msg.unlock_block_height || null,
                         scheduledBurnAt,
                         createdAt,
@@ -1321,4 +1229,4 @@ export function closeDatabase() {
     }
 }
 
-export { DatabaseService, decryptMnemonic };
+export { DatabaseService };

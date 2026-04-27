@@ -1,7 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { randomUUID, createHash } from 'crypto';
-import * as bip39 from 'bip39';
-import * as argon2 from 'argon2';
 import * as srp from 'secure-remote-password/server.js';
 import { getDatabase } from '../db/database.js';
 import { createRefreshToken, validateRefreshToken, revokeRefreshToken, revokeAllUserTokens } from '../utils/refreshToken.js';
@@ -45,31 +43,41 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
+// SignupBody — public material only.
+//
+// Privacy contract (CIPHER_PRIVACY_GUARANTEES.md): the BIP-39 mnemonic,
+// the master key, and any DiceKey checksums never leave the user's device.
+// The client derives them locally and only sends what the server legitimately
+// needs to function:
+//   - identity (username, security tier)
+//   - SRP login parameters (salt + verifier — non-secret challenge material)
+//   - public keys (identity, signature, signed pre-key, one-time pre-keys)
+//
+// Requests including `mnemonic`, `mnemonicLength`, `masterKeyHex`, or
+// `checksums` are rejected with HTTP 400 — defense in depth in case an
+// outdated client tries to send them.
 interface SignupBody {
   username: string;
   method: 'standard' | 'dice-key';
-  mnemonicLength?: 12 | 24;
-  masterKeyHex?: string;
-  mnemonic?: string[];
-  avatarHash?: string; // Hash SHA-256 du fichier avatar .blend
-  checksums?: string[]; // DiceKey checksums (30 hex strings)
-  // DiceKey specific fields
+  // Public keys — required for dice-key (signup-time enrollment),
+  // optional for standard (uploaded later via /api/v2/keys/upload).
   identityPublicKey?: string;
   signaturePublicKey?: string;
   signedPreKey?: {
     keyId: number;
     publicKey: string;
-    secretKey?: string;
     signature: string;
     timestamp: number;
   };
   oneTimePreKeys?: Array<{
     keyId: number;
     publicKey: string;
-    secretKey?: string;
   }>;
+  // SRP login parameters (computed client-side from password / masterKey).
   srpSalt?: string;
   srpVerifier?: string;
+  // Optional: SHA-256 of the user's avatar (.blend), public artifact.
+  avatarHash?: string;
 }
 
 interface EidolonBridgeSessionBody {
@@ -247,36 +255,35 @@ export async function authRoutes(fastify: FastifyInstance) {
         return { error: 'Nom d\'utilisateur déjà utilisé' };
       }
 
+      // Defense in depth: reject any client that still sends the legacy
+      // server-side-secret fields. After privacy-l1, these must NEVER
+      // appear in a signup payload — see CIPHER_PRIVACY_GUARANTEES.md.
+      const legacyFields = ['mnemonic', 'mnemonicLength', 'masterKeyHex', 'checksums'] as const;
+      for (const field of legacyFields) {
+        if ((request.body as unknown as Record<string, unknown>)[field] !== undefined) {
+          reply.code(400);
+          return {
+            error: `Champ "${field}" non accepté : les secrets sont dérivés et conservés exclusivement sur l'appareil.`,
+          };
+        }
+      }
+
       // Standard (BIP-39) signup
+      // The client has already generated the mnemonic, derived the master key,
+      // and computed the SRP salt + verifier. We only persist what the server
+      // needs : the username and the SRP challenge parameters. Public keys
+      // are uploaded in a follow-up step via /api/v2/keys/upload.
       if (body.method === 'standard') {
-        const length = body.mnemonicLength === 24 ? 24 : 12;
-        const strength = length === 24 ? 256 : 128;
-        const mnemonicArray = bip39.generateMnemonic(strength).split(' ');
-
-        // Derive masterKey from mnemonic using BIP-39 seed
-        const mnemonicString = mnemonicArray.join(' ');
-        const seed = await bip39.mnemonicToSeed(mnemonicString);
-
-        // Create masterKeyHex from seed (first 32 bytes)
-        const masterKeyHex = seed.subarray(0, 32).toString('hex');
-
-        // ✅ Don't hash here - let createUser handle encryption and hashing
         try {
           const user = await db.createUser({
             id: randomUUID(),
             username,
             security_tier: 'standard',
-            mnemonic: JSON.stringify(mnemonicArray),
-            master_key_hex: masterKeyHex, // ✅ Pass plaintext for encryption
             srp_salt: body.srpSalt,
             srp_verifier: body.srpVerifier,
           });
 
-          return generateAuthResponse(reply, request, user, {
-            flat: true,
-            mnemonic: mnemonicArray,
-            masterKeyHex, // Return unhashed version for frontend to store locally
-          });
+          return generateAuthResponse(reply, request, user, { flat: true });
         } catch (error: any) {
           request.log.error({ error, username }, 'Signup failed during user creation');
           reply.code(500);
@@ -284,18 +291,8 @@ export async function authRoutes(fastify: FastifyInstance) {
         }
       }
 
-      // DiceKey signup (enhanced with public keys)
-      if (!body.masterKeyHex) {
-        reply.code(400);
-        return { error: 'masterKeyHex requis pour DiceKey' };
-      }
-
-      if (!/^[a-zA-Z0-9+/=]+$/i.test(body.masterKeyHex)) {
-        reply.code(400);
-        return { error: 'masterKeyHex invalide (format Base64 attendu)' };
-      }
-
-      // Validate required public keys
+      // DiceKey signup — public keys are provided at signup time so the
+      // user can immediately receive E2E messages (no follow-up upload).
       if (!body.identityPublicKey || !body.signaturePublicKey) {
         reply.code(400);
         return { error: 'Clés publiques Identity et Signature requises' };
@@ -306,11 +303,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         return { error: 'Signed Pre-Key et One-Time Pre-Keys requis' };
       }
 
-
-      // Store mnemonic as empty array for DiceKey (not stored on server)
-      const mnemonicPlaceholder = ['[DiceKey-300-rolls]', '[Not-Stored-On-Server]'];
-
-      // Derive User ID from Identity Public Key (Deterministic)
+      // Derive User ID from Identity Public Key (deterministic).
       // Must match frontend logic: SHA-256(IdentityPubKey)[0..6] -> Hex
       const identityKeyBuffer = Buffer.from(body.identityPublicKey, 'base64');
       const idHash = createHash('sha256').update(identityKeyBuffer).digest();
@@ -319,14 +312,11 @@ export async function authRoutes(fastify: FastifyInstance) {
       let user;
       try {
         user = await db.createUser({
-          id: derivedUserId, // ✅ Use derived ID instead of randomUUID()
+          id: derivedUserId,
           username,
           security_tier: 'dice-key',
-          mnemonic: JSON.stringify(mnemonicPlaceholder),
-          master_key_hex: body.masterKeyHex,
           srp_salt: body.srpSalt,
           srp_verifier: body.srpVerifier,
-          dicekey_checksums: body.checksums || null, // Store encrypted checksums
         });
       } catch (error: any) {
         request.log.error({ error, username }, 'DiceKey Signup failed during user creation');
@@ -525,12 +515,14 @@ export async function authRoutes(fastify: FastifyInstance) {
 
       if (!user) {
         try {
+          // Eidolon vault bridge users authenticate via PSNX/vault token,
+          // not SRP. They have no client-side mnemonic to lose — the vault
+          // file IS their key material. Server stores only the directory
+          // entry needed to route messages to them.
           user = await db.createUser({
             id: bridgeIdentity.userId,
             username: displayUsername,
             security_tier: 'standard',
-            mnemonic: JSON.stringify(['[Eidolon-Vault-Bridge]', bridgeIdentity.normalizedVaultId]),
-            master_key_hex: null,
             srp_salt: null,
             srp_verifier: null,
           });
@@ -642,12 +634,14 @@ export async function authRoutes(fastify: FastifyInstance) {
       let user = await db.getUserById(bridgeIdentity.userId);
       if (!user) {
         try {
+          // Eidolon vault bridge users authenticate via PSNX/vault token,
+          // not SRP. They have no client-side mnemonic to lose — the vault
+          // file IS their key material. Server stores only the directory
+          // entry needed to route messages to them.
           user = await db.createUser({
             id: bridgeIdentity.userId,
             username: displayUsername,
             security_tier: 'standard',
-            mnemonic: JSON.stringify(['[Eidolon-Vault-Bridge]', bridgeIdentity.normalizedVaultId]),
-            master_key_hex: null,
             srp_salt: null,
             srp_verifier: null,
           });
@@ -838,53 +832,30 @@ export async function authRoutes(fastify: FastifyInstance) {
   );
 
   // ============================================================================
-  // GET RECOVERY KEYS (Mnemonic/Checksums)
-  // SECURITY: Returns ENCRYPTED data - client decrypts locally with masterKey
-  // MasterKey is NEVER sent to the server!
+  // RECOVERY KEYS — REMOVED in privacy-l1 (2026-04-27)
   // ============================================================================
+  // Previously returned an encrypted copy of the user's mnemonic stored on
+  // the server. After migration 002, the mnemonic exists ONLY on the user's
+  // device. Recovery is performed by typing the mnemonic into a fresh install
+  // (standard practice for crypto wallets).
+  //
+  // The route is kept as a 410 Gone so legacy clients receive a clear signal
+  // rather than a confusing 404 / 500. Once all clients are upgraded
+  // (≈ Cipher v2.x release), the route can be deleted.
   fastify.get(
     '/api/v2/auth/recovery-keys',
     {
       preHandler: fastify.authenticate as any,
     },
-    async (request, reply) => {
-      const userId = (request.user as any).sub as string;
-
-      try {
-        // Get user from DB
-        const user = await db.getUserById(userId);
-        if (!user) {
-          reply.code(404);
-          return { error: 'Utilisateur introuvable' };
-        }
-
-        // SECURITY: Return encrypted mnemonic - client decrypts locally
-        // This way masterKey NEVER leaves the client
-        const encryptedMnemonic = user.mnemonic;
-        const encryptedChecksums = user.security_tier === 'dice-key' ? user.dicekey_checksums : null;
-
-        // Log recovery keys access
-        logAuthAction(userId, 'RECOVERY_KEYS_ACCESSED', request, 'WARNING');
-
-        // SECURITY: Return encrypted data - client decrypts locally
-        return {
-          success: true,
-          securityTier: user.security_tier,
-          // Encrypted mnemonic - client must decrypt with local masterKey
-          encryptedMnemonic: encryptedMnemonic,
-          // Encrypted checksums for DiceKey users
-          encryptedChecksums: encryptedChecksums,
-          username: user.username,
-          userId: user.id,
-          createdAt: user.created_at,
-          // Note: Client must use local masterKey to decrypt these values
-          _security: 'Data is encrypted. Decrypt locally with your masterKey.',
-        };
-      } catch (error: any) {
-        fastify.log.error({ error, userId }, 'Recovery keys retrieval failed');
-        reply.code(500);
-        return { error: 'Erreur lors de la récupération des clés' };
-      }
+    async (_request, reply) => {
+      reply.code(410);
+      return {
+        error: 'recovery_keys_removed',
+        message:
+          'Server-side recovery keys have been removed for privacy. ' +
+          'Your mnemonic lives only on your device — keep it safe (write it down or store it in a password manager). ' +
+          'See CIPHER_PRIVACY_GUARANTEES.md for the rationale.',
+      };
     }
   );
 

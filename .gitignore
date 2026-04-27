@@ -30,6 +30,12 @@ out/
 !.env.example
 !.env.production.template
 
+# Privacy-l1: the frontend's .env.production carries only the public Fly
+# bridge URL (no secrets). Committing it keeps the Electron build
+# reproducible — anyone running `npm run build:win` from a fresh clone
+# gets an installer pointing at the same prod bridge.
+!apps/frontend/.env.production
+
 # =============================================================================
 # E2EE-V2 SETUP REPORTS (AUTO-GENERATED)
 # =============================================================================
@@ -60,7 +66,14 @@ data/
 # =============================================================================
 # INTERNAL DOCUMENTATION (NOT PUBLISHED)
 # =============================================================================
-Documentation/
+# Documentation/ is treated as private-by-default. The exceptions below
+# carve out the public-quality docs we want tracked. Git refuses to
+# re-include files whose parent directory is excluded, so we ignore the
+# *contents* of Documentation/ rather than the directory itself.
+Documentation/*
+!Documentation/internal/
+Documentation/internal/*
+!Documentation/internal/MESSAGE_WORKFLOW.md
 ECOSYSTEM_GATING.md
 FORUM_REPLY_TIMELOCK.md
 
