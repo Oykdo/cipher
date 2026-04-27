@@ -1,6 +1,13 @@
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+// HashRouter (URLs with `#/path`) instead of HashRouter (clean `/path`):
+// the packaged Electron build loads from a `file://` URL, where the OS
+// has no opinion on `/signup` and a navigation simply 404s on the
+// filesystem. HashRouter keeps every route attached to the same
+// `index.html` via the URL fragment, which works under any protocol.
+// In dev (Vite server) this just means seeing `localhost:5173/#/login`
+// instead of `localhost:5173/login` — same behaviour, prefixed with `#`.
+import { HashRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import './index.css';
@@ -44,11 +51,11 @@ async function initApp() {
   // Render app
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <BrowserRouter>
+      <HashRouter>
         <QueryClientProvider client={queryClient}>
           <App />
         </QueryClientProvider>
-      </BrowserRouter>
+      </HashRouter>
     </StrictMode>
   );
 }

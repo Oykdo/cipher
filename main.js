@@ -488,6 +488,21 @@ if (!gotTheLock) {
 }
 
 async function startBackend() {
+  // Privacy-l1 / centralized model: the packaged installer talks to the
+  // hosted bridge configured in apps/frontend/.env.production
+  // (VITE_API_BASE_URL = https://cipher-bridge.fly.dev). The bundled
+  // bridge is kept in the installer as an opt-in for self-hosting /
+  // offline development scenarios, but is no longer auto-spawned —
+  // running it would require a per-device DATABASE_URL and JWT_SECRET
+  // that the contract forbids us from shipping in plaintext.
+  //
+  // To opt back in (e.g. for a fully self-hosted install on a private
+  // network), set CIPHER_BUNDLED_BRIDGE=true before launching the app.
+  if (app.isPackaged && process.env.CIPHER_BUNDLED_BRIDGE !== 'true') {
+    console.log('[startBackend] Hosted bridge mode — skipping local bridge spawn');
+    return;
+  }
+
   return new Promise((resolve, reject) => {
     const backendPath = app.isPackaged
       ? path.join(process.resourcesPath, 'apps', 'bridge', 'dist', 'index.js')
@@ -722,6 +737,33 @@ ipcMain.handle('eidolon:open-installer', async () => openEidolonInstaller());
 ipcMain.handle('eidolon:get-vault-metrics', async (_event, vaultRef) => readEidolonVaultMetrics(vaultRef));
 ipcMain.handle('eidolon:connect-probe', async (_event, payload) => probeEidolonConnect(payload));
 ipcMain.handle('eidolon:connect-session', async (_event, payload) => createEidolonConnectSession(payload));
+
+// Stripe Checkout opens in the user's default browser, never inside the
+// Electron window. Keeping payment UI out of the renderer means the user
+// always sees a real address bar with the lock icon when they enter card
+// details — Electron has no such affordance, and a phishing variant of the
+// same trick would be invisible. We allowlist Stripe's checkout host only.
+ipcMain.handle('stripe:open-checkout', async (_event, url) => {
+  if (typeof url !== 'string' || url.length === 0) {
+    return { ok: false, error: 'invalid-url' };
+  }
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { ok: false, error: 'invalid-url' };
+  }
+  if (parsed.protocol !== 'https:') {
+    return { ok: false, error: 'invalid-protocol' };
+  }
+  const host = parsed.hostname.toLowerCase();
+  const allowed = host === 'checkout.stripe.com' || host.endsWith('.stripe.com');
+  if (!allowed) {
+    return { ok: false, error: 'host-not-allowed' };
+  }
+  await shell.openExternal(url);
+  return { ok: true };
+});
 
 // Secure per-device storage for the RGPD backup export password (encrypted via Electron safeStorage).
 const BACKUP_PASSWORD_STORE_FILE = 'backup-passwords.json';

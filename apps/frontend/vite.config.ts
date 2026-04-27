@@ -4,9 +4,20 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import wasm from 'vite-plugin-wasm';
-import topLevelAwait from 'vite-plugin-top-level-await';
+// vite-plugin-top-level-await removed: with build.target='esnext' and
+// the bundled Electron 35 (= Chrome 134) supporting TLA natively, the
+// plugin is redundant — and worse, it was re-emitting WASM-internal
+// bare imports (e.g. `import "a"`) as top-level side-effect imports
+// in the entry chunk, breaking module resolution at runtime.
 
 export default defineConfig(({ mode }) => ({
+  // Relative asset paths so the bundle works when loaded from `file://`
+  // by the packaged Electron app. With the default `'/'` base, Vite emits
+  // `<script src="/assets/...">` which Electron resolves to `C:/assets/...`
+  // and 404s on every chunk — blank window. `'./'` produces relative
+  // paths that resolve next to index.html in both Electron and browser.
+  base: './',
+
   // Strip console.log / .debug / .info from production bundles. Most of the
   // 300+ raw console calls in the codebase are dev noise, but a few include
   // hashes, tokens, or peerIds that would leak into any production user's
@@ -22,7 +33,44 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     wasm(), // WASM support for argon2-browser
-    topLevelAwait(), // Top-level await support
+    // Strip WASM-internal bare imports that vite-plugin-wasm leaks into
+    // JS chunks. The argon2 / libsodium WASM binaries declare imports
+    // named "a", "env", "wbg" (the wasm-bindgen import object); the
+    // wasm plugin satisfies them at module-init time but Rollup still
+    // emits them as side-effect `import "a";` statements at the top of
+    // dependent JS chunks. Browsers can't resolve those bare specifiers
+    // and the whole bundle fails to load (white screen). Stripping them
+    // post-bundle is safe — no real npm package is called "a", "env",
+    // or "wbg" — and unblocks the Electron load.
+    {
+      // vite-plugin-wasm emits unresolved bare specifiers ("a", "env",
+      // "wbg") for the wasm-bindgen import object expected by Emscripten
+      // / wasm-bindgen output. argon2-browser's lib/argon2.js triggers
+      // it; the production code path actually uses
+      // argon2-browser/dist/argon2-bundled.min.js (self-contained, no
+      // bare imports), but Vite still bundles the unused wasm-importing
+      // path. Provide an empty virtual module so module resolution
+      // succeeds at startup. If the unused code path is ever hit at
+      // runtime, the namespace will be `{}` and call will throw a clear
+      // error — better than a white-screen module-resolution failure.
+      name: 'wasm-bare-import-stub',
+      enforce: 'pre',
+      resolveId(id) {
+        if (id === 'a' || id === 'env' || id === 'wbg') {
+          return '\0wasm-bare-stub:' + id;
+        }
+        return null;
+      },
+      load(id) {
+        if (id.startsWith('\0wasm-bare-stub:')) {
+          // Empty namespace export — satisfies `import * as X from "a"`
+          // and `import { y } from "a"` patterns. Any access on an
+          // imported binding will be undefined.
+          return 'export {};';
+        }
+        return null;
+      },
+    },
     react(),
     tailwindcss(),
     nodePolyfills({
@@ -76,34 +124,17 @@ export default defineConfig(({ mode }) => ({
         }
         defaultHandler(warning);
       },
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('scheduler')) return 'vendor-react';
-            if (id.includes('framer-motion')) return 'vendor-motion';
-            if (id.includes('i18next')) return 'vendor-i18n';
-            if (
-              id.includes('libsodium') ||
-              id.includes('tweetnacl') ||
-              id.includes('@noble') ||
-              id.includes('secure-remote-password') ||
-              id.includes('argon2-browser') ||
-              id.includes('tlock-js') ||
-              id.includes('drand-client')
-            ) {
-              return 'vendor-crypto';
-            }
-            if (id.includes('three')) return 'vendor-3d';
-            return 'vendor';
-          }
-
-          if (id.includes('/src/screens/Recovery')) return 'screen-recovery';
-          if (id.includes('/src/lib/e2ee/') || id.includes('/src/core/crypto/') || id.includes('/src/shared/signal')) return 'feature-e2ee';
-          if (id.includes('/src/lib/p2p/') || id.includes('/src/hooks/useP2P') || id.includes('/src/hooks/useSocket')) return 'feature-p2p';
-          if (id.includes('/src/components/conversations/') || id.includes('/src/screens/Conversations')) return 'feature-conversations';
-          return undefined;
-        },
-      },
+      // manualChunks removed: the previous custom strategy
+      // (vendor-react / vendor-crypto / feature-e2ee / feature-p2p / …)
+      // created circular cross-chunk dependencies that surfaced as TDZ
+      // errors in production Electron builds — `auth.ts` in the entry
+      // chunk would access `create` from the zustand binding before
+      // the dependent vendor chunk had finished evaluating, despite the
+      // dependency graph saying otherwise. Letting Rollup auto-split
+      // by import graph is correct out of the box; we lose a bit of
+      // first-paint optimisation but avoid white-screen on init. Can
+      // be revisited later with `splitVendorChunkPlugin` or per-route
+      // `splitChunks` if bundle size becomes a problem.
     },
   },
   optimizeDeps: {

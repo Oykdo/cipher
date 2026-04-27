@@ -1,0 +1,51 @@
+# fly.toml app configuration file generated for cipher-bridge on 2026-04-27T10:31:26+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'cipher-bridge'
+primary_region = 'cdg'
+kill_signal = 'SIGINT'
+kill_timeout = '30s'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  BRIDGE_DATA_DIR = '/data'
+  BRIDGE_MESSAGE_MAX_PENDING_DAYS = '30'
+  BRIDGE_MESSAGE_TTL_DAYS = '7'
+  BRIDGE_PURGE_INTERVAL_MINUTES = '60'
+  BRIDGE_SECURITY_EVENT_BUFFER_SIZE = '10000'
+  EIDOLON_CONNECT_ENABLED = 'false'
+  NODE_ENV = 'production'
+  PORT = '4000'
+  TIMELOCK_ENABLED = 'false'
+
+[[mounts]]
+  source = 'cipher_bridge_data'
+  destination = '/data'
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  [http_service.concurrency]
+    type = 'connections'
+    hard_limit = 250
+    soft_limit = 200
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/health'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'

@@ -45,7 +45,12 @@ export interface AttachmentsTable {
     created_at: Generated<number>;
 }
 
-export interface AuditLogsTable {
+// AuditLogsTable removed in privacy-l1 (migration 004). The audit_logs
+// table no longer exists; security events live in the in-memory ring
+// buffer at services/security-events.ts. This block is kept temporarily
+// as a placeholder so existing Kysely type imports compile while the
+// rest of the codebase is updated. Remove once no caller references it.
+interface _RemovedAuditLogsTable_DoNotUse {
     id: string;
     user_id: string | null;
     action: string;
@@ -53,8 +58,6 @@ export interface AuditLogsTable {
     record_id: string | null;
     old_values: string | null;
     new_values: string | null;
-    ip_address: string | null;
-    user_agent: string | null;
     severity: 'INFO' | 'WARNING' | 'CRITICAL';
     timestamp: Generated<number>;
 }
@@ -126,7 +129,8 @@ export interface DatabaseSchema {
     conversation_members: ConversationMembersTable;
     messages: MessagesTable;
     attachments: AttachmentsTable;
-    audit_logs: AuditLogsTable;
+    // audit_logs removed in privacy-l1 (migration 004) — replaced by the
+    // in-memory ring buffer at services/security-events.ts.
     refresh_tokens: RefreshTokensTable;
     identity_keys: IdentityKeysTable;
     signature_keys: SignatureKeysTable;

@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electron', {
   createEidolonConnectSession: (payload) => ipcRenderer.invoke('eidolon:connect-session', payload),
   getVaultBridgeContext: () => ipcRenderer.invoke('vault-bridge:get-context'),
   selectPsnxFile: () => ipcRenderer.invoke('vault-bridge:select-psnx'),
+  openStripeCheckout: (url) => ipcRenderer.invoke('stripe:open-checkout', url),
 
   backupPassword: {
     has: (username) => ipcRenderer.invoke('backup-password:has', username),

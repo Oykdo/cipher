@@ -4,12 +4,14 @@
  * Used while the Eidolon ecosystem (vault-based signup) is pre-release.
  * Rendered from SignupFluid.tsx when EIDOLON_CONNECT_ENABLED is false.
  *
- * Backend contract (POST /api/v2/auth/signup, method=standard):
- *   request  : { username, method: 'standard', mnemonicLength: 12 | 24 }
- *   response : { id, username, securityTier, accessToken, refreshToken,
- *                mnemonic: string[], masterKeyHex }
- * The backend generates the mnemonic — frontend only displays it and
- * verifies the user has written it down before sealing the session.
+ * Backend contract (POST /api/v2/auth/signup, method=standard) — privacy-l1:
+ *   request  : { username, method: 'standard', srpSalt, srpVerifier }
+ *   response : { id, username, securityTier, accessToken, refreshToken }
+ *
+ * The mnemonic and master key are generated and kept ENTIRELY on this
+ * device. The server only learns the username and the SRP challenge
+ * parameters (which don't reveal the password). See
+ * CIPHER_PRIVACY_GUARANTEES.md.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -37,14 +39,17 @@ import {
 
 type Step = 'intro' | 'generating' | 'reveal' | 'verify' | 'password';
 
+// Combines the server response with the locally-derived mnemonic +
+// masterKey so subsequent steps (reveal / verify / password) have a
+// single object to read from.
 interface SignupResponse {
   id: string;
   username: string;
   securityTier: 'standard' | 'dice-key';
   accessToken: string;
   refreshToken: string;
-  mnemonic: string[];
-  masterKeyHex: string;
+  mnemonic: string[];     // local — server never sees it
+  masterKeyHex: string;   // local — server never sees it
 }
 
 const MIN_USERNAME_LENGTH = 3;
@@ -95,60 +100,75 @@ export default function SignupMnemonic() {
     setStep('generating');
 
     try {
+      // 1. Generate the mnemonic LOCALLY — never goes near the network.
+      //    bip39 is loaded dynamically to keep the intro screen lightweight.
+      const bip39 = await import('bip39');
+      const strength = mnemonicLength === 24 ? 256 : 128;
+      const mnemonicArray = bip39.generateMnemonic(strength).split(' ');
+
+      // 2. Derive the master key locally (BIP-39 seed → first 32 bytes hex).
+      //    Must mirror api-v2.ts mnemonicToMasterKey() so that future logins
+      //    via the same mnemonic recompute the same masterKey.
+      const seed = await bip39.mnemonicToSeed(mnemonicArray.join(' '));
+      const masterKeyHex = seed.subarray(0, 32).toString('hex');
+
+      // 3. Compute the SRP-seed verifier locally so the server can
+      //    authenticate future mnemonic-only logins without ever seeing
+      //    the mnemonic or the masterKey.
+      const { srpSalt, srpVerifier } = computeSrpSeedSetup(trimmed, mnemonicArray);
+
+      // 4. POST signup with PUBLIC fields only.
       const res = await fetch(`${API_BASE_URL}/api/v2/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: trimmed,
           method: 'standard',
-          mnemonicLength,
+          srpSalt,
+          srpVerifier,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data?.error || t('signup.mnemonic_error_generic'));
       }
-      const signupData = data as SignupResponse;
 
-      // Initialize the E2EE KeyVault with the masterKey derived from the
-      // mnemonic. Without this, sending encrypted messages fails with
-      // "KeyVault not initialized". Same pattern as QuickUnlock.
+      // 5. Recombine server response + local secrets into a single object
+      //    consumed by the reveal / verify / password steps. The mnemonic
+      //    and masterKey live only in component state from this point.
+      const signupData: SignupResponse = {
+        id: data.id,
+        username: data.username,
+        securityTier: data.securityTier,
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        mnemonic: mnemonicArray,
+        masterKeyHex,
+      };
+
+      // 6. Initialize the E2EE KeyVault with the locally-derived masterKey.
+      //    Without this, sending encrypted messages fails with
+      //    "KeyVault not initialized". Same pattern as QuickUnlock.
       try {
-        await setSessionMasterKey(signupData.masterKeyHex);
+        await setSessionMasterKey(masterKeyHex);
       } catch (mkErr) {
         console.warn('[signup-mnemonic] Failed to cache masterKey', mkErr);
       }
       try {
-        await setTemporaryMasterKey(signupData.masterKeyHex);
+        await setTemporaryMasterKey(masterKeyHex);
       } catch (mkErr) {
         console.warn('[signup-mnemonic] Failed to persist masterKey', mkErr);
       }
       try {
-        await getE2EEVault(signupData.masterKeyHex);
+        await getE2EEVault(masterKeyHex);
       } catch (vaultErr) {
         console.warn('[signup-mnemonic] Failed to init E2EE vault', vaultErr);
       }
 
-      // Register the SRP-seed verifier so this user can log back in later
-      // via their mnemonic alone (zero-knowledge — server never sees it).
-      // Failure here must not block signup — the account is still usable on
-      // this device via the session we just received.
-      try {
-        const { srpSalt, srpVerifier } = computeSrpSeedSetup(
-          signupData.username,
-          signupData.mnemonic
-        );
-        await fetch(`${API_BASE_URL}/api/v2/auth/srp-seed/setup`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${signupData.accessToken}`,
-          },
-          body: JSON.stringify({ srpSalt, srpVerifier }),
-        });
-      } catch (setupErr) {
-        console.warn('[srp-seed] setup failed', setupErr);
-      }
+      // Note: the legacy POST /api/v2/auth/srp-seed/setup call has been
+      // removed — the signup payload now carries srpSalt + srpVerifier
+      // directly, so the user is registered with mnemonic-login credentials
+      // in a single round-trip.
 
       setResponse(signupData);
       setMnemonicHidden(true);
@@ -222,11 +242,22 @@ export default function SignupMnemonic() {
       const storedHash = await hashPassword(password, normalizedUsername);
       localStorage.setItem(`pwd_${normalizedUsername}`, storedHash);
 
-      // Seal the KeyVault with the password and stash the master key inside.
-      // QuickUnlock reads exactly this entry on subsequent launches.
+      // Seal the KeyVault with the password and stash the master key + the
+      // BIP-39 mnemonic inside. QuickUnlock reads `masterKey:<username>` on
+      // subsequent launches; BackupSettings reads `mnemonic:<username>` when
+      // the user wants to re-export their recovery phrase.
+      //
+      // Privacy contract (CIPHER_PRIVACY_GUARANTEES.md): the mnemonic is
+      // server-side absent. It lives only here, sealed by the user's
+      // password — pillar "portage des données personnelles". From the
+      // masterKey alone (already in this vault) an attacker who knows the
+      // password could re-derive identity and signing keys; adding the
+      // mnemonic does not change that threat surface, it merely lets the
+      // legitimate user re-export their recovery phrase from the device.
       try {
         const vault = await getKeyVault(password);
         await vault.storeData(`masterKey:${normalizedUsername}`, response.masterKeyHex);
+        await vault.storeData(`mnemonic:${normalizedUsername}`, response.mnemonic.join(' '));
       } catch (vaultErr) {
         throw new Error(getErrorMessage(vaultErr, t('signup.mnemonic_password_vault_error')));
       }

@@ -1,3 +1,36 @@
+/**
+ * BackupService — user-triggered data export ("portage").
+ *
+ * SCOPE
+ * -----
+ * This service backs the `POST /api/backup/export` route. It exports the
+ * caller's OWN data (their conversations, messages, settings) so they can
+ * carry it to a new device or another bridge. This is the "portage des
+ * données personnelles" pillar of CIPHER_PRIVACY_GUARANTEES.md in action.
+ *
+ * NOT auto-backup
+ * ---------------
+ * The auto-scheduler (`startScheduler`) is intentionally a no-op. The
+ * server is not allowed to silently snapshot user data on a timer — that
+ * would re-introduce the very server-side persistence the contract
+ * forbids. If you find yourself wanting to enable it, re-read the contract
+ * first.
+ *
+ * Privacy invariant
+ * -----------------
+ * After migration 002 (privacy-l1), `db.exportUserData()` no longer
+ * returns mnemonics, master keys, or any sender_plaintext — those columns
+ * have been dropped at the schema level. The export becomes naturally
+ * clean. If a future change re-adds such a column, this comment + the
+ * privacy-invariant CI test (L1-T9) will catch it.
+ *
+ * Local files
+ * -----------
+ * Generated backups land in `apps/bridge/backups/<userId>/`, gitignored
+ * (see .gitignore line "apps/bridge/backups/"). They are produced on
+ * demand and rotated; nothing is generated unless a user explicitly hits
+ * the export endpoint.
+ */
 import { join } from 'path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, readdirSync, statSync, createReadStream, createWriteStream } from 'fs';
 import { createGzip, createGunzip } from 'zlib';
@@ -76,15 +109,15 @@ export class BackupService {
     }
 
     public startScheduler() {
-        if (this.intervalId) clearInterval(this.intervalId);
-
-        if (!this.currentConfig.enabled) {
-            this.logger.info('Auto backup is disabled');
-            return;
+        // Auto-backup is intentionally disabled — see file header.
+        // The server must not snapshot user data on a timer; it would
+        // re-introduce the persistence the privacy contract forbids.
+        // Backups are user-triggered only, via POST /api/backup/export.
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
         }
-
-        // TODO: Implement multi-user scheduler
-        this.logger.warn('Auto backup scheduler is currently disabled for multi-user support');
+        this.logger.info('Auto backup is disabled by design (see CIPHER_PRIVACY_GUARANTEES.md)');
     }
 
     public stopScheduler() {

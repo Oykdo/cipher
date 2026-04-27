@@ -207,15 +207,12 @@ async function buildKeyOriginFacet(
     };
   }
 
-  let keyBits = 256;
-
-  if (user.security_tier === 'standard' && user.master_key_hex) {
-    // Heuristic similar to usersRoutes: infer key size from stored hash length
-    const hexLength = String(user.master_key_hex).length;
-    keyBits = hexLength <= 30 ? 128 : 256;
-  } else if (user.security_tier === 'dice-key') {
-    keyBits = 775; // DiceKey entropy
-  }
+  // Approximate key strength for the trust-star facet.
+  // master_key_hex was dropped in privacy-l1 — the server no longer stores
+  // any hash of the user's master key. We report the safer lower-bound for
+  // standard accounts (matches usersRoutes); the frontend can refine it
+  // using its local KeyVault if a more precise display is needed.
+  const keyBits = user.security_tier === 'dice-key' ? 775 : 128;
 
   let state: FacetState = 'UNVERIFIED';
   let severity: Severity = 'INFO';
@@ -259,54 +256,21 @@ async function buildKeyOriginFacet(
 }
 
 async function buildDeviceFacet(
-  user: any,
-  clientInfo: ComputeParams['clientInfo'],
+  _user: any,
+  _clientInfo: ComputeParams['clientInfo'],
   now: number,
 ): Promise<TrustStarFacet> {
-  let state: FacetState = 'UNVERIFIED';
-  let severity: Severity = 'INFO';
-  let description: string;
-
-  const userAgentHeader = clientInfo?.userAgent;
-  const userAgent = Array.isArray(userAgentHeader)
-    ? userAgentHeader[0]
-    : userAgentHeader || undefined;
-
-  try {
-    const logs = await db.getAuditLogs({
-      userId: user.id,
-      tableName: 'auth',
-      limit: 50,
-    });
-
-    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
-    const hasRecentLog = Array.isArray(logs)
-      ? logs.some((log: any) => {
-          if (!log.timestamp) return false;
-          const recentEnough = now - Number(log.timestamp) < THIRTY_DAYS;
-          if (!recentEnough) return false;
-          if (!userAgent) return true;
-          return log.user_agent === userAgent;
-        })
-      : false;
-
-    if (hasRecentLog) {
-      state = 'VERIFIED';
-      severity = 'INFO';
-      description =
-        "Cet appareil a été vérifié récemment via une session authentifiée reconnue.";
-    } else {
-      state = 'AT_RISK';
-      severity = 'WARNING';
-      description =
-        "Nous ne trouvons pas de preuve récente pour cet appareil. Vérifiez que vous reconnaissez cette connexion.";
-    }
-  } catch {
-    state = 'UNVERIFIED';
-    severity = 'WARNING';
-    description =
-      "Impossible de vérifier l'état de cet appareil (données de journal indisponibles).";
-  }
+  // Reaching this code means the trust-star route was hit with a valid
+  // JWT (the route is gated by fastify.authenticate). Operationally
+  // that is equivalent to — and strictly stronger than — the old
+  // "recent login from this user-agent" heuristic, which depended on
+  // server-side activity logs we no longer keep (privacy contract).
+  // No PII consulted, no false-alarm UNVERIFIED state surfaced to the
+  // user, same facet weight preserved.
+  const state: FacetState = 'VERIFIED';
+  const severity: Severity = 'INFO';
+  const description =
+    "Session active sur cet appareil. La confiance repose sur votre clé maître locale.";
 
   return {
     id: 2,

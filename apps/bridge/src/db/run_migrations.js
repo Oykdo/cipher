@@ -12,13 +12,21 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { Pool } = pg;
 
+// Note: privacy-l1 (2026-04-27) drops several columns these legacy
+// migrations originally added (sender_plaintext, mnemonic, master_key_hex,
+// dicekey_checksums, IPs in audit_logs) AND the audit_logs table itself.
+// The legacy migrations are kept on disk for historical traceability but
+// are no longer applied by default. A fresh deployment runs
+// scripts/schema_postgresql.sql (L1-clean) directly.
+//
+// Excluded from the active list:
+//   - 003_update_audit_logs_jsonb.sql : audit_logs table dropped in 004
+//   - 004_add_sender_plaintext.sql    : column dropped in 002
 const migrations = [
     '001_add_dicekey_tables.sql',
     '002_add_discoverable.sql',
     '002_add_user_dicekey_fields.sql',
     'add_conversation_requests.sql',
-    '003_update_audit_logs_jsonb.sql',
-    '004_add_sender_plaintext.sql'
 ];
 
 async function runMigrations() {

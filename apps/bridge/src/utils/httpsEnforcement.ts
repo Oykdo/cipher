@@ -46,6 +46,18 @@ export function isHttps(request: FastifyRequest, trustProxy: boolean = true): bo
 }
 
 /**
+ * Paths exempted from HTTPS redirection.
+ *
+ * Cloud platforms (Fly.io, Render, Railway, …) terminate TLS at the edge
+ * and forward plain HTTP to the container for internal health probes —
+ * those probes never set `x-forwarded-proto`, so a strict redirect would
+ * trap them in a 308 loop and the platform would mark the machine as
+ * unhealthy. Health endpoints must respond directly, regardless of the
+ * inbound protocol.
+ */
+const HTTPS_BYPASS_PATHS = new Set<string>(['/health', '/ping', '/readiness', '/liveness']);
+
+/**
  * Enforces HTTPS by redirecting HTTP requests
  * @param config HTTPS configuration
  */
@@ -53,6 +65,13 @@ export function enforceHttps(config: HttpsConfig = DEFAULT_HTTPS_CONFIG) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     if (!config.enabled) {
       return; // Skip in development
+    }
+
+    // Health / liveness probes must answer in band on whichever protocol
+    // the platform speaks — see HTTPS_BYPASS_PATHS comment above.
+    const path = request.url.split('?')[0];
+    if (HTTPS_BYPASS_PATHS.has(path)) {
+      return;
     }
 
     if (!isHttps(request, config.trustProxy)) {

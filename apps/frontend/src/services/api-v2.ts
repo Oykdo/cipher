@@ -13,12 +13,26 @@ import { authFetchV2WithRefresh, fetchWithRefresh } from "./api-interceptor";
 // TYPES & INTERFACES (correspondant aux DTOs backend)
 // ============================================================================
 
+// Public material only — privacy-l1 (CIPHER_PRIVACY_GUARANTEES.md).
+// The mnemonic and master key are generated and kept on the device; the
+// client sends only the SRP challenge parameters (and, for dice-key, the
+// public keys needed to bootstrap E2E reception).
 export interface SignupRequestV2 {
   username: string;
-  securityTier: SecurityTier;
-  mnemonicLength?: 12 | 24; // Pour standard
-  masterKeyHex?: string; // Pour dice-key
-  mnemonic?: string[]; // Pour dice-key
+  method: 'standard' | 'dice-key';
+  srpSalt: string;
+  srpVerifier: string;
+  // Dice-key flavor only:
+  identityPublicKey?: string;
+  signaturePublicKey?: string;
+  signedPreKey?: {
+    keyId: number;
+    publicKey: string;
+    signature: string;
+    timestamp: number;
+  };
+  oneTimePreKeys?: Array<{ keyId: number; publicKey: string }>;
+  avatarHash?: string;
 }
 
 export interface SignupResponseV2 {
@@ -27,7 +41,7 @@ export interface SignupResponseV2 {
   securityTier: SecurityTier;
   accessToken: string;
   refreshToken: string;
-  mnemonic: string | string[]; // Peut être string ou array (backend retourne string)
+  // mnemonic / masterKeyHex are NOT returned: they were never sent.
 }
 
 export interface LoginRequestV2 {
@@ -75,8 +89,8 @@ export interface MessageV2 {
   conversationId: string;
   senderId: string;
   body: string;
-  // Returned only to the sender; used to re-read own messages after reconnect
-  sender_plaintext?: string;
+  // sender_plaintext field removed in privacy-l1. The sender keeps a
+  // self-addressed ciphertext locally via selfEncryptingMessage.ts.
   createdAt: number;
   unlockBlockHeight?: number;
   isLocked?: boolean;
@@ -132,30 +146,61 @@ export const apiv2 = {
   // ========================
 
   /**
-   * Signup avec méthode Standard (BIP-39)
+   * Signup BIP-39 (privacy-l1).
+   *
+   * The caller has already generated the mnemonic, derived the master key,
+   * and computed the SRP-seed challenge parameters locally — none of those
+   * secrets cross the wire. The server only stores the username and the
+   * SRP salt + verifier (challenge material, not a secret).
    */
-  signupStandard: async (username: string, mnemonicLength: 12 | 24 = 12): Promise<SignupResponseV2> => {
+  signupStandard: async (
+    username: string,
+    srpSalt: string,
+    srpVerifier: string
+  ): Promise<SignupResponseV2> => {
     return fetchV2<SignupResponseV2>("/auth/signup", {
       method: "POST",
       body: JSON.stringify({
         method: "standard",
         username,
-        mnemonicLength,
+        srpSalt,
+        srpVerifier,
       }),
     });
   },
 
   /**
-   * Signup avec méthode DiceKey
+   * Signup DiceKey (privacy-l1).
+   *
+   * Same contract as signupStandard, plus the public keys (X3DH bootstrap)
+   * that DiceKey accounts publish at signup. The masterKey and the dice
+   * rolls themselves never leave the device.
    */
-  signupDiceKey: async (username: string, masterKeyHex: string, mnemonic: string[]): Promise<SignupResponseV2> => {
+  signupDiceKey: async (
+    username: string,
+    srpSalt: string,
+    srpVerifier: string,
+    publicKeys: {
+      identityPublicKey: string;
+      signaturePublicKey: string;
+      signedPreKey: {
+        keyId: number;
+        publicKey: string;
+        signature: string;
+        timestamp: number;
+      };
+      oneTimePreKeys: Array<{ keyId: number; publicKey: string }>;
+      avatarHash?: string;
+    }
+  ): Promise<SignupResponseV2> => {
     return fetchV2<SignupResponseV2>("/auth/signup", {
       method: "POST",
       body: JSON.stringify({
         method: "dice-key",
         username,
-        masterKeyHex,
-        mnemonic,
+        srpSalt,
+        srpVerifier,
+        ...publicKeys,
       }),
     });
   },
@@ -237,12 +282,19 @@ export const apiv2 = {
   },
 
   /**
-   * Envoyer un message
+   * Send an encrypted message envelope.
+   *
+   * `body` is the opaque ciphertext — for E2EE it's a JSON envelope that
+   * already contains a sender-addressed copy (see e2ee/messagingIntegration
+   * `senderCopy` for v1 envelopes, e2ee/selfEncryptingMessage `keys`
+   * mapping for v2). The server has no plaintext copy by design — see
+   * CIPHER_PRIVACY_GUARANTEES.md. The legacy `senderPlaintext` field is
+   * gone (privacy-l1) and would be rejected with HTTP 400 if sent.
    */
   sendMessage: async (
     conversationId: string,
     body: string,
-    options?: { scheduledBurnAt?: number; unlockBlockHeight?: number; burnDelay?: number; senderPlaintext?: string }
+    options?: { scheduledBurnAt?: number; unlockBlockHeight?: number; burnDelay?: number }
   ): Promise<MessageV2> => {
     return authFetchV2WithRefresh("/messages", {
       method: "POST",
@@ -562,9 +614,10 @@ export async function mnemonicToMasterKey(mnemonic: string): Promise<string> {
 }
 
 /**
- * Récupère les clés de récupération CHIFFREES depuis le backend
- * SECURITY: Le backend retourne les données chiffrées - le client doit les déchiffrer localement
- * MasterKey n'est JAMAIS envoyée au serveur
+ * @deprecated Removed in privacy-l1 — the server no longer stores the
+ * mnemonic or any encrypted copy of it (CIPHER_PRIVACY_GUARANTEES.md).
+ * The mnemonic lives only on the device; recovery means typing it into
+ * a fresh install. The endpoint returns HTTP 410 Gone if called.
  */
 export async function getRecoveryKeys(accessToken: string): Promise<{
   success: boolean;

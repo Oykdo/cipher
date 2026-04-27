@@ -93,34 +93,16 @@ export async function usersRoutes(fastify: FastifyInstance) {
           return { error: 'User not found' };
         }
 
-        // Determine key length from mnemonic ciphertext length for standard accounts
-        let keyBits = 256; // Default
-        if (user.security_tier === 'standard' && user.mnemonic) {
-          try {
-            // Check if it's the encrypted JSON format
-            if (user.mnemonic.startsWith('{')) {
-              const mnemonicData = JSON.parse(user.mnemonic);
-              if (mnemonicData && typeof mnemonicData.ct === 'string') {
-                // Estimate based on ciphertext length (Base64)
-                // 12 words (128 bits) -> ~100-160 chars Base64
-                // 24 words (256 bits) -> ~200-300 chars Base64
-                // Threshold set to 180 to separate them
-                keyBits = mnemonicData.ct.length < 180 ? 128 : 256;
-              }
-            } else {
-              // Legacy plaintext format (array of strings)
-              const words = JSON.parse(user.mnemonic);
-              if (Array.isArray(words)) {
-                 keyBits = words.length === 12 ? 128 : 256;
-              }
-            }
-          } catch (e) {
-            // Default to 256 on error
-            keyBits = 256;
-          }
-        } else if (user.security_tier === 'dice-key') {
-          keyBits = 775; // DiceKey entropy
-        }
+        // Approximate key strength for the UI badge.
+        //
+        // The previous implementation inferred 12 vs 24 BIP-39 words from the
+        // length of the server-stored encrypted mnemonic ciphertext — that
+        // column was dropped in privacy-l1 (the mnemonic now lives only on
+        // the device). The server can no longer distinguish 128 vs 256 bits
+        // for "standard" accounts, so it reports the safer (lower-bound)
+        // assumption and lets the client display a more precise figure if
+        // it has the actual mnemonic locally.
+        let keyBits = user.security_tier === 'dice-key' ? 775 : 128;
 
         return {
           id: user.id,

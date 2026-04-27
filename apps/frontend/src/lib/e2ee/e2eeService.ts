@@ -119,6 +119,17 @@ export async function initializeE2EE(username: string): Promise<void> {
   debugLogger.info('✅ [E2EE Service] Initialized for ${username}');
   // SECURITY: crypto log removed
 
+  // Privacy-l1: hydrate the decrypted-message cache from the now-open
+  // vault so previously decrypted plaintexts are available to the UI
+  // without re-decryption (which would break Double Ratchet anyway).
+  // Best-effort, non-blocking — UI works even if this fails (just slower).
+  try {
+    const { hydrateCacheFromVault } = await import('./decryptedMessageCache');
+    void hydrateCacheFromVault();
+  } catch (err) {
+    debugLogger.warn('[E2EE Service] Cache hydration kickoff failed', err);
+  }
+
   // Publish key bundle to server (async, don't block initialization)
   publishKeyBundleToServer().catch(err => {
     debugLogger.warn('[E2EE Service] Failed to publish key bundle (will retry on next init)', err);
