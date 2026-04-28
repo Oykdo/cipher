@@ -1,6 +1,6 @@
 ================================================================================
   🔐 DEAD DROP - APPLICATION DE MESSAGERIE SÉCURISÉE
-  Version: 0.0.1-alpha (Test)
+  Version: 1.1.0-alpha (Test)
 ================================================================================
 
 Merci de tester Dead Drop !
@@ -157,7 +157,7 @@ Envoyez vos retours à : [VOTRE_EMAIL]
 │                         ℹ️ INFORMATIONS                                  │
 └──────────────────────────────────────────────────────────────────────────┘
 
-Version        : 0.0.1-alpha
+Version        : 1.1.0-alpha
 Date           : 2025-11-09
 Statut         : Test privé
 Technologie    : Electron + React + Node.js
