@@ -1,17 +1,17 @@
 @echo off
 REM ========================================
-REM  Dead Drop - Launcher
-REM  Version: 0.0.1-alpha
+REM  Cipher - Dev Launcher
+REM  https://github.com/Oykdo/cipher
 REM ========================================
 
-title Dead Drop Launcher
+title Cipher Dev Launcher
 
 echo.
 echo ========================================
-echo   Dead Drop - Secure Messenger
+echo   Cipher - Secure E2E Messenger
 echo ========================================
 echo.
-echo Demarrage de l'application...
+echo Demarrage de l'application en mode dev...
 echo.
 
 REM Vérifier si Node.js est installé
@@ -40,9 +40,9 @@ if not exist "node_modules\" (
     )
 )
 
-REM Lancer l'application
+REM Lancer l'application en mode dev
 echo.
-echo Lancement de Dead Drop...
+echo Lancement de Cipher (dev)...
 echo.
 echo - Backend: http://localhost:4000
 echo - Frontend: http://localhost:5173

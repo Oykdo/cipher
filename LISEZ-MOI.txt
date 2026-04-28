@@ -9,7 +9,7 @@ Merci de tester Dead Drop !
 │                        🚀 DÉMARRAGE RAPIDE                               │
 └──────────────────────────────────────────────────────────────────────────┘
 
-1. DOUBLE-CLIQUEZ sur le fichier : LANCER_DEAD_DROP.bat
+1. DOUBLE-CLIQUEZ sur le fichier : cipher.bat
    
 2. Attendez que l'application se lance (1-2 minutes la première fois)
 
@@ -106,7 +106,7 @@ OU
 
 ❌ Erreur lors de l'installation
    → Supprimez le dossier "node_modules"
-   → Relancez LANCER_DEAD_DROP.bat
+   → Relancez cipher.bat
 
 
 ┌──────────────────────────────────────────────────────────────────────────┐
