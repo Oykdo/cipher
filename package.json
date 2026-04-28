@@ -74,14 +74,6 @@
           "!*.db",
           "!*.db-*"
         ]
-      },
-      {
-        "from": "assets/eidolon-installer",
-        "to": "eidolon-installer",
-        "filter": [
-          "**/*",
-          "!.gitkeep"
-        ]
       }
     ],
     "win": {
