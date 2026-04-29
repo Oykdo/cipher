@@ -101,12 +101,21 @@ export function csrfProtection() {
         // JWT tokens are not automatically sent by the browser, so they are inherently CSRF-safe
         const authHeader = request.headers.authorization;
         if (authHeader?.startsWith('Bearer ')) {
-            // Additional protection: validate Origin header
+            // Additional belt-and-suspenders Origin check for browser clients.
+            // Native clients (Electron .exe, mobile WebViews) do not send a
+            // browser-imposed Origin header — Electron loadFile() pages send
+            // origin: 'null' or omit it entirely. For those, the JWT itself
+            // is the auth proof and there is no XHR-from-malicious-origin
+            // attack surface to gate (browsers won't auto-attach the
+            // Authorization header cross-origin). So we only enforce the
+            // Origin/Referer match when one of them is actually present.
             const origin = request.headers.origin;
             const referer = request.headers.referer;
+            const isBrowserClient =
+                (typeof origin === 'string' && origin.length > 0 && origin !== 'null') ||
+                (typeof referer === 'string' && referer.length > 0);
 
-            // In production, require valid origin
-            if (config.isProd) {
+            if (config.isProd && isBrowserClient) {
                 const validOrigin = origin && config.security.allowedOrigins.includes(origin);
                 const validReferer = referer && config.security.allowedOrigins.some(o => referer.startsWith(o));
 
