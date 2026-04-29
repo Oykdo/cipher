@@ -194,9 +194,18 @@ class DatabaseService {
      * `dicekey_checksums` — those columns no longer exist (migration 002).
      */
     async createUser(user) {
+        // Standard (BIP-39) and DiceKey signups now ship the SEED-derived SRP
+        // verifier in `srp_seed_*`, leaving `srp_*` empty until the user picks
+        // a device password (after which `/srp/setup` populates `srp_*` from
+        // the password-derived verifier). Pre-1.1.1 callers wrote the seed
+        // verifier into `srp_*`; keep that path working for any code that
+        // hasn't migrated yet by accepting either field name.
         await run(this.pool, `
-            INSERT INTO users (id, username, security_tier, discoverable, srp_salt, srp_verifier, avatar_hash)
-            VALUES ($1, $2, $3, true, $4, $5, $6)
+            INSERT INTO users (id, username, security_tier, discoverable,
+                               srp_salt, srp_verifier,
+                               srp_seed_salt, srp_seed_verifier,
+                               avatar_hash)
+            VALUES ($1, $2, $3, true, $4, $5, $6, $7, $8)
             ON CONFLICT (id) DO NOTHING
         `, [
             user.id,
@@ -204,6 +213,8 @@ class DatabaseService {
             user.security_tier,
             user.srp_salt || null,
             user.srp_verifier || null,
+            user.srp_seed_salt || null,
+            user.srp_seed_verifier || null,
             user.avatar_hash || null,
         ]);
 
@@ -619,10 +630,14 @@ class DatabaseService {
     // REFRESH_TOKENS QUERIES
     // ============================================================================
     async createRefreshToken(data) {
+        // Per CIPHER_PRIVACY_GUARANTEES.md, refresh_tokens carries no
+        // surveillance metadata: ip_address and user_agent were dropped in
+        // migration 002_remove_plaintext_secrets. Any data.user_agent /
+        // data.ip_address passed in by callers is silently ignored.
         await run(this.pool, `
-            INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, user_agent, ip_address)
-            VALUES ($1, $2, $3, $4, $5, $6)
-        `, [data.id, data.user_id, data.token_hash, new Date(data.expires_at), data.user_agent || null, data.ip_address || null]);
+            INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at)
+            VALUES ($1, $2, $3, $4)
+        `, [data.id, data.user_id, data.token_hash, new Date(data.expires_at)]);
         return this.getRefreshTokenById(data.id);
     }
 

@@ -269,18 +269,21 @@ export async function authRoutes(fastify: FastifyInstance) {
       }
 
       // Standard (BIP-39) signup
-      // The client has already generated the mnemonic, derived the master key,
-      // and computed the SRP salt + verifier. We only persist what the server
-      // needs : the username and the SRP challenge parameters. Public keys
-      // are uploaded in a follow-up step via /api/v2/keys/upload.
+      // The client computes the SRP salt + verifier from the mnemonic, so
+      // these are the SEED-login credentials and must land in srp_seed_*.
+      // The classic srp_* columns stay NULL until the user picks a device
+      // password and the frontend calls /srp/setup with password-derived
+      // credentials. Storing the mnemonic verifier in srp_* (the pre-1.1.1
+      // behaviour) was the bug behind the broken /srp-seed/login/init
+      // 401s — see commit history for v1.1.1.
       if (body.method === 'standard') {
         try {
           const user = await db.createUser({
             id: randomUUID(),
             username,
             security_tier: 'standard',
-            srp_salt: body.srpSalt,
-            srp_verifier: body.srpVerifier,
+            srp_seed_salt: body.srpSalt,
+            srp_seed_verifier: body.srpVerifier,
           });
 
           return generateAuthResponse(reply, request, user, { flat: true });
@@ -309,14 +312,16 @@ export async function authRoutes(fastify: FastifyInstance) {
       const idHash = createHash('sha256').update(identityKeyBuffer).digest();
       const derivedUserId = idHash.subarray(0, 6).toString('hex');
 
+      // DiceKey signup ships the seed-derived verifier the same way
+      // standard signup does (see comment above) — store under srp_seed_*.
       let user;
       try {
         user = await db.createUser({
           id: derivedUserId,
           username,
           security_tier: 'dice-key',
-          srp_salt: body.srpSalt,
-          srp_verifier: body.srpVerifier,
+          srp_seed_salt: body.srpSalt,
+          srp_seed_verifier: body.srpVerifier,
         });
       } catch (error: any) {
         request.log.error({ error, username }, 'DiceKey Signup failed during user creation');
