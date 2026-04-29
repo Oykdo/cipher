@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { API_BASE_URL } from "../../config";
 
 type CryptoAddress = {
     name: string;
@@ -77,7 +78,7 @@ export function ContributionSettings() {
     useEffect(() => {
         const run = async () => {
             try {
-                const res = await fetch("/api/public/contribution-targets", {
+                const res = await fetch(`${API_BASE_URL}/api/public/contribution-targets`, {
                     method: "GET",
                     headers: { Accept: "application/json" },
                     cache: "no-store",
@@ -134,7 +135,7 @@ export function ContributionSettings() {
             }
 
             const amountCents = Math.round(amountNumber * 100);
-            const res = await fetch("/api/public/stripe/create-checkout-session", {
+            const res = await fetch(`${API_BASE_URL}/api/public/stripe/create-checkout-session`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
