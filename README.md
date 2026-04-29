@@ -2,6 +2,16 @@
 
 > An end-to-end encrypted messenger where the server stores nothing it doesn't have to.
 
+<p align="center">
+  <a href="https://github.com/Oykdo/cipher/releases/latest">
+    <img src="https://img.shields.io/github/v/release/Oykdo/cipher?include_prereleases&label=%E2%AC%87%20Download%20Cipher%20for%20Windows&style=for-the-badge&color=2ea44f" alt="Download latest Cipher release" height="44" />
+  </a>
+</p>
+
+<p align="center">
+  <sub>≈ 92 MiB · <a href="#install">install instructions</a> · <a href="CIPHER_PRIVACY_GUARANTEES.md">privacy contract</a> · macOS / Linux: <a href="#build-from-source">build from source</a></sub>
+</p>
+
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#status)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Privacy contract](https://img.shields.io/badge/privacy-contract-green.svg)](CIPHER_PRIVACY_GUARANTEES.md)
