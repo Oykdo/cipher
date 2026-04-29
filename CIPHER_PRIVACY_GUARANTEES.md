@@ -2,7 +2,7 @@
 
 > **Contract with the user.** This document describes what the Cipher server stores, what it does not store, and how anyone can verify the promise holds. Any pull request that contradicts this contract must be rejected.
 
-**Status**: v1.1.0 — ships the "L1 strict" refactor (April 2026 sprint). Sections marked **[TARGET]** are not yet implemented in the code as of this document; see `## Current scope vs target` at the end of the page.
+**Status**: v1.1.1 — ships the "L1 strict" refactor (April 2026 sprint), now with Stripe donation persistence wired end-to-end. Sections marked **[TARGET]** are not yet implemented in the code as of this document; see `## Current scope vs target` at the end of the page.
 
 ---
 
@@ -235,4 +235,4 @@ In short: **dropping audit logs reduces our legal surface**, it does not increas
 
 ---
 
-*Document v1.1.0 — created 2026-04-27 as part of the privacy L1 sprint.*
+*Document v1.1.1 — created 2026-04-27, updated 2026-04-29 (donations table added in migration 005).*

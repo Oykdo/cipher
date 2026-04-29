@@ -1,4 +1,4 @@
--- Dead Drop Messenger - Database Schema (SQLite)
+-- Cipher - Database Schema (SQLite)
 -- Version: 1.1.0
 -- Created: 2025-10-26
 

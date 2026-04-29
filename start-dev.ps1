@@ -1,7 +1,7 @@
-# Dead Drop Development Startup Script
+# Cipher Development Startup Script
 # PowerShell script to start both backend and frontend
 
-Write-Host "Starting Dead Drop Development Servers..." -ForegroundColor Cyan
+Write-Host "Starting Cipher Development Servers..." -ForegroundColor Cyan
 Write-Host ""
 
 # Check if backend is already running
@@ -45,7 +45,7 @@ if ($frontendRunning) {
 }
 
 Write-Host ""
-Write-Host "Dead Drop is starting!" -ForegroundColor Green
+Write-Host "Cipher is starting!" -ForegroundColor Green
 Write-Host ""
 Write-Host "URLs:" -ForegroundColor Cyan
 Write-Host "   Frontend: http://localhost:5178" -ForegroundColor White

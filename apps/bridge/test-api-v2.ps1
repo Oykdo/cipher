@@ -1,4 +1,4 @@
-# Dead Drop API v2 Test Suite
+# Cipher API v2 Test Suite
 # Tests all endpoints of the new Clean Architecture
 
 $BaseUrl = "http://localhost:4000"
@@ -51,7 +51,7 @@ function Test-Endpoint {
 }
 
 Write-Host "========================================" -ForegroundColor Yellow
-Write-Host "  Dead Drop API v2 - Test Suite" -ForegroundColor Yellow
+Write-Host "  Cipher API v2 - Test Suite" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
 # Test 1: Health Check

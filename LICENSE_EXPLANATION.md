@@ -1,4 +1,4 @@
-# 📄 Explication de la Licence - Dead Drop
+# 📄 Explication de la Licence - Cipher
 
 ## ❓ Pourquoi deux licences étaient mentionnées ?
 
@@ -136,7 +136,7 @@ WITH REGARD TO THIS SOFTWARE...
 
 #### MIT License
 ```
-Copyright (c) 2025 Dead Drop Project Contributors
+Copyright (c) 2025 Cipher Project Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -237,7 +237,7 @@ grep -i "license" README.md
 - [TLDRLegal](https://tldrlegal.com/) - Licences expliquées simplement
 - [SPDX License List](https://spdx.org/licenses/) - Liste officielle
 
-### Pour Dead Drop
+### Pour Cipher
 - [LICENSE](./LICENSE) - Texte complet de notre licence MIT
 - [OPEN_SOURCE_GUIDE.md](./OPEN_SOURCE_GUIDE.md) - Guide open source complet
 

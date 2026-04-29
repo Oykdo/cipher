@@ -1,9 +1,9 @@
 ================================================================================
-  🔐 DEAD DROP - APPLICATION DE MESSAGERIE SÉCURISÉE
-  Version: 1.1.0-alpha (Test)
+  🔐 CIPHER - APPLICATION DE MESSAGERIE SÉCURISÉE
+  Version: 1.1.1-alpha (Test)
 ================================================================================
 
-Merci de tester Dead Drop !
+Merci de tester Cipher !
 
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                        🚀 DÉMARRAGE RAPIDE                               │
@@ -76,7 +76,7 @@ Lors du premier lancement :
 │                         🛑 ARRÊTER L'APPLICATION                         │
 └──────────────────────────────────────────────────────────────────────────┘
 
-Pour arrêter Dead Drop :
+Pour arrêter Cipher :
 
 ✓ Fermez simplement la fenêtre de l'application
 
@@ -157,7 +157,7 @@ Envoyez vos retours à : [VOTRE_EMAIL]
 │                         ℹ️ INFORMATIONS                                  │
 └──────────────────────────────────────────────────────────────────────────┘
 
-Version        : 1.1.0-alpha
+Version        : 1.1.1-alpha
 Date           : 2025-11-09
 Statut         : Test privé
 Technologie    : Electron + React + Node.js
@@ -166,7 +166,7 @@ Chiffrement    : AES-GCM-256 (bout en bout)
 
 ================================================================================
 
-Merci de votre aide pour améliorer Dead Drop ! 🙏
+Merci de votre aide pour améliorer Cipher ! 🙏
 
 🔐 Your messages, your keys, zero trust.
 

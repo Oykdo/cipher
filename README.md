@@ -31,7 +31,7 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 
 ### Windows (available now)
 
-1. Download `Cipher-Setup-1.1.0.exe` from the [latest release](../../releases/latest).
+1. Download `Cipher-Setup-1.1.1.exe` from the [latest release](../../releases/latest).
 2. Run it. Windows SmartScreen will warn you (the binary is unsigned during alpha) — click "More info" → "Run anyway".
 3. Pick an install directory and finish.
 

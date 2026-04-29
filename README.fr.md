@@ -1,8 +1,8 @@
-# 🔐 Cipher Pulse (Dead Drop)
+# 🔐 Cipher
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)
@@ -19,7 +19,7 @@
 
 ## 📖 À propos
 
-**Cipher Pulse** (anciennement Dead Drop) est une application de messagerie sécurisée de nouvelle génération qui combine un chiffrement de qualité militaire avec des fonctionnalités innovantes de confidentialité. Construit sur l'algorithme Double Ratchet du protocole Signal, il garantit une confidentialité persistante tout en offrant des fonctionnalités uniques comme les messages verrouillés temporellement via blockchain et la destruction automatique après lecture.
+**Cipher** est une application de messagerie sécurisée de nouvelle génération qui combine un chiffrement de qualité militaire avec des fonctionnalités innovantes de confidentialité. Construit sur l'algorithme Double Ratchet du protocole Signal, il garantit une confidentialité persistante tout en offrant des fonctionnalités uniques comme les messages verrouillés temporellement via blockchain et la destruction automatique après lecture.
 
 ### 🎯 Philosophie
 

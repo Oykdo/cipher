@@ -1,6 +1,52 @@
 import type { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { z } from 'zod';
+import { getDatabase } from '../db/database.js';
+
+type DonationStatus = 'pending' | 'succeeded' | 'failed' | 'refunded';
+
+async function upsertDonationFromSession(session: Stripe.Checkout.Session, status: DonationStatus) {
+  const db = getDatabase();
+  const paymentIntentId =
+    typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : (session.payment_intent?.id ?? null);
+  const email = session.customer_details?.email ?? session.customer_email ?? null;
+  const amount = session.amount_total ?? 0;
+  const currency = (session.currency ?? 'eur').toLowerCase();
+
+  await db.pool.query(
+    `INSERT INTO donations
+       (stripe_session_id, stripe_payment_intent_id, amount_cents, currency, status, customer_email, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+     ON CONFLICT (stripe_session_id) DO UPDATE SET
+       stripe_payment_intent_id = COALESCE(EXCLUDED.stripe_payment_intent_id, donations.stripe_payment_intent_id),
+       status                   = EXCLUDED.status,
+       customer_email           = COALESCE(EXCLUDED.customer_email, donations.customer_email),
+       metadata                 = COALESCE(EXCLUDED.metadata, donations.metadata),
+       updated_at               = NOW()`,
+    [
+      session.id,
+      paymentIntentId,
+      amount,
+      currency,
+      status,
+      email,
+      session.metadata ? JSON.stringify(session.metadata) : null,
+    ],
+  );
+}
+
+async function updateDonationStatusByPaymentIntent(paymentIntentId: string, status: DonationStatus) {
+  const db = getDatabase();
+  await db.pool.query(
+    `UPDATE donations
+        SET status     = $1,
+            updated_at = NOW()
+      WHERE stripe_payment_intent_id = $2`,
+    [status, paymentIntentId],
+  );
+}
 
 const createCheckoutSchema = z.object({
   amountCents: z.coerce.number().int().min(100).max(250_000),
@@ -128,7 +174,6 @@ export async function stripeRoutes(app: FastifyInstance) {
           return { error: `Webhook signature verification failed: ${err?.message || 'unknown'}` };
         }
 
-        // Minimal handling: log useful events. Extend later to record contributions.
         webhookApp.log.info(
           {
             stripeEventId: event.id,
@@ -137,16 +182,49 @@ export async function stripeRoutes(app: FastifyInstance) {
           'Stripe webhook received'
         );
 
-        switch (event.type) {
-          case 'checkout.session.completed':
-          case 'checkout.session.async_payment_succeeded':
-          case 'payment_intent.succeeded': {
-            // For contributions, you can read metadata here.
-            // const obj = event.data.object as any;
-            break;
+        try {
+          switch (event.type) {
+            case 'checkout.session.completed':
+            case 'checkout.session.async_payment_succeeded': {
+              const session = event.data.object as Stripe.Checkout.Session;
+              const status: DonationStatus =
+                session.payment_status === 'paid' ? 'succeeded' : 'pending';
+              await upsertDonationFromSession(session, status);
+              break;
+            }
+            case 'payment_intent.succeeded': {
+              const pi = event.data.object as Stripe.PaymentIntent;
+              await updateDonationStatusByPaymentIntent(pi.id, 'succeeded');
+              break;
+            }
+            case 'payment_intent.payment_failed': {
+              const pi = event.data.object as Stripe.PaymentIntent;
+              await updateDonationStatusByPaymentIntent(pi.id, 'failed');
+              break;
+            }
+            case 'charge.refunded': {
+              const charge = event.data.object as Stripe.Charge;
+              const piId =
+                typeof charge.payment_intent === 'string'
+                  ? charge.payment_intent
+                  : charge.payment_intent?.id;
+              if (piId) {
+                await updateDonationStatusByPaymentIntent(piId, 'refunded');
+              }
+              break;
+            }
+            default:
+              // Other events are acknowledged but not persisted.
+              break;
           }
-          default:
-            break;
+        } catch (err: any) {
+          // DB write failed — return 5xx so Stripe retries with backoff.
+          webhookApp.log.error(
+            { stripeEventId: event.id, type: event.type, error: err?.message },
+            'Stripe webhook persistence failed',
+          );
+          reply.code(500);
+          return { error: 'Persistence failed', code: 'DONATION_PERSIST_FAILED' };
         }
 
         return { received: true };

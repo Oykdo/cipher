@@ -496,9 +496,17 @@ async function startBackend() {
   // running it would require a per-device DATABASE_URL and JWT_SECRET
   // that the contract forbids us from shipping in plaintext.
   //
-  // To opt back in (e.g. for a fully self-hosted install on a private
-  // network), set CIPHER_BUNDLED_BRIDGE=true before launching the app.
-  if (app.isPackaged && process.env.CIPHER_BUNDLED_BRIDGE !== 'true') {
+  // In dev, `npm run dev` already spawns the bridge on :4000 via the
+  // `dev:bridge` concurrently pane. Spawning a second one here on :4001
+  // is a duplicate — both share the same DATABASE_URL and PSI cache,
+  // and the second always loses the race during `initializePsiServer`,
+  // which is exactly the "Backend startup timeout" that was firing in
+  // dev. Skip the spawn unless the operator explicitly opts in.
+  //
+  // To opt back in (e.g. for a fully self-hosted packaged install on a
+  // private network, or to debug the bundled bridge in dev), set
+  // CIPHER_BUNDLED_BRIDGE=true before launching the app.
+  if (process.env.CIPHER_BUNDLED_BRIDGE !== 'true') {
     console.log('[startBackend] Hosted bridge mode — skipping local bridge spawn');
     return;
   }

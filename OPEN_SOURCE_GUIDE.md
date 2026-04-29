@@ -1,4 +1,4 @@
-# Guide Open Source - Dead Drop
+# Guide Open Source - Cipher
 
 ## 🌍 Qu'est-ce que l'Open Source ?
 
@@ -8,7 +8,7 @@
 - ✅ **Distribué** selon les termes de votre licence
 - ✅ **Contribué** par la communauté
 
-## 📋 Implications pour Dead Drop
+## 📋 Implications pour Cipher
 
 ### ✅ Avantages
 
@@ -48,7 +48,7 @@
    - Votre code peut être copié (selon votre licence)
    - D'autres peuvent créer des "forks" concurrents
    - Attribution requise selon la licence (MIT, GPL, etc.)
-   - Marques déposées séparées du code (Dead Drop™)
+   - Marques déposées séparées du code (Cipher™)
 
 3. **Support et Maintenance**
    - Les utilisateurs peuvent signaler des bugs publiquement (GitHub Issues)
@@ -152,7 +152,7 @@ Votre fichier `.gitignore` protège déjà :
    - Comme GPL mais s'applique aussi aux services web
    - Si quelqu'un héberge votre app modifiée, doit partager le code
 
-### 🎯 Recommandation pour Dead Drop
+### 🎯 Recommandation pour Cipher
 
 **MIT License** est idéale car :
 - Simple et claire
@@ -280,7 +280,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy...
 
 **Optimisez votre README.md** :
 ```markdown
-# Dead Drop - Messagerie Sécurisée E2EE
+# Cipher - Messagerie Sécurisée E2EE
 
 [Badges: build status, license, version]
 
@@ -384,7 +384,7 @@ En tant qu'application de messagerie sécurisée :
 **Q: Quelqu'un peut voler mon code ?**
 R: Oui, mais avec attribution (selon licence). C'est le principe. Mais votre marque/nom reste vôtre.
 
-**Q: Puis-je vendre Dead Drop ?**
+**Q: Puis-je vendre Cipher ?**
 R: Oui ! Open source ≠ gratuit. Vous pouvez vendre le service, le support, l'hébergement.
 
 **Q: Que faire si quelqu'un abuse de mon code ?**
@@ -401,7 +401,7 @@ R: SECURITY.md donne les instructions. Corriger rapidement, créer un CVE si né
 
 ## 🎯 Conclusion
 
-### Pour Dead Drop, l'Open Source est un ATOUT
+### Pour Cipher, l'Open Source est un ATOUT
 
 ✅ **Confiance** : Les utilisateurs peuvent vérifier le chiffrement
 ✅ **Sécurité** : Audits communautaires gratuits

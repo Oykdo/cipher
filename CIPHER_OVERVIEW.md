@@ -4,7 +4,7 @@
 
 ## 1) En une phrase
 
-**Cipher Pulse** (anciennement *Dead Drop*) est une application de messagerie sécurisée et résiliente qui met l’accent sur la **confidentialité**, la **souveraineté de l’utilisateur**, et des modes de communication adaptés aux contextes sensibles (messages chiffrés, temporisés, auto-destructibles, avec options P2P).
+**Cipher Pulse** (anciennement *Cipher*) est une application de messagerie sécurisée et résiliente qui met l’accent sur la **confidentialité**, la **souveraineté de l’utilisateur**, et des modes de communication adaptés aux contextes sensibles (messages chiffrés, temporisés, auto-destructibles, avec options P2P).
 
 ## 2) Le problème que Cipher Pulse adresse
 
@@ -125,7 +125,7 @@ Contraintes :
 - proposer des questions aux lecteurs (feedback recherché)
 
 Contenu source :
-- Cipher Pulse (Dead Drop) : messagerie secure orientée confidentialité
+- Cipher Pulse (Cipher) : messagerie secure orientée confidentialité
 - fonctionnalités : E2EE, time-lock, burn-after-reading, P2P optionnel, pièces jointes + caption, multi-langues
 - projet open-source, contribution via crypto + Stripe
 ```
