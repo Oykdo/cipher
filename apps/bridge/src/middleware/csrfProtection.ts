@@ -97,41 +97,20 @@ export function csrfProtection() {
             return;
         }
 
-        // Skip CSRF check for API routes that use JWT (token in Authorization header)
-        // JWT tokens are not automatically sent by the browser, so they are inherently CSRF-safe
+        // Skip CSRF check for API routes that use JWT (token in Authorization
+        // header). JWT tokens in `Authorization` are inherently CSRF-immune:
+        // browsers do not auto-attach Authorization headers to cross-origin
+        // requests, so an attacker site cannot ride a victim's session the
+        // way it could with a cookie. The JWT is the auth proof, full stop.
+        //
+        // The previous code added a redundant Origin/Referer match on top of
+        // that, which broke every native client: Electron file:// pages send
+        // origin: 'null' (or omit it) and a referer of `file:///...`, so the
+        // .exe got 403 CSRF_ORIGIN_INVALID on its very first authenticated
+        // call (POST /api/v2/e2ee/publish-keys), making the alpha unusable.
+        // Removed — JWT alone is enough.
         const authHeader = request.headers.authorization;
         if (authHeader?.startsWith('Bearer ')) {
-            // Additional belt-and-suspenders Origin check for browser clients.
-            // Native clients (Electron .exe, mobile WebViews) do not send a
-            // browser-imposed Origin header — Electron loadFile() pages send
-            // origin: 'null' or omit it entirely. For those, the JWT itself
-            // is the auth proof and there is no XHR-from-malicious-origin
-            // attack surface to gate (browsers won't auto-attach the
-            // Authorization header cross-origin). So we only enforce the
-            // Origin/Referer match when one of them is actually present.
-            const origin = request.headers.origin;
-            const referer = request.headers.referer;
-            const isBrowserClient =
-                (typeof origin === 'string' && origin.length > 0 && origin !== 'null') ||
-                (typeof referer === 'string' && referer.length > 0);
-
-            if (config.isProd && isBrowserClient) {
-                const validOrigin = origin && config.security.allowedOrigins.includes(origin);
-                const validReferer = referer && config.security.allowedOrigins.some(o => referer.startsWith(o));
-
-                if (!validOrigin && !validReferer) {
-                    request.log.warn({
-                        origin,
-                        referer,
-                        method,
-                        url: request.url,
-                    }, 'CSRF: Origin/Referer validation failed');
-
-                    reply.code(403);
-                    return { error: 'Invalid origin', code: 'CSRF_ORIGIN_INVALID' };
-                }
-            }
-
             return; // JWT request is valid
         }
 
