@@ -9,6 +9,36 @@ import { getDatabase } from '../db/database.js';
 const activeUploadsByUser = new Map<string, number>();
 const MAX_ACTIVE_UPLOADS_PER_USER = 3;
 
+function stripUnsafeFilenameChars(filename: string): string {
+  return filename
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/[\\/]/g, '_')
+    .trim();
+}
+
+function contentDispositionFallback(filename: string): string {
+  const fallback = stripUnsafeFilenameChars(filename)
+    .replace(/[^\x20-\x7e]/g, '_')
+    .replace(/["\\]/g, '_')
+    .trim();
+
+  return fallback || 'attachment.enc';
+}
+
+function encodeRFC5987Value(value: string): string {
+  return encodeURIComponent(stripUnsafeFilenameChars(value)).replace(/['()*]/g, (char) =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+}
+
+export function buildAttachmentContentDisposition(filename: string): string {
+  const downloadName = `${filename}.enc`;
+  const fallback = contentDispositionFallback(downloadName);
+  const encoded = encodeRFC5987Value(downloadName);
+
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
 /**
  * Attachment routes (encrypted client-side)
  * Chunked upload support for large files
@@ -391,7 +421,7 @@ export async function attachmentRoutes(fastify: FastifyInstance) {
       }
 
       reply.header('Content-Type', 'application/octet-stream');
-      reply.header('Content-Disposition', `attachment; filename="${att.filename.replace(/"/g, '')}.enc"`);
+      reply.header('Content-Disposition', buildAttachmentContentDisposition(att.filename));
       return reply.send(await import('fs').then((fs) => fs.readFileSync(att.path)));
     });
   }
