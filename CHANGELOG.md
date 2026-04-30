@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.2.1 — i18n top-up
+
+### Changed
+
+- **Translations for `conversations.group.*` in 6 locales**: German,
+  Spanish, Italian, Portuguese, Russian, Chinese (Simplified). v1.2.0
+  shipped EN + FR complete and the other 6 falling back to EN values;
+  this release replaces them with native translations across all 27
+  group-related strings (modal labels, member count format, owner /
+  you badges, leave / remove / delete confirmations, and the 6 error
+  messages). Placeholders (`{{count}}`, `{{users}}`, `{{more}}`,
+  `{{username}}`) preserved across every locale.
+
 ## v1.2.0 — Group conversations
 
 Direct (1:1) conversations remain unchanged. The new surface is group
