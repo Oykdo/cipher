@@ -15,6 +15,8 @@
  * convenience gate, like iOS's screen-lock relative to the Secure Enclave.
  */
 
+import { getArgon2 } from './argon2Loader';
+
 const STORAGE_KEY = 'cipher.appLock.v1';
 
 // Argon2id parameters — matches the master-key derivation elsewhere, because
@@ -94,36 +96,8 @@ function fromHex(hex: string): Uint8Array {
   return out;
 }
 
-// argon2-browser is a UMD global attached to `self.argon2`. Matches the
-// loading pattern used in src/lib/e2ee/keyManager.ts — keep them aligned so
-// Vite bundles only one copy of the WASM.
-let argon2: any = null;
-async function ensureArgon2(): Promise<void> {
-  if (argon2) return;
-  const g = typeof self !== 'undefined' ? self : (globalThis as any);
-  try {
-    await import('argon2-browser');
-    if (typeof g.argon2?.hash === 'function') {
-      argon2 = g.argon2;
-      return;
-    }
-  } catch {
-    // fall through
-  }
-  try {
-    await import('argon2-browser/dist/argon2-bundled.min.js');
-    if (typeof g.argon2?.hash === 'function') {
-      argon2 = g.argon2;
-      return;
-    }
-  } catch {
-    // fall through
-  }
-  throw new Error('argon2 unavailable');
-}
-
 async function hashPin(pin: string, salt: Uint8Array): Promise<Uint8Array> {
-  await ensureArgon2();
+  const argon2 = await getArgon2();
   const result = await argon2.hash({
     pass: pin,
     salt,

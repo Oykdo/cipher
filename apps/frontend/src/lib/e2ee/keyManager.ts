@@ -14,41 +14,7 @@
  */
 
 import _sodium from 'libsodium-wrappers';
-
-// Argon2 with WASM support (vite-plugin-wasm)
-let argon2: any = null;
-
-async function ensureArgon2Loaded() {
-  if (argon2) return;
-
-  // argon2-browser is a UMD module that attaches to `self.argon2`.
-  // In Electron/Vite, `self` may not propagate correctly, so we
-  // ensure a landing zone exists and pick it up after import.
-  const g = typeof self !== 'undefined' ? self : (globalThis as any);
-
-  try {
-    await import('argon2-browser');
-    // UMD attaches to self.argon2
-    if (typeof g.argon2?.hash === 'function') {
-      argon2 = g.argon2;
-      return;
-    }
-  } catch {
-    // main entry failed
-  }
-
-  try {
-    await import('argon2-browser/dist/argon2-bundled.min.js');
-    if (typeof g.argon2?.hash === 'function') {
-      argon2 = g.argon2;
-      return;
-    }
-  } catch {
-    // bundled entry failed
-  }
-
-  throw new Error('Failed to load argon2-browser. WASM may not be supported.');
-}
+import { getArgon2 } from '../argon2Loader';
 
 // ============================================================================
 // TYPES
@@ -116,7 +82,7 @@ const ARGON2_PARAMS = {
  * - Winner of Password Hashing Competition 2015
  */
 async function deriveMasterKey(password: string, salt: Uint8Array): Promise<Uint8Array> {
-  await ensureArgon2Loaded();
+  const argon2 = await getArgon2();
   
   const result = await argon2.hash({
     pass: password,
