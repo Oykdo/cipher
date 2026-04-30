@@ -573,6 +573,104 @@ export default function Conversations() {
     void loadConversations();
   });
 
+  useSocketEvent(socket, 'message', (payload: any) => {
+    if (!payload || typeof payload !== 'object') return;
+
+    switch (payload.type) {
+      case 'conversation': {
+        const conversation = payload.conversation as ConversationSummaryV3 | undefined;
+        if (!conversation?.id) {
+          void loadConversations();
+          return;
+        }
+        setConversations((prev) => {
+          const withoutExisting = prev.filter((conv) => conv.id !== conversation.id);
+          return [conversation, ...withoutExisting].sort(
+            (a, b) => (b.lastMessageAt ?? b.createdAt ?? 0) - (a.lastMessageAt ?? a.createdAt ?? 0),
+          );
+        });
+        break;
+      }
+      case 'conversation_request':
+      case 'conversation_request_rejected':
+        setRequestsRefreshKey((key) => key + 1);
+        break;
+      case 'conversation_request_accepted':
+        setRequestsRefreshKey((key) => key + 1);
+        void loadConversations();
+        break;
+      case 'group_member_added': {
+        const conversationId = payload.conversationId as string | undefined;
+        if (!conversationId) return;
+        setConversations((prev) =>
+          prev.map((conv) => {
+            if (conv.id !== conversationId) return conv;
+            const member = payload.member;
+            const hasMember = member?.id && conv.members.some((m) => m.id === member.id);
+            return {
+              ...conv,
+              members: member?.id && !hasMember ? [...conv.members, member] : conv.members,
+              memberCount: Number(payload.memberCount ?? conv.memberCount),
+            };
+          }),
+        );
+        break;
+      }
+      case 'group_member_removed': {
+        const conversationId = payload.conversationId as string | undefined;
+        const removedUserId = payload.userId as string | undefined;
+        if (!conversationId || !removedUserId) return;
+        if (removedUserId === session?.user?.id) {
+          setConversations((prev) => prev.filter((conv) => conv.id !== conversationId));
+          decryptedGroupTitles.delete(conversationId);
+          if (selectedConvId === conversationId) {
+            setSelectedConvId(null);
+            setViewMode('list');
+          }
+          return;
+        }
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === conversationId
+              ? {
+                  ...conv,
+                  members: conv.members.filter((member) => member.id !== removedUserId),
+                  memberCount: Number(payload.memberCount ?? Math.max(0, conv.memberCount - 1)),
+                }
+              : conv,
+          ),
+        );
+        break;
+      }
+      case 'group_title_updated': {
+        const conversationId = payload.conversationId as string | undefined;
+        if (!conversationId) return;
+        decryptedGroupTitles.delete(conversationId);
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === conversationId
+              ? { ...conv, encryptedTitle: payload.encryptedTitle ?? conv.encryptedTitle }
+              : conv,
+          ),
+        );
+        break;
+      }
+      case 'conversation_deleted': {
+        const conversationId = payload.conversationId as string | undefined;
+        if (!conversationId) return;
+        setConversations((prev) => prev.filter((conv) => conv.id !== conversationId));
+        decryptedGroupTitles.delete(conversationId);
+        if (selectedConvId === conversationId) {
+          setSelectedConvId(null);
+          setViewMode('list');
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  });
+
   // ============================================================================
   // API CALLS
   // ============================================================================

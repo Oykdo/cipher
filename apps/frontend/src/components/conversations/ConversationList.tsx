@@ -36,6 +36,68 @@ export function ConversationList({
   formatTime,
 }: ConversationListProps) {
   const { t } = useTranslation();
+  const directConversations = conversations.filter((conv) => !isGroupConversation(conv));
+  const groupConversations = conversations.filter(isGroupConversation);
+
+  const renderConversation = (conv: ConversationSummaryV3) => {
+    const isGroup = isGroupConversation(conv);
+    const decryptedTitle = decryptedTitles?.get(conv.id) ?? null;
+    const title = getConversationTitle(conv, currentUserId, decryptedTitle, t);
+
+    const peer = !isGroup ? getDirectPeer(conv, currentUserId) : null;
+    const peerOnline = peer ? onlineUsers.has(peer.id) : false;
+
+    return (
+      <motion.button
+        key={conv.id}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={() => onSelectConversation(conv.id)}
+        className={`
+              w-full text-left p-4 rounded-lg transition-colors
+              ${selectedConversationId === conv.id
+            ? 'bg-quantum-cyan/20 border border-quantum-cyan'
+            : 'hover:bg-quantum-cyan/10'
+          }
+            `}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <span className="font-semibold text-pure-white flex items-center gap-2 truncate">
+            <span className="truncate">{title}</span>
+            {isGroup ? (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded-full border border-quantum-cyan/40 bg-quantum-cyan/10 text-quantum-cyan shrink-0"
+                title={t('conversations.group.n_members', {
+                  count: getMemberCount(conv),
+                  defaultValue: `${getMemberCount(conv)} members`,
+                })}
+              >
+                {getMemberCount(conv)}
+              </span>
+            ) : (
+              <span
+                className={`inline-block w-2 h-2 rounded-full shrink-0 ${peerOnline
+                  ? 'bg-green-400 animate-pulse'
+                  : 'bg-gray-500'
+                  }`}
+                title={peerOnline ? t('common.online') : t('common.offline')}
+              />
+            )}
+          </span>
+          {conv.lastMessageAt && (
+            <span className="text-xs text-muted-grey">
+              {formatTime(conv.lastMessageAt)}
+            </span>
+          )}
+        </div>
+        {conv.lastMessagePreview && (
+          <p className="text-sm text-soft-grey truncate">
+            {conv.lastMessagePreview}
+          </p>
+        )}
+      </motion.button>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full bg-dark-matter-lighter">
@@ -69,67 +131,22 @@ export function ConversationList({
           </div>
         ) : (
           <div className="space-y-1 p-2">
-            {conversations.map((conv) => {
-              const isGroup = isGroupConversation(conv);
-              const decryptedTitle = decryptedTitles?.get(conv.id) ?? null;
-              const title = getConversationTitle(conv, currentUserId, decryptedTitle, t);
-
-              // Direct: online dot for the peer.
-              // Group: member-count chip (no per-group online aggregation in MVP).
-              const peer = !isGroup ? getDirectPeer(conv, currentUserId) : null;
-              const peerOnline = peer ? onlineUsers.has(peer.id) : false;
-
-              return (
-                <motion.button
-                  key={conv.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => onSelectConversation(conv.id)}
-                  className={`
-                        w-full text-left p-4 rounded-lg transition-colors
-                        ${selectedConversationId === conv.id
-                      ? 'bg-quantum-cyan/20 border border-quantum-cyan'
-                      : 'hover:bg-quantum-cyan/10'
-                    }
-                      `}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-pure-white flex items-center gap-2 truncate">
-                      <span className="truncate">{title}</span>
-                      {isGroup ? (
-                        <span
-                          className="text-[10px] px-1.5 py-0.5 rounded-full border border-quantum-cyan/40 bg-quantum-cyan/10 text-quantum-cyan shrink-0"
-                          title={t('conversations.group.n_members', {
-                            count: getMemberCount(conv),
-                            defaultValue: `${getMemberCount(conv)} members`,
-                          })}
-                        >
-                          {getMemberCount(conv)}
-                        </span>
-                      ) : (
-                        <span
-                          className={`inline-block w-2 h-2 rounded-full shrink-0 ${peerOnline
-                            ? 'bg-green-400 animate-pulse'
-                            : 'bg-gray-500'
-                            }`}
-                          title={peerOnline ? t('common.online') : t('common.offline')}
-                        />
-                      )}
-                    </span>
-                    {conv.lastMessageAt && (
-                      <span className="text-xs text-muted-grey">
-                        {formatTime(conv.lastMessageAt)}
-                      </span>
-                    )}
-                  </div>
-                  {conv.lastMessagePreview && (
-                    <p className="text-sm text-soft-grey truncate">
-                      {conv.lastMessagePreview}
-                    </p>
-                  )}
-                </motion.button>
-              );
-            })}
+            {directConversations.length > 0 && (
+              <section className="space-y-1">
+                <h2 className="px-2 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-grey">
+                  {t('conversations.direct_section', { defaultValue: '1:1 conversations' })}
+                </h2>
+                {directConversations.map(renderConversation)}
+              </section>
+            )}
+            {groupConversations.length > 0 && (
+              <section className="space-y-1">
+                <h2 className="px-2 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-grey">
+                  {t('conversations.group.section_title', { defaultValue: 'Groups' })}
+                </h2>
+                {groupConversations.map(renderConversation)}
+              </section>
+            )}
           </div>
         )}
       </div>
