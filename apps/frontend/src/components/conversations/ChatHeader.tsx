@@ -1,14 +1,24 @@
 import { useTranslation } from 'react-i18next';
-import type { ConversationSummaryV2 } from '../../services/api-v2';
+import type { ConversationSummaryV3 } from '../../services/api-v2';
 import type { CallState } from '../../lib/calls/CallManager';
+import {
+  getConversationTitle,
+  getDirectPeer,
+  isGroupConversation,
+  getMemberCount,
+} from '../../lib/conversations/helpers';
 
 export type ConnectionMode = 'p2p' | 'relayed' | 'connecting';
 export type EncryptionMode = 'nacl-box' | 'double-ratchet';
 
 interface ChatHeaderProps {
-  conversation: ConversationSummaryV2;
+  conversation: ConversationSummaryV3;
   onlineUsers: Set<string>;
+  currentUserId: string;
+  /** Decrypted group title, when available. Ignored for direct convs. */
+  decryptedGroupTitle?: string | null;
   onBackToList: () => void;
+  onOpenGroupDetails?: () => void;
   connectionMode?: ConnectionMode;
   onEncryptionModeChange?: (mode: EncryptionMode) => void;
   callState?: CallState;
@@ -20,19 +30,35 @@ interface ChatHeaderProps {
 export function ChatHeader({
   conversation,
   onlineUsers,
+  currentUserId,
+  decryptedGroupTitle,
   onBackToList,
+  onOpenGroupDetails,
   callState,
   onStartAudioCall,
   onStartVideoCall,
   onEndCall,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
-  const isOnline = onlineUsers.has(conversation.otherParticipant.id);
+
+  const isGroup = isGroupConversation(conversation);
+  const title = getConversationTitle(
+    conversation,
+    currentUserId,
+    decryptedGroupTitle ?? null,
+    t,
+  );
+
+  // Direct: peer-online drives the call enable state. Groups have no
+  // calls at all in 1.2.0 (rendered hidden below).
+  const peer = !isGroup ? getDirectPeer(conversation, currentUserId) : null;
+  const isPeerOnline = peer ? onlineUsers.has(peer.id) : false;
+
   const isThisConversationCall =
     callState?.phase !== 'idle' && callState?.conversationId === conversation.id;
   const callBusyElsewhere =
     callState?.phase !== 'idle' && callState?.conversationId !== conversation.id;
-  const callDisabled = !isOnline || callBusyElsewhere;
+  const callDisabled = !isPeerOnline || callBusyElsewhere;
 
   return (
     <div className="p-4 border-b border-[rgba(0,240,255,0.12)] bg-[rgba(6,12,26,0.82)] backdrop-blur-xl">
@@ -54,47 +80,68 @@ export function ChatHeader({
             <BackArrowIcon />
           </button>
 
-          <div className="flex-1 min-w-0">
+          <button
+            type="button"
+            onClick={isGroup ? onOpenGroupDetails : undefined}
+            disabled={!isGroup}
+            className={[
+              'flex-1 min-w-0 text-left',
+              isGroup ? 'cursor-pointer hover:opacity-80' : 'cursor-default',
+            ].join(' ')}
+            title={isGroup ? t('conversations.group.members_panel_title', { defaultValue: 'Group members' }) : undefined}
+          >
             <h2 className="text-xl font-bold text-pure-white flex items-center gap-2">
-              <span className="truncate">{conversation.otherParticipant.username}</span>
-              <span
-                className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}
-                title={isOnline ? t('common.online') : t('common.offline')}
-              />
+              <span className="truncate">{title}</span>
+              {isGroup ? (
+                <span className="text-xs px-2 py-0.5 rounded-full border border-quantum-cyan/40 bg-quantum-cyan/10 text-quantum-cyan shrink-0">
+                  {t('conversations.group.n_members', {
+                    count: getMemberCount(conversation),
+                    defaultValue: `${getMemberCount(conversation)} members`,
+                  })}
+                </span>
+              ) : (
+                <span
+                  className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${isPeerOnline ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}
+                  title={isPeerOnline ? t('common.online') : t('common.offline')}
+                />
+              )}
             </h2>
-          </div>
+          </button>
         </div>
 
-        <div className="shrink-0 flex items-center gap-2">
-          {isThisConversationCall ? (
-            <CallButton
-              variant="end"
-              onClick={onEndCall}
-              ariaLabel={t('conversations.end_call', 'End encrypted call')}
-            >
-              <PhoneEndIcon />
-            </CallButton>
-          ) : (
-            <>
+        {/* Calls are direct-only in 1.2.0 — group calls are tracked for 1.3+. */}
+        {!isGroup && (
+          <div className="shrink-0 flex items-center gap-2">
+            {isThisConversationCall ? (
               <CallButton
-                variant="audio"
-                onClick={onStartAudioCall}
-                disabled={callDisabled}
-                ariaLabel={t('conversations.start_audio_call', 'Start encrypted audio call')}
+                variant="end"
+                onClick={onEndCall}
+                ariaLabel={t('conversations.end_call', 'End encrypted call')}
               >
-                <PhoneIcon />
+                <PhoneEndIcon />
               </CallButton>
-              <CallButton
-                variant="video"
-                onClick={onStartVideoCall}
-                disabled={callDisabled}
-                ariaLabel={t('conversations.start_video_call', 'Start encrypted video call')}
-              >
-                <VideoIcon />
-              </CallButton>
-            </>
-          )}
-        </div>
+            ) : (
+              <>
+                <CallButton
+                  variant="audio"
+                  onClick={onStartAudioCall}
+                  disabled={callDisabled}
+                  ariaLabel={t('conversations.start_audio_call', 'Start encrypted audio call')}
+                >
+                  <PhoneIcon />
+                </CallButton>
+                <CallButton
+                  variant="video"
+                  onClick={onStartVideoCall}
+                  disabled={callDisabled}
+                  ariaLabel={t('conversations.start_video_call', 'Start encrypted video call')}
+                >
+                  <VideoIcon />
+                </CallButton>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

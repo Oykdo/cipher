@@ -7,11 +7,15 @@
  */
 
 /**
- * Backup file format version 2 - "Secure Chat Backup Vault"
+ * Backup file format envelope. Version 2 was direct-only; version 3
+ * (Cipher 1.2.0) adds group conversation metadata. The cryptographic
+ * envelope (KDF + payload encryption) is unchanged across versions —
+ * only the inner payload schema evolved, so importers handle both
+ * versions side-by-side.
  */
 export interface BackupFileV2 {
   format: 'SecureChatBackup';
-  version: 2;
+  version: 2 | 3;
   kdf: {
     algorithm: 'pbkdf2';
     salt: string;        // Base64 encoded
@@ -25,6 +29,8 @@ export interface BackupFileV2 {
   checksum: string;      // BLAKE2b of decrypted payload for integrity
   createdAt: string;     // ISO timestamp
 }
+
+export type BackupFileV3 = BackupFileV2 & { version: 3 };
 
 /**
  * Decrypted backup payload structure
@@ -57,13 +63,33 @@ export interface BackupContact {
 }
 
 /**
- * Conversation with archived messages
+ * Conversation with archived messages.
+ *
+ * v3 (Cipher 1.2.0) adds the group fields: `type`, `members`,
+ * `createdBy`, `encryptedTitle`, and `decryptedTitle` (UX convenience).
+ * `peerUsername` is kept as an OPTIONAL deprecated field so old v2
+ * backups still import cleanly — for a direct conversation, it equals
+ * `members.find(m => m.id !== self).username`.
  */
 export interface BackupConversation {
   id: string;
-  peerUsername: string;
+  /** Conversation kind. Defaults to 'direct' on import for v2 backups. */
+  type?: 'direct' | 'group';
+  /**
+   * Resolved members at export time. Required in v3 backups; absent in
+   * v2 (importer reconstructs from `peerUsername` + self).
+   */
+  members?: Array<{ id: string; username: string }>;
+  /** Group owner. Null for direct, optional for forward compat. */
+  createdBy?: string | null;
+  /** Encrypted group title envelope (e2ee-v2). Null for direct. */
+  encryptedTitle?: string | null;
+  /** Decrypted group title at export time, for UX after restore. */
+  decryptedTitle?: string | null;
   createdAt: number;
   archivedMessages: ArchivedMessage[];
+  /** @deprecated v2 only. Use `members` (resolved against `currentUserId`) in v3. */
+  peerUsername?: string;
 }
 
 /**

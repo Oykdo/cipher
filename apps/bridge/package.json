@@ -1,6 +1,6 @@
 {
   "name": "@pulse/bridge",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -12,7 +12,8 @@
     "migrate:encrypt": "node --import tsx src/db/migrate-to-encrypted.js",
     "db:check-encryption": "node -e \"import { existsSync } from 'fs'; import { join } from 'path'; const keyPath = join(process.env.BRIDGE_DATA_DIR || './data', '.db.key'); console.log(existsSync(keyPath) ? '✅ Database is encrypted' : '❌ Database is NOT encrypted');\"",
     "db:clear": "node scripts/clear-database.cjs",
-    "db:migrate": "node scripts/migrate-conversation-requests.js"
+    "db:migrate": "node scripts/migrate-conversation-requests.js",
+    "db:migrate:groups": "node scripts/run-migration-007.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

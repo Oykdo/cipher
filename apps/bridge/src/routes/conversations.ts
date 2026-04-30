@@ -1,19 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { getDatabase } from '../db/database.js';
 import { randomUUID } from 'crypto';
+import {
+  buildConversationSummary,
+  type ConversationSummary,
+} from '../utils/conversationSummary.js';
 
 const db = getDatabase();
 
-interface MessageRecord {
-  id: string;
-  conversationId: string;
-  senderId: string;
-  body: string;
-  createdAt: number;
-}
-
 export async function conversationRoutes(fastify: FastifyInstance) {
-  // List user conversations
+  // List user conversations (direct + group, augmented shape)
   fastify.get(
     '/api/v2/conversations',
     {
@@ -23,63 +19,17 @@ export async function conversationRoutes(fastify: FastifyInstance) {
       const userId = (request.user as any).sub as string;
       const userConversations = await db.getUserConversations(userId);
 
-      const conversations = [] as any[];
+      const conversations: ConversationSummary[] = [];
       for (const convo of userConversations) {
-        const members = await db.getConversationMembers(convo.id);
-        const participants = [] as any[];
-        for (const memberId of members) {
-          const user = await db.getUserById(memberId);
-          if (user) participants.push({ id: user.id, username: user.username });
-        }
-
-        // Find the other participant (not the current user)
-        const otherParticipant = participants.find(p => p.id !== userId);
-
-        if (!otherParticipant) {
-          continue; // Skip if no other participant found
-        }
-
-        let lastMessage: MessageRecord | null = null;
-        if (convo.last_message_id) {
-          const dbMessage = await db.getMessageById(convo.last_message_id);
-          if (dbMessage) {
-            lastMessage = {
-              id: dbMessage.id,
-              conversationId: dbMessage.conversation_id,
-              senderId: dbMessage.sender_id,
-              body: dbMessage.body,
-              createdAt: dbMessage.created_at,
-            };
-          }
-        }
-
-        // ✅ Transform to match frontend ConversationSummaryV2 interface
-        // Don't send encrypted preview - use generic message instead
-        let preview: string | undefined = undefined;
-        if (lastMessage) {
-          // Always use a generic preview for privacy
-          // The actual decryption will happen when opening the conversation
-          preview = 'Nouveau message';
-        }
-
-        conversations.push({
-          id: convo.id,
-          createdAt: convo.created_at,
-          lastMessageAt: convo.last_message_at || undefined,
-          lastMessagePreview: preview,
-          otherParticipant: {
-            id: otherParticipant.id,
-            username: otherParticipant.username,
-          }
-        });
+        const summary = await buildConversationSummary(convo, userId);
+        if (summary) conversations.push(summary);
       }
 
-      // ✅ Return object with conversations property
       return { conversations };
-    }
+    },
   );
 
-  // Create conversation
+  // Create a direct (1:1) conversation. Group creation lives in routes/groups.ts.
   fastify.post(
     '/api/v2/conversations',
     {
@@ -107,29 +57,28 @@ export async function conversationRoutes(fastify: FastifyInstance) {
       }
 
       const convoId = randomUUID();
-      const convo = await db.createConversation(convoId, [userId, targetUser.id]);
+      const convo = await db.createConversation(
+        convoId,
+        [userId, targetUser.id],
+        { type: 'direct' },
+      );
 
-      const members = await db.getConversationMembers(convo.id);
-      const participants = [] as any[];
-      for (const memberId of members) {
-        const user = await db.getUserById(memberId)!;
-        participants.push({ id: user.id, username: user.username });
+      const summary = await buildConversationSummary(convo, userId);
+      if (!summary) {
+        reply.code(500);
+        return { error: 'Conversation créée mais introuvable' };
       }
 
-      const payload = {
-        id: convo.id,
-        participants,
-        lastMessage: null as MessageRecord | null,
-      };
-
-      fastify.broadcast(members, {
+      const memberIds = summary.members.map((m) => m.id);
+      fastify.broadcast(memberIds, {
         type: 'conversation',
-        conversation: payload,
+        conversation: summary,
       });
 
-      return payload;
-    }
+      return summary;
+    },
   );
 
-  // Note: User search moved to /routes/users.ts
+  // Note: User search lives in /routes/users.ts.
+  // Note: Group creation/management lives in /routes/groups.ts.
 }

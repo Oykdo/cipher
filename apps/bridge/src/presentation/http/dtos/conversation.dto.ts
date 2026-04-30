@@ -26,10 +26,16 @@ export interface CreateConversationResponse {
 export interface ListConversationsResponse {
   conversations: Array<{
     id: string;
+    type: 'direct' | 'group';
     createdAt: number;
     lastMessageAt?: number;
     lastMessagePreview?: string;
-    otherParticipant: {
+    members: Array<{ id: string; username: string }>;
+    memberCount: number;
+    createdBy: string | null;
+    encryptedTitle?: string | null;
+    /** Convenience field for direct conversations only. */
+    otherParticipant?: {
       id: string;
       username: string;
     };

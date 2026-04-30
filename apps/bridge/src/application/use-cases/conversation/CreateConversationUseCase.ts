@@ -41,8 +41,8 @@ export class CreateConversationUseCase {
       throw new Error('Cannot create conversation with yourself');
     }
 
-    // 4. Vérifier si la conversation existe déjà
-    const existing = await this.conversationRepository.findByParticipants([
+    // 4. Vérifier si la conversation directe existe déjà
+    const existing = await this.conversationRepository.findDirectByParticipants([
       input.initiatorId,
       targetUser.id,
     ]);
@@ -57,8 +57,8 @@ export class CreateConversationUseCase {
       };
     }
 
-    // 5. Créer la conversation
-    const conversation = Conversation.create(input.initiatorId, targetUser.id);
+    // 5. Créer la conversation directe
+    const conversation = Conversation.createDirect(input.initiatorId, targetUser.id);
 
     // 6. Persister
     await this.conversationRepository.create(conversation);

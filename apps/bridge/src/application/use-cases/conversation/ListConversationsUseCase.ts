@@ -11,10 +11,16 @@ import type { User } from '../../../domain/entities/User';
 
 export interface ConversationSummary {
   id: string;
+  type: 'direct' | 'group';
   createdAt: number;
   lastMessageAt?: number;
   lastMessagePreview?: string;
-  otherParticipant: {
+  members: Array<{ id: string; username: string }>;
+  memberCount: number;
+  createdBy: string | null;
+  encryptedTitle?: string | null;
+  /** Convenience field for direct conversations only (undefined for groups). */
+  otherParticipant?: {
     id: string;
     username: string;
   };
@@ -43,13 +49,21 @@ export class ListConversationsUseCase {
     const summaries: ConversationSummary[] = [];
 
     for (const conversation of conversations) {
-      // 2.1 Trouver l'autre participant
-      const otherParticipantId = conversation.getOtherParticipant(input.userId);
-      const otherParticipant = await this.userRepository.findById(otherParticipantId);
-      
-      if (!otherParticipant) {
-        // Skip si l'utilisateur n'existe plus
-        continue;
+      // 2.1 Resolve every member to { id, username }
+      const memberRecords = await Promise.all(
+        conversation.participants.map((id) => this.userRepository.findById(id)),
+      );
+      const members = memberRecords
+        .filter((u): u is User => !!u)
+        .map((u) => ({ id: u.id, username: u.username }));
+
+      // For direct conversations, surface the other side as a convenience
+      // so the frontend doesn't have to filter the array on every render.
+      let otherParticipant: { id: string; username: string } | undefined;
+      if (conversation.isDirect()) {
+        const peer = members.find((m) => m.id !== input.userId);
+        if (!peer) continue; // The peer's account vanished — skip the row.
+        otherParticipant = peer;
       }
 
       // 2.2 Récupérer le dernier message
@@ -60,13 +74,15 @@ export class ListConversationsUseCase {
 
       summaries.push({
         id: conversation.id,
+        type: conversation.type,
         createdAt: conversation.createdAt,
         lastMessageAt: lastMessage?.createdAt,
         lastMessagePreview: lastMessage?.body,
-        otherParticipant: {
-          id: otherParticipant.id,
-          username: otherParticipant.username,
-        },
+        members,
+        memberCount: members.length,
+        createdBy: conversation.createdBy,
+        encryptedTitle: conversation.encryptedTitle ?? null,
+        otherParticipant,
       });
     }
 

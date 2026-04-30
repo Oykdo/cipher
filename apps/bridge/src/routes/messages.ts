@@ -264,6 +264,26 @@ export async function messageRoutes(fastify: FastifyInstance) {
         return { error: 'Conversation introuvable' };
       }
 
+      // Defense in depth (1.2.0): groups must use e2ee-v2 only. e2ee-v1
+      // chains keys per (sender, peer) pair and cannot represent N
+      // recipients — accepting one in a group would silently leave most
+      // members unable to decrypt. The body is otherwise opaque, so we
+      // best-effort detect the v1 shape via JSON.parse and reject.
+      if (convo.type === 'group') {
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed && parsed.version === 'e2ee-v1') {
+            reply.code(400);
+            return {
+              error: 'e2ee-v1 envelopes are not allowed in group conversations. Use e2ee-v2.',
+            };
+          }
+        } catch {
+          // Body isn't JSON (or is malformed) — let it through; client-
+          // side encryption is opaque to us anyway.
+        }
+      }
+
       const messageId = randomUUID();
 
       // Calculate scheduled burn time

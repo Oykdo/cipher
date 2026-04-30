@@ -302,14 +302,58 @@ class DatabaseService {
     // ============================================================================
     // CONVERSATION QUERIES
     // ============================================================================
-    async createConversation(id, memberIds) {
-        // Transaction for atomicity
+    /**
+     * Create a conversation (direct 1:1 or group 2-10).
+     *
+     * @param {string} id
+     * @param {string[]} memberIds
+     * @param {{ type?: 'direct' | 'group', createdBy?: string | null, encryptedTitle?: string | null }} [opts]
+     * @returns {Promise<object>} the created conversation row
+     */
+    async createConversation(id, memberIds, opts = {}) {
+        const type = opts.type ?? 'direct';
+        const createdBy = opts.createdBy ?? null;
+        const encryptedTitle = opts.encryptedTitle ?? null;
+
+        if (type === 'direct') {
+            if (memberIds.length !== 2) {
+                throw new Error('Direct conversation requires exactly 2 members');
+            }
+        } else if (type === 'group') {
+            if (memberIds.length < 2 || memberIds.length > 10) {
+                throw new Error('Group conversation requires between 2 and 10 members');
+            }
+            if (!createdBy) {
+                throw new Error('Group conversation requires createdBy (owner)');
+            }
+            if (!memberIds.includes(createdBy)) {
+                throw new Error('Group owner must be in the member list');
+            }
+        } else {
+            throw new Error(`Unknown conversation type: ${type}`);
+        }
+
+        const dedupedMembers = Array.from(new Set(memberIds));
+
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
-            await run(client, `INSERT INTO conversations (id) VALUES ($1) ON CONFLICT DO NOTHING`, [id]);
-            await run(client, `INSERT INTO conversation_members (conversation_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [id, memberIds[0]]);
-            await run(client, `INSERT INTO conversation_members (conversation_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [id, memberIds[1]]);
+            await run(
+                client,
+                `INSERT INTO conversations (id, type, created_by, encrypted_title)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT DO NOTHING`,
+                [id, type, createdBy, encryptedTitle],
+            );
+            for (const memberId of dedupedMembers) {
+                await run(
+                    client,
+                    `INSERT INTO conversation_members (conversation_id, user_id)
+                     VALUES ($1, $2)
+                     ON CONFLICT DO NOTHING`,
+                    [id, memberId],
+                );
+            }
             await client.query('COMMIT');
         } catch (e) {
             await client.query('ROLLBACK');
@@ -342,6 +386,62 @@ class DatabaseService {
     async conversationExists(id) {
         const row = await get(this.pool, 'SELECT 1 as one FROM conversations WHERE id = $1 LIMIT 1', [id]);
         return !!row;
+    }
+
+    /**
+     * Add a single member to an existing conversation (group only at the
+     * route layer, but enforced applicatively elsewhere). Returns true if
+     * the row was inserted, false if the user was already a member.
+     */
+    async addConversationMember(conversationId, userId) {
+        const result = await run(
+            this.pool,
+            `INSERT INTO conversation_members (conversation_id, user_id)
+             VALUES ($1, $2)
+             ON CONFLICT DO NOTHING`,
+            [conversationId, userId],
+        );
+        return (result?.rowCount ?? 0) > 0;
+    }
+
+    /** Remove a member from a conversation. Returns true if a row was deleted. */
+    async removeConversationMember(conversationId, userId) {
+        const result = await run(
+            this.pool,
+            `DELETE FROM conversation_members
+             WHERE conversation_id = $1 AND user_id = $2`,
+            [conversationId, userId],
+        );
+        return (result?.rowCount ?? 0) > 0;
+    }
+
+    /** Count members of a conversation (used to enforce the 10-cap). */
+    async countConversationMembers(conversationId) {
+        const row = await get(
+            this.pool,
+            `SELECT COUNT(*)::int AS n FROM conversation_members WHERE conversation_id = $1`,
+            [conversationId],
+        );
+        return row?.n ?? 0;
+    }
+
+    /** Update the opaque encrypted_title of a group conversation. */
+    async updateConversationEncryptedTitle(conversationId, encryptedTitle) {
+        await run(
+            this.pool,
+            `UPDATE conversations SET encrypted_title = $1 WHERE id = $2`,
+            [encryptedTitle, conversationId],
+        );
+    }
+
+    /** Delete a conversation (cascade via FKs removes members + messages). */
+    async deleteConversation(id) {
+        const result = await run(
+            this.pool,
+            `DELETE FROM conversations WHERE id = $1`,
+            [id],
+        );
+        return (result?.rowCount ?? 0) > 0;
     }
 
     // ============================================================================
@@ -446,47 +546,78 @@ class DatabaseService {
      * Privacy-l1 contract: once a message is marked delivered, the purge
      * worker will drop it after BRIDGE_MESSAGE_TTL_DAYS (default 7).
      *
-     * Strategy: for 1-to-1 conversations (the common case), mark
-     * `delivered_at = NOW()` as soon as the (single) recipient fetches.
-     * For group conversations (>2 members), per-recipient tracking is
-     * required — deferred until groups become a real product surface.
+     * Dispatcher by conversation type:
+     *   - direct (1:1): set messages.delivered_at = NOW() in one statement
+     *     (single recipient → coarse-grained timestamp suffices).
+     *   - group: write per-recipient rows in message_deliveries and only
+     *     promote messages.delivered_at to NOW() once every non-sender
+     *     member has a delivered_at IS NOT NULL row.
      *
      * Idempotent: skips messages already marked delivered.
      * Best-effort: logs failures but never throws into the request path.
      *
      * @param {string} conversationId
      * @param {string} recipientUserId   The user who just GET-ed the conversation
-     * @returns {Promise<number>}        How many messages were newly marked
+     * @returns {Promise<number>}        How many messages had messages.delivered_at promoted
      */
     async markMessagesDeliveredFor(conversationId, recipientUserId) {
         try {
-            // Group support: count members. If >2, defer (per-recipient ack
-            // needed). If exactly 2, the recipient is the only "other" party
-            // and a single fetch ack-es the whole conversation worth of
-            // pending messages.
-            const memberCountRow = await get(
-                this.pool,
-                'SELECT COUNT(*)::int AS n FROM conversation_members WHERE conversation_id = $1',
-                [conversationId]
-            );
-            const memberCount = memberCountRow?.n ?? 0;
-            if (memberCount !== 2) {
-                // TODO(privacy-l1, groups): introduce a message_deliveries
-                // junction table to track per-recipient acks for groups,
-                // then set messages.delivered_at when the set covers all
-                // recipients (excluding sender).
-                return 0;
+            const conv = await this.getConversationById(conversationId);
+            if (!conv) return 0;
+            const type = conv.type ?? 'direct';
+
+            if (type === 'direct') {
+                const result = await run(this.pool, `
+                    UPDATE messages
+                    SET delivered_at = NOW()
+                    WHERE conversation_id = $1
+                      AND sender_id <> $2
+                      AND delivered_at IS NULL
+                `, [conversationId, recipientUserId]);
+                return result?.rowCount ?? 0;
             }
 
-            const result = await run(this.pool, `
-                UPDATE messages
-                SET delivered_at = NOW()
-                WHERE conversation_id = $1
-                  AND sender_id <> $2
-                  AND delivered_at IS NULL
+            // Groups: per-recipient delivery tracking.
+            // (1) Record this recipient's fetch for every message they did
+            //     not already ack and that they did not send themselves.
+            await run(this.pool, `
+                INSERT INTO message_deliveries (message_id, user_id, delivered_at)
+                SELECT m.id, $2::varchar, NOW()
+                FROM messages m
+                WHERE m.conversation_id = $1
+                  AND m.sender_id <> $2
+                  AND NOT EXISTS (
+                    SELECT 1 FROM message_deliveries md
+                    WHERE md.message_id = m.id
+                      AND md.user_id = $2
+                      AND md.delivered_at IS NOT NULL
+                  )
+                ON CONFLICT (message_id, user_id) DO UPDATE
+                  SET delivered_at = COALESCE(message_deliveries.delivered_at, NOW())
             `, [conversationId, recipientUserId]);
 
-            return result?.rowCount ?? 0;
+            // (2) Promote messages.delivered_at when every non-sender member
+            //     has a delivered_at row. This is the trigger for the
+            //     retention purge (privacy-l1).
+            const promoted = await run(this.pool, `
+                UPDATE messages m
+                SET delivered_at = NOW()
+                WHERE m.conversation_id = $1
+                  AND m.delivered_at IS NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM conversation_members cm
+                    WHERE cm.conversation_id = $1
+                      AND cm.user_id <> m.sender_id
+                      AND NOT EXISTS (
+                        SELECT 1 FROM message_deliveries md
+                        WHERE md.message_id = m.id
+                          AND md.user_id = cm.user_id
+                          AND md.delivered_at IS NOT NULL
+                      )
+                  )
+            `, [conversationId]);
+
+            return promoted?.rowCount ?? 0;
         } catch (error) {
             console.warn(
                 '[Database] markMessagesDeliveredFor failed:',
@@ -874,36 +1005,81 @@ class DatabaseService {
         try {
             await client.query('BEGIN');
 
-            // Phase 1 — recreate missing conversations using the senders
-            // present in the backup messages as the member list. Best effort:
-            // if we can't infer at least one other participant we still keep
-            // the user as a sole member so messages attach somewhere.
+            // Phase 1 — recreate missing conversations.
+            //
+            // Member resolution (in order of preference):
+            //   1. v3 backups carry an explicit `members` array on each
+            //      conversation row (with the new type/created_by/encrypted_title
+            //      fields); honor it directly.
+            //   2. v2 backups don't — we infer the member set from the senders
+            //      that appear in the conversation's messages (plus the importer
+            //      themselves), then default to type='direct' iff exactly two
+            //      members were inferred, else 'group'. The cap at 10 matches
+            //      the application-layer maximum for groups.
             for (const conv of (data.conversations || [])) {
                 if (!conv || !conv.id) continue;
                 if (allowedConvIds.has(conv.id)) {
                     stats.conversationsSkipped++;
                     continue;
                 }
-                const convMessages = (data.messages || []).filter(
-                    (m) => m && m.conversation_id === conv.id
-                );
-                const senderIds = Array.from(
-                    new Set(convMessages.map((m) => m.sender_id).filter(Boolean))
-                );
-                if (!senderIds.includes(userId)) senderIds.push(userId);
-                const members = senderIds.slice(0, 2);
+
+                let members;
+                if (Array.isArray(conv.members) && conv.members.length > 0) {
+                    members = Array.from(
+                        new Set(
+                            conv.members
+                                .map((m) => (typeof m === 'string' ? m : m?.id))
+                                .filter(Boolean),
+                        ),
+                    );
+                } else {
+                    const convMessages = (data.messages || []).filter(
+                        (m) => m && m.conversation_id === conv.id,
+                    );
+                    const senderIds = Array.from(
+                        new Set(convMessages.map((m) => m.sender_id).filter(Boolean)),
+                    );
+                    if (!senderIds.includes(userId)) senderIds.push(userId);
+                    members = senderIds;
+                }
+
+                if (members.length === 0) {
+                    stats.conversationsSkipped++;
+                    continue;
+                }
+                if (members.length > 10) {
+                    console.warn(
+                        `[Database] restoreUserData: conversation ${conv.id} has ${members.length} members, capping at 10`,
+                    );
+                    members = members.slice(0, 10);
+                }
+
+                const type =
+                    conv.type === 'direct' || conv.type === 'group'
+                        ? conv.type
+                        : members.length === 2
+                          ? 'direct'
+                          : 'group';
+                const createdBy =
+                    typeof conv.created_by === 'string' && members.includes(conv.created_by)
+                        ? conv.created_by
+                        : null;
+                const encryptedTitle =
+                    typeof conv.encrypted_title === 'string' ? conv.encrypted_title : null;
 
                 await run(
                     client,
-                    `INSERT INTO conversations (id) VALUES ($1) ON CONFLICT DO NOTHING`,
-                    [conv.id]
+                    `INSERT INTO conversations (id, type, created_by, encrypted_title)
+                     VALUES ($1, $2, $3, $4)
+                     ON CONFLICT DO NOTHING`,
+                    [conv.id, type, createdBy, encryptedTitle],
                 );
                 for (const m of members) {
                     await run(
                         client,
                         `INSERT INTO conversation_members (conversation_id, user_id)
                          VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-                        [conv.id, m]
+                        [conv.id, m],
                     );
                 }
                 allowedConvIds.add(conv.id);

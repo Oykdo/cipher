@@ -11,24 +11,31 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
-import { type ConversationSummaryV2, type MessageV2, apiv2 } from '../services/api-v2';
+import { type ConversationSummaryV3, type MessageV2, apiv2 } from '../services/api-v2';
+import {
+  isGroupConversation,
+  getDirectPeer,
+} from '../lib/conversations/helpers';
 import { useSocketWithRefresh } from '../hooks/useSocketWithRefresh';
 import { useX3DHHandshake } from '../hooks/useX3DHHandshake';
 import { useSocketEvent, useConversationRoom, useTypingIndicator } from '../hooks/useSocket';
 import UserSearch, { type UserSearchResult } from '../components/UserSearch';
+import { GroupConversationModal } from '../components/conversations/GroupConversationModal';
+import { GroupDetailsPanel } from '../components/conversations/GroupDetailsPanel';
 import { ConversationList } from '../components/conversations/ConversationList';
 import { ChatHeader, type ConnectionMode } from '../components/conversations/ChatHeader';
 import { CallOverlay } from '../components/conversations/CallOverlay';
 import { MessageList } from '../components/conversations/MessageList';
 import { MessageInput } from '../components/conversations/MessageInput';
 import { useConversationMessages } from '../hooks/useConversationMessages';
-import { encryptMessageForSending, decryptReceivedMessage } from '../lib/e2ee/messagingIntegration';
+import { decryptReceivedMessage } from '../lib/e2ee/messagingIntegration';
+import { encryptOutgoing, GroupEncryptionError } from '../lib/messaging/encryptionDispatch';
 import { getEncryptionModePreference } from '../lib/e2ee/sessionManager';
 import { getCachedDecryptedMessage, cacheDecryptedMessage, clearAllDecryptedCache, flushPendingWrites as flushDecryptedCacheWrites } from '../lib/e2ee/decryptedMessageCache';
 import { hasUserKeys, loadUserKeys } from '../lib/e2ee/keyManager';
+import { getCurrentE2EEKeyPair } from '../lib/e2ee/e2eeService';
 import CosmicConstellationLogo from '../components/CosmicConstellationLogo';
-import { getConversationParticipantKeys } from '../lib/e2ee/publicKeyService';
-import { encryptSelfEncryptingMessage, decryptSelfEncryptingMessage, isSelfEncryptingMessage } from '../lib/e2ee/selfEncryptingMessage';
+import { decryptSelfEncryptingMessage, isSelfEncryptingMessage } from '../lib/e2ee/selfEncryptingMessage';
 import { hasArchivedMessages } from '../lib/backup';
 import ConversationRequests from '../components/ConversationRequests';
 import { useP2P } from '../hooks/useP2P';
@@ -77,7 +84,10 @@ export default function Conversations() {
   useX3DHHandshake({ socket, connected });
 
   // Conversations state
-  const [conversations, setConversations] = useState<ConversationSummaryV2[]>([]);
+  const [conversations, setConversations] = useState<ConversationSummaryV3[]>([]);
+  // Decrypted group titles, keyed by conversation id. Populated client-side
+  // from `encryptedTitle` after E2EE decryption succeeds.
+  const [decryptedGroupTitles] = useState<Map<string, string>>(() => new Map());
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -85,6 +95,8 @@ export default function Conversations() {
 
   // New conversation modal
   const [showNewConvModal, setShowNewConvModal] = useState(false);
+  const [showNewGroupModal, setShowNewGroupModal] = useState(false);
+  const [showGroupDetailsForId, setShowGroupDetailsForId] = useState<string | null>(null);
   const [creatingConv, setCreatingConv] = useState(false);
 
   // Online status tracking
@@ -179,14 +191,24 @@ export default function Conversations() {
     p2pManager,
     useCallback(
       (peerId: string, conversationId: string) => {
+        // Calls are direct-only in 1.2.0 — return null for groups so the
+        // call manager declines the invocation rather than misroute it.
+        const currentUserId = session?.user?.id ?? '';
         const conversation = conversations.find((conv) => conv.id === conversationId);
-        if (conversation?.otherParticipant.id === peerId) {
-          return conversation.otherParticipant.username;
+        if (!conversation || isGroupConversation(conversation)) return null;
+
+        const peer = getDirectPeer(conversation, currentUserId);
+        if (peer && peer.id === peerId) return peer.username;
+
+        // Fallback: locate any direct conversation that has this peerId.
+        for (const conv of conversations) {
+          if (isGroupConversation(conv)) continue;
+          const candidate = getDirectPeer(conv, currentUserId);
+          if (candidate && candidate.id === peerId) return candidate.username;
         }
-        const fallback = conversations.find((conv) => conv.otherParticipant.id === peerId);
-        return fallback?.otherParticipant.username ?? null;
+        return null;
       },
-      [conversations]
+      [conversations, session?.user?.id]
     )
   );
 
@@ -297,10 +319,81 @@ export default function Conversations() {
     if (isTimeLocked) {
       plaintext = '[Message verrouillé]';
     } else {
-      // ✅ FIX: Try E2EE decryption first, fallback to legacy
-      const peerUsername = conversations.find(c => c.id === data.conversationId)?.otherParticipant?.username;
-      
-      if (peerUsername) {
+      const incomingConv = conversations.find(c => c.id === data.conversationId);
+      const isGroupIncoming = !!incomingConv && isGroupConversation(incomingConv);
+      const peerUsername = incomingConv && !isGroupIncoming
+        ? getDirectPeer(incomingConv, session.user.id)?.username
+        : undefined;
+
+      // First, try to detect an e2ee-v2 self-encrypting envelope. This is
+      // the path that works for BOTH direct (when keys are published) and
+      // group messages (e2ee-v2 mandatory). Without this dispatch, group
+      // realtime messages would fall through to the legacy masterKey path
+      // and crash with `atob()` on the JSON envelope.
+      let parsedV2: unknown = null;
+      try {
+        parsedV2 = JSON.parse(data.message.body);
+      } catch {
+        parsedV2 = null;
+      }
+
+      if (isSelfEncryptingMessage(parsedV2) && session?.user?.id) {
+        // Prefer the DETERMINISTIC e2ee-v2 keypair from e2eeService —
+        // that's the one whose pubkey was uploaded to users.public_key
+        // and which the sender encrypted to via getPublicKeys. The
+        // local random keypair from loadUserKeys is kept as a last-
+        // resort fallback for backward compatibility (older messages
+        // sealed to a previously-uploaded random key).
+        const detKeyPair = getCurrentE2EEKeyPair();
+        let decrypted: string | null = null;
+        const attempts: Array<{ pub: Uint8Array; priv: Uint8Array; label: string }> = [];
+        if (detKeyPair) {
+          attempts.push({
+            pub: detKeyPair.publicKey,
+            priv: detKeyPair.privateKey,
+            label: 'deterministic',
+          });
+        }
+        try {
+          const userKeys = await loadUserKeys(session.user.id);
+          if (userKeys) {
+            attempts.push({
+              pub: userKeys.publicKey,
+              priv: userKeys.privateKey,
+              label: 'random-local',
+            });
+          }
+        } catch {
+          // ignore — deterministic alone is enough in normal cases
+        }
+
+        let lastErr: unknown = null;
+        for (const attempt of attempts) {
+          try {
+            decrypted = await decryptSelfEncryptingMessage(
+              parsedV2,
+              session.user.id,
+              attempt.pub,
+              attempt.priv,
+            );
+            break;
+          } catch (err) {
+            lastErr = err;
+            // Try next keypair
+          }
+        }
+
+        if (decrypted !== null) {
+          plaintext = decrypted;
+        } else {
+          console.warn('[Realtime] e2ee-v2 decrypt failed (all keypairs)', lastErr);
+          plaintext = '[Erreur de déchiffrement]';
+        }
+      } else if (isGroupIncoming) {
+        // Group message that isn't a v2 envelope — refuse to fall back
+        // to v1 / legacy paths (see §4 of the 1.2.0 plan).
+        plaintext = '[Message non lisible — format incompatible]';
+      } else if (peerUsername) {
         try {
           const result = await decryptReceivedMessage(peerUsername, data.message.body, undefined, true);
           console.log('[tlock/recv] after E2EE decrypt', {
@@ -514,9 +607,13 @@ export default function Conversations() {
         return;
       }
 
-      // Get peer username from conversation
+      // Get peer username from conversation. For groups, this stays
+      // undefined — group decryption goes through the e2ee-v2 self-
+      // encrypting envelope which doesn't need a peer username at all.
       const selectedConv = conversations.find(c => c.id === conversationId);
-      const peerUsername = selectedConv?.otherParticipant?.username;
+      const peerUsername = selectedConv && !isGroupConversation(selectedConv) && session?.user?.id
+        ? getDirectPeer(selectedConv, session.user.id)?.username
+        : undefined;
 
       // SECURITY FIX: Sort messages by timestamp to ensure correct decryption order
       // The Double Ratchet protocol requires messages to be processed in order
@@ -595,16 +692,39 @@ export default function Conversations() {
                    throw new Error('User keys not found');
                 }
                 
+                // Prefer the deterministic keypair (matches what the
+                // sender encrypted to via users.public_key); fall back
+                // to the local random keypair for older messages.
+                const detKeyPair = getCurrentE2EEKeyPair();
                 const userKeys = await loadUserKeys(session!.user.id);
-                if (!userKeys) throw new Error('User keys not found');
-                
-                const decrypted = await decryptSelfEncryptingMessage(
-                  parsedBody,
-                  userKeys.userId,
-                  userKeys.publicKey,
-                  userKeys.privateKey
-                );
-                
+                const attempts: Array<{ pub: Uint8Array; priv: Uint8Array }> = [];
+                if (detKeyPair) {
+                  attempts.push({ pub: detKeyPair.publicKey, priv: detKeyPair.privateKey });
+                }
+                if (userKeys) {
+                  attempts.push({ pub: userKeys.publicKey, priv: userKeys.privateKey });
+                }
+                if (attempts.length === 0) {
+                  throw new Error('No usable user keypair for e2ee-v2 decrypt');
+                }
+
+                let decrypted: string | null = null;
+                let lastErr: unknown = null;
+                for (const attempt of attempts) {
+                  try {
+                    decrypted = await decryptSelfEncryptingMessage(
+                      parsedBody,
+                      session!.user.id,
+                      attempt.pub,
+                      attempt.priv,
+                    );
+                    break;
+                  } catch (err) {
+                    lastErr = err;
+                  }
+                }
+                if (decrypted === null) throw lastErr ?? new Error('e2ee-v2 decrypt failed');
+
                 decryptedBody = decrypted;
                 console.log('✅ [E2EE-v2] Decrypted successfully');
                 
@@ -660,8 +780,11 @@ export default function Conversations() {
               // Cache plaintext
               cacheDecryptedMessage(msg.id, conversationId, decryptedBody);
             }
-            } else if (peerUsername) {
-            // Messages from peer - try E2EE first, fallback to legacy
+            } else if (peerUsername && selectedConv && !isGroupConversation(selectedConv)) {
+            // Direct messages from peer — try E2EE first, fallback to legacy.
+            // Group v1 reception is forbidden (see §4 of the 1.2.0 plan):
+            // a v1 envelope received in a group context is either a buggy
+            // sender or an attack, never legitimate.
             try {
               const result = await decryptReceivedMessage(
                 peerUsername,
@@ -861,10 +984,15 @@ export default function Conversations() {
     // Generate temporary ID for optimistic update
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Get peer info
+    // Get peer info. For groups, both stay undefined — the e2ee-v2
+    // dispatcher (encryptionDispatch.ts in §7) handles the N-recipient
+    // path and the legacy 1:1 fields are intentionally not populated.
     const selectedConv = conversations.find(c => c.id === selectedConvId);
-    const peerId = selectedConv?.otherParticipant?.id;
-    const peerUsername = selectedConv?.otherParticipant?.username;
+    const directPeer = selectedConv && !isGroupConversation(selectedConv)
+      ? getDirectPeer(selectedConv, session.user.id)
+      : null;
+    const peerId = directPeer?.id;
+    const peerUsername = directPeer?.username;
 
     // Optimistic add with temp ID (shows immediately)
     const optimisticBody = attachmentFile
@@ -1030,131 +1158,63 @@ export default function Conversations() {
 
       let encryptedBody: string;
 
-      // ENCRYPTION: Try e2ee-v2 first, fallback to e2ee-v1
+      // ENCRYPTION: single dispatcher entry point — see lib/messaging/
+      // encryptionDispatch.ts. Discriminates direct (v2 → v1 fallback)
+      // vs group (v2 only, hard error). The previous "no peerUsername →
+      // raw masterKey envelope" branch (RISQUE 008 in the 1.2.0 plan)
+      // is GONE: every direct conversation has a peer by construction,
+      // and groups never reach v1 / legacy paths.
+      if (!selectedConv) {
+        throw new Error('Selected conversation not found');
+      }
+      let messageType: import('../lib/messaging/encryptionDispatch').OutgoingMessageType;
+      let bodyToEncrypt: string;
+      let attachmentMetadata: { filename?: string; mimeType?: string; size?: number } | undefined;
       if (encryptedAttachment) {
-        // For attachments, encrypt the attachment envelope
-        const attachmentJson = JSON.stringify(encryptedAttachment);
-        
-        if (useE2EEv2 && peerUsername) {
-          // Use e2ee-v2 for attachments
-          console.log('🔐 [E2EE-v2] Encrypting attachment with e2ee-v2');
-          try {
-            const userKeys = await loadUserKeys(session.user.id);
-            if (!userKeys) throw new Error('Failed to load user keys');
-            
-            const participantKeys = await getConversationParticipantKeys(selectedConvId);
-
-            if (participantKeys.length < 2) {
-              throw new Error('Not enough participant keys for e2ee-v2');
+        messageType = 'attachment';
+        bodyToEncrypt = JSON.stringify(encryptedAttachment);
+        attachmentMetadata = attachmentFile
+          ? {
+              filename: attachmentFile.name,
+              mimeType: attachmentFile.type,
+              size: attachmentFile.size,
             }
-            
-            const encrypted = await encryptSelfEncryptingMessage(
-              attachmentJson,
-              participantKeys.map(p => ({ userId: p.userId, publicKey: p.publicKey })),
-              'attachment',
-              {
-                filename: attachmentFile!.name,
-                mimeType: attachmentFile!.type,
-                size: attachmentFile!.size,
-              }
-            );
-            
-            encryptedBody = JSON.stringify(encrypted);
-            console.log('✅ [E2EE-v2] Attachment encrypted successfully');
-          } catch (e2eev2Error) {
-            const msg = e2eev2Error instanceof Error ? e2eev2Error.message : String(e2eev2Error);
-            if (msg.includes('Missing e2ee-v2 public keys') || msg.includes('Not enough participant keys')) {
-              console.info('ℹ️ [E2EE-v2] Not available (participants missing keys), using e2ee-v1');
-            } else {
-              console.warn('⚠️ [E2EE-v2] Failed, falling back to e2ee-v1:', e2eev2Error);
-            }
-            // Fallback to e2ee-v1
-            encryptedBody = await encryptMessageForSending(
-              peerUsername,
-              attachmentJson,
-              async (text) => await encryptMessage(selectedConvId, text)
-            );
-          }
-        } else if (peerUsername) {
-          // e2ee-v1 fallback
-          encryptedBody = await encryptMessageForSending(
-            peerUsername,
-            attachmentJson,
-            async (text) => await encryptMessage(selectedConvId, text)
-          );
-        } else {
-          console.warn('⚠️ [E2EE] No peer username for attachment, using legacy encryption');
-          const encrypted = await encryptMessage(selectedConvId, attachmentJson);
-          encryptedBody = JSON.stringify(encrypted);
-        }
-      } else if (useE2EEv2 && peerUsername) {
-        // TEXT MESSAGE with e2ee-v2
-        console.log('🔐 [E2EE-v2] Encrypting text message with e2ee-v2');
-        
-        try {
-          // Load user's own keys
-          const userKeys = await loadUserKeys(session.user.id);
-          if (!userKeys) {
-            throw new Error('User keys not found');
-          }
-          
-          // Fetch participant keys (including sender!)
-          const participantKeys = await getConversationParticipantKeys(selectedConvId);
-          
-          console.log(`📋 [E2EE-v2] Encrypting for ${participantKeys.length} participants`);
-
-          if (participantKeys.length < 2) {
-            throw new Error('Not enough participant keys for e2ee-v2');
-          }
-          
-          // Determine message type
-          let messageType: 'standard' | 'bar' | 'timelock' = 'standard';
-          if (burnAfterReading) {
-            messageType = 'bar';
-          } else if (timeLockEnabled) {
-            messageType = 'timelock';
-          }
-          
-          // Encrypt with e2ee-v2
-          const encrypted = await encryptSelfEncryptingMessage(
-            effectiveTextBody,
-            participantKeys.map(p => ({
-              userId: p.userId,
-              publicKey: p.publicKey,
-            })),
-            messageType
-          );
-
-          encryptedBody = JSON.stringify(encrypted);
-          console.log('✅ [E2EE-v2] Message encrypted successfully');
-        } catch (e2eev2Error) {
-          const msg = e2eev2Error instanceof Error ? e2eev2Error.message : String(e2eev2Error);
-          if (msg.includes('Missing e2ee-v2 public keys') || msg.includes('Not enough participant keys')) {
-            console.info('ℹ️ [E2EE-v2] Not available (participants missing keys), using e2ee-v1');
-          } else {
-            console.warn('⚠️ [E2EE-v2] Encryption failed, falling back to e2ee-v1:', e2eev2Error);
-          }
-
-          // Fallback to e2ee-v1
-          encryptedBody = await encryptMessageForSending(
-            peerUsername,
-            effectiveTextBody,
-            async (text) => await encryptMessage(selectedConvId, text)
-          );
-        }
-      } else if (peerUsername) {
-        // e2ee-v1 fallback (no e2ee-v2 keys)
-        console.log('🔐 [E2EE-v1] Using e2ee-v1 encryption');
-        encryptedBody = await encryptMessageForSending(
-          peerUsername,
-          effectiveTextBody,
-          async (text) => await encryptMessage(selectedConvId, text)
-        );
+          : undefined;
+      } else if (burnAfterReading) {
+        messageType = 'bar';
+        bodyToEncrypt = effectiveTextBody;
+      } else if (timeLockEnabled) {
+        messageType = 'timelock';
+        bodyToEncrypt = effectiveTextBody;
       } else {
-        // Legacy encryption (no username)
-        console.warn('⚠️ [E2EE] No peer username, using legacy encryption');
-        const encrypted = await encryptMessage(selectedConvId, effectiveTextBody);
-        encryptedBody = JSON.stringify(encrypted);
+        messageType = 'standard';
+        bodyToEncrypt = effectiveTextBody;
+      }
+
+      try {
+        encryptedBody = await encryptOutgoing(selectedConv, bodyToEncrypt, messageType, {
+          conversationId: selectedConvId,
+          currentUserId: session.user.id,
+          useE2EEv2,
+          legacyEncrypt: async (text: string) => encryptMessage(selectedConvId, text),
+          attachmentMetadata,
+        });
+      } catch (err) {
+        if (err instanceof GroupEncryptionError) {
+          // Surface a user-actionable message; never silently fall back
+          // to v1 for groups (would leave most members unable to decrypt).
+          console.error(`[E2EE] Group send blocked: ${err.code}`, err);
+          setError(
+            t('conversations.group.error_e2ee_missing_keys', {
+              defaultValue: 'Cannot send: a group member has not published their E2EE keys.',
+            }),
+          );
+          setSendingMessage(false);
+          // Roll back the optimistic message
+          setMessages((prev) => prev.filter((m) => m.id !== tempId));
+          return;
+        }
+        throw err;
       }
 
       // Calculate options
@@ -1439,7 +1499,11 @@ export default function Conversations() {
   const activeCallConversation = callState.conversationId
     ? conversations.find(c => c.id === callState.conversationId)
     : null;
-  const activeCallPeerLabel = activeCallConversation?.otherParticipant.username || 'Contact';
+  // Calls are direct-only in 1.2.0; getDirectPeer returns null for groups,
+  // which can't reach this UI anyway (see ChatHeader call buttons hidden).
+  const activeCallPeerLabel = activeCallConversation && session?.user?.id
+    ? getDirectPeer(activeCallConversation, session.user.id)?.username ?? 'Contact'
+    : 'Contact';
 
   useEffect(() => {
     if (callState.conversationId && callState.phase === 'incoming' && callState.conversationId !== selectedConvId) {
@@ -1449,24 +1513,20 @@ export default function Conversations() {
   }, [callState.conversationId, callState.phase, selectedConvId]);
 
   const handleStartAudioCall = useCallback(async () => {
-    if (!selectedConv) return;
-    await startCall(
-      selectedConv.otherParticipant.id,
-      selectedConv.otherParticipant.username,
-      selectedConv.id,
-      'audio'
-    );
-  }, [selectedConv, startCall]);
+    if (!selectedConv || !session?.user?.id) return;
+    if (isGroupConversation(selectedConv)) return; // Group calls deferred to 1.3+
+    const peer = getDirectPeer(selectedConv, session.user.id);
+    if (!peer) return;
+    await startCall(peer.id, peer.username, selectedConv.id, 'audio');
+  }, [selectedConv, session?.user?.id, startCall]);
 
   const handleStartVideoCall = useCallback(async () => {
-    if (!selectedConv) return;
-    await startCall(
-      selectedConv.otherParticipant.id,
-      selectedConv.otherParticipant.username,
-      selectedConv.id,
-      'video'
-    );
-  }, [selectedConv, startCall]);
+    if (!selectedConv || !session?.user?.id) return;
+    if (isGroupConversation(selectedConv)) return; // Group calls deferred to 1.3+
+    const peer = getDirectPeer(selectedConv, session.user.id);
+    if (!peer) return;
+    await startCall(peer.id, peer.username, selectedConv.id, 'video');
+  }, [selectedConv, session?.user?.id, startCall]);
 
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -1606,8 +1666,11 @@ export default function Conversations() {
               conversations={conversations}
               selectedConversationId={selectedConvId}
               onlineUsers={onlineUsers}
+              currentUserId={session.user.id}
+              decryptedTitles={decryptedGroupTitles}
               onSelectConversation={(id) => setSelectedConvId(id)}
               onOpenNewConversation={() => setShowNewConvModal(true)}
+              onOpenNewGroup={() => setShowNewGroupModal(true)}
               formatTime={formatTime}
             />
           </div>
@@ -1625,8 +1688,17 @@ export default function Conversations() {
               <ChatHeader
                 conversation={selectedConv}
                 onlineUsers={onlineUsers}
+                currentUserId={session.user.id}
+                decryptedGroupTitle={decryptedGroupTitles.get(selectedConv.id) ?? null}
                 onBackToList={() => setViewMode('list')}
-                connectionMode={connectionModes.get(selectedConvId!) || (onlineUsers.has(selectedConv.otherParticipant.id) ? 'connecting' : 'relayed')}
+                onOpenGroupDetails={() => setShowGroupDetailsForId(selectedConv.id)}
+                connectionMode={
+                  connectionModes.get(selectedConvId!) ||
+                  ((!isGroupConversation(selectedConv) &&
+                    onlineUsers.has(getDirectPeer(selectedConv, session.user.id)?.id ?? ''))
+                    ? 'connecting'
+                    : 'relayed')
+                }
                 callState={callState}
                 onStartAudioCall={handleStartAudioCall}
                 onStartVideoCall={handleStartVideoCall}
@@ -1730,6 +1802,69 @@ export default function Conversations() {
             error={error}
           />
         )}
+        {showNewGroupModal && session?.user?.id && (
+          <GroupConversationModal
+            currentUserId={session.user.id}
+            onCreated={(conv, title) => {
+              setConversations((prev) =>
+                prev.find((c) => c.id === conv.id) ? prev : [conv, ...prev],
+              );
+              if (title) decryptedGroupTitles.set(conv.id, title);
+              setShowNewGroupModal(false);
+              setSelectedConvId(conv.id);
+              setViewMode('chat');
+            }}
+            onCancel={() => setShowNewGroupModal(false)}
+          />
+        )}
+        {showGroupDetailsForId && session?.user?.id && (() => {
+          const conv = conversations.find((c) => c.id === showGroupDetailsForId);
+          if (!conv) return null;
+          return (
+            <GroupDetailsPanel
+              conversation={conv}
+              currentUserId={session.user.id}
+              decryptedTitle={decryptedGroupTitles.get(conv.id) ?? null}
+              onMemberAdded={(member, memberCount, newEncryptedTitle) => {
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === conv.id
+                      ? {
+                          ...c,
+                          members: [...c.members, member],
+                          memberCount,
+                          encryptedTitle: newEncryptedTitle ?? c.encryptedTitle,
+                        }
+                      : c,
+                  ),
+                );
+              }}
+              onMemberRemoved={(userId, memberCount) => {
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === conv.id
+                      ? {
+                          ...c,
+                          members: c.members.filter((m) => m.id !== userId),
+                          memberCount,
+                        }
+                      : c,
+                  ),
+                );
+              }}
+              onConversationGone={() => {
+                setConversations((prev) => prev.filter((c) => c.id !== conv.id));
+                decryptedGroupTitles.delete(conv.id);
+                setShowGroupDetailsForId(null);
+                if (selectedConvId === conv.id) {
+                  setSelectedConvId(null);
+                  setViewMode('list');
+                }
+              }}
+              onClose={() => setShowGroupDetailsForId(null)}
+            />
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

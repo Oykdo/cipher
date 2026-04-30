@@ -1,42 +1,54 @@
 /**
  * Conversation Repository Interface - Domain Layer
+ *
+ * Direct (1:1) and group (2-10 members) conversations are unified behind
+ * a single repository. Implementations enforce 2-10 for groups and 2 for
+ * direct via the entity validation and via DB-level guards.
  */
 
 import type { Conversation } from '../entities/Conversation';
 
 export interface IConversationRepository {
-  /**
-   * Trouver une conversation par ID
-   */
+  /** Find a conversation by ID (works for both direct and group). */
   findById(id: string): Promise<Conversation | null>;
 
   /**
-   * Trouver une conversation entre deux participants
+   * Find a *direct* conversation between two users. Returns null if either
+   * (a) no conversation exists between them, or (b) only group conversations
+   * link them. Use this to dedupe direct-conversation creation requests.
    */
-  findByParticipants(userIds: [string, string]): Promise<Conversation | null>;
+  findDirectByParticipants(userIds: [string, string]): Promise<Conversation | null>;
 
-  /**
-   * Créer une nouvelle conversation
-   */
-  create(conversation: Conversation): Promise<void>;
-
-  /**
-   * Mettre à jour une conversation
-   */
-  update(conversation: Conversation): Promise<void>;
-
-  /**
-   * Supprimer une conversation
-   */
-  delete(id: string): Promise<void>;
-
-  /**
-   * Lister toutes les conversations d'un utilisateur
-   */
+  /** List all conversations a user belongs to (direct + group). */
   findByUserId(userId: string): Promise<Conversation[]>;
 
-  /**
-   * Vérifier si une conversation existe
-   */
+  /** Persist a new conversation. */
+  create(conversation: Conversation): Promise<void>;
+
+  /** Update mutable fields (last_message_id, last_message_at, encrypted_title). */
+  update(conversation: Conversation): Promise<void>;
+
+  /** Delete a conversation (cascade via FKs removes members + messages). */
+  delete(id: string): Promise<void>;
+
+  /** Cheap existence check used by middleware. */
   exists(id: string): Promise<boolean>;
+
+  // ============================================================================
+  // Membership management
+  // ============================================================================
+  /** List all member user IDs of a conversation (direct or group). */
+  getMembers(conversationId: string): Promise<string[]>;
+
+  /**
+   * Add a member to a group. Implementations enforce the 10-member cap and
+   * refuse on direct conversations.
+   */
+  addMember(conversationId: string, userId: string): Promise<void>;
+
+  /**
+   * Remove a member from a group. Implementations refuse if userId is the
+   * owner (use delete() to dissolve the group) and refuse on direct.
+   */
+  removeMember(conversationId: string, userId: string): Promise<void>;
 }

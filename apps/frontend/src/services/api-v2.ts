@@ -73,15 +73,73 @@ export interface CreateConversationResponseV2 {
   }>;
 }
 
-export interface ConversationSummaryV2 {
+// ============================================================================
+// CONVERSATION SUMMARY (V3 — direct + group)
+// ============================================================================
+//
+// Direct (1:1) and group (2-10) conversations share the same shape, with
+// `type` discriminating. `otherParticipant` is a convenience field present
+// only for direct conversations (the bridge computes it server-side); for
+// groups, render from `members` + `encryptedTitle`. The type alias
+// `ConversationSummaryV2` is kept as a deprecated re-export so existing
+// imports don't all need to be touched in the same commit — but new code
+// should reference `ConversationSummaryV3` directly.
+
+export type ConversationType = 'direct' | 'group';
+
+export interface ConversationMemberV3 {
   id: string;
+  username: string;
+}
+
+export interface ConversationSummaryV3 {
+  id: string;
+  type: ConversationType;
   createdAt: number;
   lastMessageAt?: number;
   lastMessagePreview?: string;
-  otherParticipant: {
-    id: string;
-    username: string;
-  };
+  members: ConversationMemberV3[];
+  memberCount: number;
+  createdBy: string | null;
+  encryptedTitle?: string | null;
+  /** Set only when type === 'direct'. */
+  otherParticipant?: ConversationMemberV3;
+}
+
+/** @deprecated use ConversationSummaryV3 */
+export type ConversationSummaryV2 = ConversationSummaryV3;
+
+// ============================================================================
+// GROUP CREATION + MEMBER MANAGEMENT (1.2.0)
+// ============================================================================
+
+export interface CreateGroupRequestV2 {
+  /**
+   * Usernames of every other member (NOT the creator). Min 1, max 9 —
+   * the creator is added automatically and the total is capped at 10.
+   */
+  memberUsernames: string[];
+  /** Opaque e2ee-v2 envelope of the optional group title. */
+  encryptedTitle?: string;
+}
+
+export interface AddGroupMemberRequestV2 {
+  username: string;
+  /**
+   * Optional new title envelope rewrapped to include the new member's
+   * key. Send when you want the new member to be able to decrypt the
+   * title — otherwise they'll see null.
+   */
+  newEncryptedTitle?: string;
+}
+
+export interface AddGroupMemberResponseV2 {
+  member: ConversationMemberV3;
+  memberCount: number;
+}
+
+export interface UpdateGroupTitleRequestV2 {
+  encryptedTitle: string;
 }
 
 export interface MessageV2 {
@@ -238,16 +296,16 @@ export const apiv2 = {
   // ========================
 
   /**
-   * Lister les conversations de l'utilisateur
+   * Lister les conversations de l'utilisateur (direct + group).
    */
-  listConversations: async (): Promise<{ conversations: ConversationSummaryV2[] }> => {
+  listConversations: async (): Promise<{ conversations: ConversationSummaryV3[] }> => {
     return authFetchV2WithRefresh("/conversations");
   },
 
   /**
-   * Créer une nouvelle conversation
+   * Créer une conversation directe (1:1).
    */
-  createConversation: async (targetUsername: string): Promise<CreateConversationResponseV2> => {
+  createConversation: async (targetUsername: string): Promise<ConversationSummaryV3> => {
     return authFetchV2WithRefresh("/conversations", {
       method: "POST",
       body: JSON.stringify({ targetUsername }),
@@ -255,10 +313,65 @@ export const apiv2 = {
   },
 
   /**
-   * Récupérer une conversation par ID
+   * Récupérer une conversation par ID.
    */
   getConversation: async (conversationId: string): Promise<CreateConversationResponseV2> => {
     return authFetchV2WithRefresh(`/conversations/${conversationId}`);
+  },
+
+  // ========================
+  // GROUPS (1.2.0)
+  // ========================
+
+  /** Créer un groupe (2-10 membres, créateur = owner). */
+  createGroup: async (input: CreateGroupRequestV2): Promise<ConversationSummaryV3> => {
+    return authFetchV2WithRefresh("/groups", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  /** Ajouter un membre à un groupe (owner only). */
+  addGroupMember: async (
+    groupId: string,
+    input: AddGroupMemberRequestV2,
+  ): Promise<AddGroupMemberResponseV2> => {
+    return authFetchV2WithRefresh(`/groups/${groupId}/members`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  /** Retirer un membre d'un groupe (owner OU membre lui-même). */
+  removeGroupMember: async (groupId: string, userId: string): Promise<void> => {
+    await authFetchV2WithRefresh(`/groups/${groupId}/members/${userId}`, {
+      method: "DELETE",
+    });
+  },
+
+  /** Quitter un groupe (membre non-owner). */
+  leaveGroup: async (groupId: string): Promise<void> => {
+    await authFetchV2WithRefresh(`/groups/${groupId}/leave`, {
+      method: "POST",
+    });
+  },
+
+  /** Mettre à jour le titre chiffré d'un groupe (owner only). */
+  updateGroupTitle: async (
+    groupId: string,
+    input: UpdateGroupTitleRequestV2,
+  ): Promise<{ id: string; encryptedTitle: string }> => {
+    return authFetchV2WithRefresh(`/groups/${groupId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  },
+
+  /** Supprimer un groupe (owner only, cascade). */
+  deleteGroup: async (groupId: string): Promise<void> => {
+    await authFetchV2WithRefresh(`/groups/${groupId}`, {
+      method: "DELETE",
+    });
   },
 
   // ========================

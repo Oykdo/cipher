@@ -1,5 +1,5 @@
 -- Cipher - Database Schema (PostgreSQL)
--- Version: 2.2.0
+-- Version: 2.5.0
 --
 -- Conforms to CIPHER_PRIVACY_GUARANTEES.md (root). Any column added here
 -- must be justified against the contract: secrets and PII have no place
@@ -15,6 +15,7 @@ DROP TABLE IF EXISTS identity_keys CASCADE;
 DROP TABLE IF EXISTS audit_logs CASCADE;
 DROP TABLE IF EXISTS refresh_tokens CASCADE;
 DROP TABLE IF EXISTS attachments CASCADE;
+DROP TABLE IF EXISTS message_deliveries CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS conversation_members CASCADE;
 DROP TABLE IF EXISTS conversations CASCADE;
@@ -48,14 +49,24 @@ CREATE INDEX IF NOT EXISTS idx_users_discoverable ON users(discoverable, usernam
 -- ============================================================================
 -- CONVERSATIONS TABLE
 -- ============================================================================
+-- Direct (1:1) and group (2-10 members) conversations share this table.
+-- The `type` column discriminates; `created_by` is the group owner (NULL
+-- for direct), and `encrypted_title` is opaque ciphertext (e2ee-v2 keys-
+-- map) for the optional group title. The 2-10 member-count constraint is
+-- enforced applicatively in routes/groups.ts, not via SQL trigger.
 CREATE TABLE IF NOT EXISTS conversations (
-  id VARCHAR(255) PRIMARY KEY,            -- Format: "userId1:userId2" (sorted) - Keeping VARCHAR to match current logic
+  id VARCHAR(255) PRIMARY KEY,            -- UUID v4 (randomUUID()) for both direct and group
+  type VARCHAR(16) NOT NULL DEFAULT 'direct' CHECK (type IN ('direct', 'group')),
+  created_by VARCHAR(255),                -- Group owner; NULL for direct conversations
+  encrypted_title TEXT,                   -- Group title (e2ee-v2 envelope); NULL for direct
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   last_message_id VARCHAR(255),           -- ID du dernier message (FK vers messages)
-  last_message_at TIMESTAMP WITH TIME ZONE -- Timestamp dernier message (pour tri)
+  last_message_at TIMESTAMP WITH TIME ZONE, -- Timestamp dernier message (pour tri)
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_conversations_last_message ON conversations(last_message_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_type ON conversations(type);
 
 -- ============================================================================
 -- CONVERSATION_MEMBERS TABLE (Junction table)
@@ -110,6 +121,33 @@ CREATE INDEX IF NOT EXISTS idx_messages_scheduled_burn ON messages(scheduled_bur
 -- Purge worker indexes (privacy-l1) — partial indexes keep them small.
 CREATE INDEX IF NOT EXISTS idx_messages_purge_delivered ON messages(delivered_at) WHERE delivered_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_messages_purge_pending ON messages(created_at) WHERE delivered_at IS NULL;
+
+-- ============================================================================
+-- MESSAGE_DELIVERIES TABLE (per-recipient ACK for groups)
+-- ============================================================================
+-- Direct (1:1) conversations keep using messages.delivered_at unchanged
+-- (a single timestamp is enough when there's exactly one recipient). For
+-- group conversations, messages.delivered_at can no longer represent
+-- "every recipient fetched it" without per-recipient state, so we store
+-- one row per (message, recipient) here. markMessagesDeliveredFor()
+-- promotes messages.delivered_at to NOW once every non-sender member
+-- has a delivered_at IS NOT NULL row. Read receipts (read_at) are
+-- modelled but not exposed in 1.2.0.
+CREATE TABLE IF NOT EXISTS message_deliveries (
+  message_id   VARCHAR(255) NOT NULL,
+  user_id      VARCHAR(255) NOT NULL,
+  delivered_at TIMESTAMP WITH TIME ZONE,
+  read_at      TIMESTAMP WITH TIME ZONE,
+  PRIMARY KEY (message_id, user_id),
+  FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id)    REFERENCES users(id)    ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_message_deliveries_user_pending
+  ON message_deliveries(user_id, message_id)
+  WHERE delivered_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_message_deliveries_message
+  ON message_deliveries(message_id);
 
 -- ============================================================================
 -- ATTACHMENTS TABLE
@@ -259,4 +297,4 @@ CREATE TABLE IF NOT EXISTS metadata (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-INSERT INTO metadata (key, value) VALUES ('schema_version', '2.2.0') ON CONFLICT DO NOTHING;
+INSERT INTO metadata (key, value) VALUES ('schema_version', '2.5.0') ON CONFLICT DO NOTHING;

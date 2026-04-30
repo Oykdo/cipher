@@ -118,6 +118,54 @@ describe('SelfEncryptingMessage - Basic Encryption/Decryption', () => {
     expect(decryptedCharlie).toBe(plaintext);
   });
 
+  it('should encrypt and decrypt for the 1.2.0 group cap (10 participants)', async () => {
+    const plaintext = 'Group message at the upper bound';
+    const participants = await Promise.all(
+      Array.from({ length: 10 }, (_, i) => generateParticipant(`u${i}`)),
+    );
+
+    const encrypted = await encryptSelfEncryptingMessage(
+      plaintext,
+      participants.map((p) => p.participant),
+      'standard',
+    );
+
+    expect(Object.keys(encrypted.keys)).toHaveLength(10);
+    // Every member can decrypt — sanity check on a few representative ones.
+    for (const idx of [0, 4, 9]) {
+      const out = await decryptSelfEncryptingMessage(
+        encrypted,
+        `u${idx}`,
+        participants[idx].participant.publicKey,
+        participants[idx].privateKey,
+      );
+      expect(out).toBe(plaintext);
+    }
+  });
+
+  it('cannot decrypt as a userId not in the keys map (forward-security after remove)', async () => {
+    const alice = await generateParticipant('alice');
+    const bob = await generateParticipant('bob');
+    // Charlie was removed before this message was sent — not in the keys map.
+    const charlie = await generateParticipant('charlie');
+
+    const encrypted = await encryptSelfEncryptingMessage(
+      'After charlie was removed',
+      [alice.participant, bob.participant],
+      'standard',
+    );
+
+    expect(encrypted.keys['charlie']).toBeUndefined();
+    await expect(
+      decryptSelfEncryptingMessage(
+        encrypted,
+        'charlie',
+        charlie.participant.publicKey,
+        charlie.privateKey,
+      ),
+    ).rejects.toThrow();
+  });
+
   it('should encrypt messages of different lengths', async () => {
     const alice = await generateParticipant('alice-123');
 

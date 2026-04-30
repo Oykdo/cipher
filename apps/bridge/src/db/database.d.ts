@@ -24,12 +24,29 @@ export interface DbInstance {
   updateUserAvatarHash(userId: string, hash: string): Promise<void>;
   getUserByAvatarHash(hash: string): Promise<any | null>;
 
-  // Conversations
-  createConversation(id: string, members: string[]): Promise<any>;
+  // Conversations (direct + group, see migration 007_add_groups.sql)
+  createConversation(
+    id: string,
+    members: string[],
+    opts?: {
+      type?: 'direct' | 'group';
+      createdBy?: string | null;
+      encryptedTitle?: string | null;
+    },
+  ): Promise<any>;
   getConversationById(id: string): Promise<any | null>;
   getConversationMembers(conversationId: string): Promise<string[]>;
   getUserConversations(userId: string): Promise<any[]>;
   conversationExists(id: string): Promise<boolean>;
+  // Group membership management (rejected at the route layer for direct convs)
+  addConversationMember(conversationId: string, userId: string): Promise<boolean>;
+  removeConversationMember(conversationId: string, userId: string): Promise<boolean>;
+  countConversationMembers(conversationId: string): Promise<number>;
+  updateConversationEncryptedTitle(
+    conversationId: string,
+    encryptedTitle: string | null,
+  ): Promise<void>;
+  deleteConversation(id: string): Promise<boolean>;
 
   // Conversation Requests — `message` field removed in privacy-l1
   // (was free-text in clear; will return as E2E-encrypted in V2 if demanded).

@@ -26,21 +26,26 @@ const db = getDatabase();
 // SECURITY FIX VULN-011: Zod schemas for WebSocket payload validation
 // ============================================================================
 
+// ConversationId is a single UUID v4 (36 chars). The previous 73-char
+// "uuid:uuid" regex was a leftover from an earlier domain-layer factory
+// that concatenated participant IDs — the actual conversation ID has been
+// `randomUUID()` since the V2 routes shipped, and ConversationIdSchema in
+// validation/securitySchemas.ts already enforces the 36-char form
+// everywhere else (POST /messages, etc.). Aligning the WebSocket regex
+// here is what makes group conversations (UUID-only, no peer pair) reach
+// the join_conversation / typing events correctly.
+const ConversationIdRegex =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const JoinRoomSchema = z.object({
-  conversationId: z.string()
-    .min(73, 'ConversationId too short')
-    .max(73, 'ConversationId too long')
-    .regex(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-      'Invalid conversationId format'
-    ),
+  conversationId: z
+    .string()
+    .length(36, 'Invalid conversationId length')
+    .regex(ConversationIdRegex, 'Invalid conversationId format'),
 });
 
 const TypingSchema = z.object({
-  conversationId: z.string()
-    .min(73)
-    .max(73)
-    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
+  conversationId: z.string().length(36).regex(ConversationIdRegex),
   isTyping: z.boolean(),
 });
 

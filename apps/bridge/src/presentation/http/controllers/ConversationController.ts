@@ -61,13 +61,15 @@ export class ConversationController {
     return {
       conversations: result.conversations.map((c) => ({
         id: c.id,
+        type: c.type,
         createdAt: c.createdAt,
         lastMessageAt: c.lastMessageAt,
         lastMessagePreview: c.lastMessagePreview,
-        otherParticipant: {
-          id: c.otherParticipant.id,
-          username: c.otherParticipant.username,
-        },
+        members: c.members,
+        memberCount: c.memberCount,
+        createdBy: c.createdBy,
+        encryptedTitle: c.encryptedTitle ?? null,
+        otherParticipant: c.otherParticipant,
       })),
     };
   }

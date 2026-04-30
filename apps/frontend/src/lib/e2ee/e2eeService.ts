@@ -1007,3 +1007,31 @@ export function getSigningKeyPair(): { publicKey: Uint8Array; privateKey: Uint8A
   }
   return currentIdentityKeys.signingKeyPair;
 }
+
+/**
+ * Get the current user's deterministic Curve25519 identity keypair.
+ *
+ * This is the keypair whose PUBLIC half is published to `users.public_key`
+ * by `publishKeyBundleToServer` (and thus the one returned by
+ * `getPublicKeys` to other clients). For e2ee-v2 / selfEncryptingMessage
+ * the same keypair must be used on receive — `loadUserKeys` from
+ * keyManager returns a *separate* random keypair that is never
+ * uploaded to the server (see useKeyInitialization.ts comment about the
+ * call-signature fix), so seal_open with the random privkey would
+ * always fail against ciphertext sealed to the deterministic pubkey.
+ *
+ * Returns null if E2EE has not been initialized yet for this session.
+ * Callers must pair the returned keypair with their bridge userId
+ * (session.user.id) when calling decryptSelfEncryptingMessage — the
+ * sender wrote `keys[userId]`, not `keys[username]`.
+ */
+export function getCurrentE2EEKeyPair(): {
+  publicKey: Uint8Array;
+  privateKey: Uint8Array;
+} | null {
+  if (!currentIdentityKeys?.identityKeyPair) return null;
+  return {
+    publicKey: currentIdentityKeys.identityKeyPair.publicKey,
+    privateKey: currentIdentityKeys.identityKeyPair.privateKey,
+  };
+}

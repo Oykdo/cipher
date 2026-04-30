@@ -29,9 +29,15 @@ import {
 } from './backupCrypto';
 import { getCachedDecryptedMessage } from '../e2ee/decryptedMessageCache';
 import { decryptReceivedMessage } from '../e2ee/messagingIntegration';
+import {
+  decryptSelfEncryptingMessage,
+  isSelfEncryptingMessage,
+} from '../e2ee/selfEncryptingMessage';
+import { loadUserKeys } from '../e2ee/keyManager';
 import { getMyFingerprint, isE2EEInitialized } from '../e2ee/e2eeService';
 import { useAuthStore } from '../../store/auth';
 import { apiv2 } from '../../services/api-v2';
+import { isGroupConversation, getDirectPeer } from '../conversations/helpers';
 
 import { debugLogger } from "../debugLogger";
 /**
@@ -85,63 +91,125 @@ export async function exportToBackupVault(
       };
     }
 
-    // Process each conversation
+    // Process each conversation (direct + group, v3 format)
     if (options.includeMessages) {
       const totalConvs = conversations.length;
-      
+      // Cache the user's keys once for group decryption — every group
+      // message uses the same private key to unwrap the per-message
+      // symmetric key.
+      const userKeys = await loadUserKeys(session.user.id);
+
       for (let i = 0; i < totalConvs; i++) {
         const conv = conversations[i];
         onProgress?.(`Processing conversation ${i + 1}/${totalConvs}...`, 20 + (i / totalConvs) * 60);
 
-        const peerUsername = conv.otherParticipant?.username || 'unknown';
+        const isGroup = isGroupConversation(conv);
+        const peer = !isGroup ? getDirectPeer(conv, session.user.id) : null;
+        const peerUsername = peer?.username || 'unknown';
+
+        // Try to recover the decrypted group title from the encrypted
+        // envelope so the importer doesn't have to redo the work.
+        let decryptedTitle: string | null = null;
+        if (isGroup && conv.encryptedTitle && userKeys) {
+          try {
+            const envelope = JSON.parse(conv.encryptedTitle);
+            if (isSelfEncryptingMessage(envelope)) {
+              decryptedTitle = await decryptSelfEncryptingMessage(
+                envelope,
+                session.user.id,
+                userKeys.publicKey,
+                userKeys.privateKey,
+              );
+            }
+          } catch {
+            // Silently fall back to null — we still export the encrypted
+            // title verbatim, the importer can retry decryption later.
+          }
+        }
 
         const backupConv: BackupConversation = {
           id: conv.id,
-          peerUsername,
+          type: conv.type,
+          members: conv.members.map((m) => ({ id: m.id, username: m.username })),
+          createdBy: conv.createdBy ?? null,
+          encryptedTitle: conv.encryptedTitle ?? null,
+          decryptedTitle,
+          peerUsername: isGroup ? undefined : peerUsername, // v2 compat
           createdAt: conv.createdAt || Date.now(),
           archivedMessages: [],
         };
 
         // Fetch and process messages for this conversation
         const { messages } = await apiv2.listMessages(conv.id);
-        
+
         for (const msg of messages) {
           try {
-            // Try to get plaintext
             let plaintext = getCachedDecryptedMessage(msg.id);
-            
+
             if (!plaintext && msg.senderId !== session.user.id) {
-              // Decrypt message from peer
+              // Try to decrypt — group messages take the e2ee-v2 path
+              // (no peerUsername involved), direct messages keep the
+              // existing v2-or-v1 path.
               try {
-                const result = await decryptReceivedMessage(
-                  peerUsername,
-                  msg.body,
-                  undefined,
-                  true
-                );
-                plaintext = result.text;
+                if (isGroup) {
+                  if (!userKeys) {
+                    plaintext = '[Group message could not be decrypted: no user keys]';
+                  } else {
+                    let envelope: unknown;
+                    try {
+                      envelope = JSON.parse(msg.body);
+                    } catch {
+                      envelope = null;
+                    }
+                    if (envelope && isSelfEncryptingMessage(envelope)) {
+                      plaintext = await decryptSelfEncryptingMessage(
+                        envelope,
+                        session.user.id,
+                        userKeys.publicKey,
+                        userKeys.privateKey,
+                      );
+                    } else {
+                      plaintext = '[Group message in unsupported format]';
+                    }
+                  }
+                } else {
+                  const result = await decryptReceivedMessage(
+                    peerUsername,
+                    msg.body,
+                    undefined,
+                    true,
+                  );
+                  plaintext = result.text;
+                }
               } catch (e) {
-                // If decryption fails, use placeholder
                 plaintext = '[Message could not be decrypted for backup]';
               }
             } else if (!plaintext) {
-              // Own message - may be stored encrypted for recipient
               plaintext = '[Your encrypted message]';
             }
 
-            // Re-encrypt with BEK
             const encryptedContent = await encryptMessageForBackup(plaintext, bek);
+
+            // Resolve the sender's display name: own message → self,
+            // group message from another member → look up in members,
+            // direct from peer → peerUsername.
+            let senderName: string;
+            if (msg.senderId === session.user.id) {
+              senderName = session.user.username;
+            } else if (isGroup) {
+              senderName =
+                conv.members.find((m) => m.id === msg.senderId)?.username ??
+                msg.senderId;
+            } else {
+              senderName = peerUsername;
+            }
 
             const archivedMsg: ArchivedMessage = {
               id: msg.id,
               timestamp: msg.createdAt || Date.now(),
-              sender: msg.senderId === session.user.id ? session.user.username : peerUsername,
+              sender: senderName,
               encryptedContent,
               originalEncryption: detectEncryptionType(msg.body),
-              // Preserve the tlock drand round so the message stays gated
-              // after import. Without this, a message whose round has not
-              // yet published would be treated as a normal plaintext on
-              // restore — a confidentiality regression.
               ...(msg.unlockBlockHeight && msg.unlockBlockHeight > 0
                 ? { unlockBlockHeight: msg.unlockBlockHeight }
                 : {}),
@@ -163,10 +231,10 @@ export async function exportToBackupVault(
     const payloadJson = JSON.stringify(payload);
     const encrypted = await encryptBackupPayload(payloadJson, password);
 
-    // Create backup file structure
+    // Create backup file structure (v3 — direct + group)
     const backupFile: BackupFileV2 = {
       format: 'SecureChatBackup',
-      version: 2,
+      version: 3,
       kdf: {
         algorithm: 'pbkdf2',
         salt: toBase64(encrypted.salt),
@@ -218,8 +286,13 @@ export async function importFromBackupVault(
     throw new Error('Invalid backup file format');
   }
 
-  // Validate format
-  if (backupFile.format !== 'SecureChatBackup' || backupFile.version !== 2) {
+  // Validate format. v2 (direct only) and v3 (direct + group, 1.2.0+)
+  // share the same envelope and KDF; only the inner conversations
+  // schema differs, so the importer accepts both.
+  if (
+    backupFile.format !== 'SecureChatBackup' ||
+    (backupFile.version !== 2 && backupFile.version !== 3)
+  ) {
     throw new Error('Unsupported backup format or version');
   }
 
@@ -398,10 +471,13 @@ export async function validateBackupFile(file: File): Promise<{
     const content = await file.text();
     const backup = JSON.parse(content);
 
-    if (backup.format === 'SecureChatBackup' && backup.version === 2) {
+    if (
+      backup.format === 'SecureChatBackup' &&
+      (backup.version === 2 || backup.version === 3)
+    ) {
       return {
         valid: true,
-        version: 2,
+        version: backup.version,
         encrypted: true,
         createdAt: backup.createdAt,
       };
@@ -431,24 +507,44 @@ async function fetchContacts(): Promise<Array<{
   verified: boolean;
 }>> {
   try {
-    // Fetch contacts from conversations (users we've messaged)
+    // Fetch contacts from conversations (users we've messaged).
+    // For groups, every member except self counts as a contact.
+    const session = useAuthStore.getState().session;
+    const selfId = session?.user?.id;
     const { conversations } = await apiv2.listConversations();
-    
-    // Extract unique contacts
-    const contactsMap = new Map<string, { username: string; fingerprint?: string; addedAt: number; verified: boolean }>();
-    
+
+    const contactsMap = new Map<
+      string,
+      { username: string; fingerprint?: string; addedAt: number; verified: boolean }
+    >();
+
+    const addContact = (
+      username: string,
+      conversationCreatedAt: number | undefined,
+    ) => {
+      if (!username || contactsMap.has(username)) return;
+      contactsMap.set(username, {
+        username,
+        fingerprint: undefined,
+        addedAt: conversationCreatedAt
+          ? new Date(conversationCreatedAt).getTime()
+          : Date.now(),
+        verified: false,
+      });
+    };
+
     for (const conv of conversations) {
-      const contact = conv.otherParticipant;
-      if (contact && !contactsMap.has(contact.username)) {
-        contactsMap.set(contact.username, {
-          username: contact.username,
-          fingerprint: undefined,
-          addedAt: conv.createdAt ? new Date(conv.createdAt).getTime() : Date.now(),
-          verified: false, // TODO: Implement verification status tracking
-        });
+      if (isGroupConversation(conv)) {
+        for (const member of conv.members) {
+          if (member.id === selfId) continue;
+          addContact(member.username, conv.createdAt);
+        }
+      } else {
+        const contact = conv.otherParticipant ?? getDirectPeer(conv, selfId ?? '');
+        if (contact) addContact(contact.username, conv.createdAt);
       }
     }
-    
+
     return Array.from(contactsMap.values());
   } catch (error) {
     console.warn('[Backup] Failed to fetch contacts:', error);
