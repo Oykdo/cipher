@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why this manual run? (artifacts only, no release publish)'
+        required: false
+        default: 'manual test'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            builder_flag: --linux
+            artifact_name: cipher-linux
+            artifact_glob: |
+              release/*.AppImage
+              release/*.deb
+          - os: windows-latest
+            builder_flag: --win
+            artifact_name: cipher-windows
+            artifact_glob: release/*.exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            apps/bridge/package-lock.json
+            apps/frontend/package-lock.json
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Install bridge deps
+        run: npm ci
+        working-directory: apps/bridge
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: apps/frontend
+
+      # apps/bridge/.env.production is gitignored and listed in the
+      # electron-builder `files` array. If the BRIDGE_ENV_PRODUCTION secret
+      # is set we materialize it; otherwise we drop an empty file so the
+      # packager doesn't choke on the missing entry. The bridge env loader
+      # in main.js silently ignores empty/missing files.
+      - name: Materialize apps/bridge/.env.production
+        shell: bash
+        env:
+          BRIDGE_ENV_PRODUCTION: ${{ secrets.BRIDGE_ENV_PRODUCTION }}
+        run: |
+          if [ -n "${BRIDGE_ENV_PRODUCTION:-}" ]; then
+            printf '%s\n' "$BRIDGE_ENV_PRODUCTION" > apps/bridge/.env.production
+            echo "✓ .env.production materialized from secret"
+          else
+            : > apps/bridge/.env.production
+            echo "⚠ BRIDGE_ENV_PRODUCTION secret not set — shipping with empty .env.production"
+          fi
+
+      - name: Build frontend + bridge
+        run: npm run build:all
+
+      - name: Package with electron-builder
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            PUBLISH_FLAG="always"
+          else
+            PUBLISH_FLAG="never"
+          fi
+          echo "Publish mode: $PUBLISH_FLAG"
+          npx electron-builder ${{ matrix.builder_flag }} --publish "$PUBLISH_FLAG"
+
+      - name: Smoke test Linux artifacts
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release
+          APPIMAGE=$(ls *.AppImage 2>/dev/null | head -1 || true)
+          DEB=$(ls *.deb 2>/dev/null | head -1 || true)
+          if [ -z "$APPIMAGE" ] || [ -z "$DEB" ]; then
+            echo "::error::Missing artifact (AppImage='$APPIMAGE' deb='$DEB')"
+            ls -la
+            exit 1
+          fi
+          APPIMAGE_SIZE=$(stat -c%s "$APPIMAGE")
+          DEB_SIZE=$(stat -c%s "$DEB")
+          echo "AppImage: $APPIMAGE ($APPIMAGE_SIZE bytes)"
+          echo "deb:      $DEB ($DEB_SIZE bytes)"
+          # An Electron bundle is always >30MB; anything smaller means the
+          # packager truncated or skipped the embedded chromium.
+          if [ "$APPIMAGE_SIZE" -lt 30000000 ]; then
+            echo "::error::AppImage suspiciously small (<30MB) — likely truncated"
+            exit 1
+          fi
+          if [ "$DEB_SIZE" -lt 30000000 ]; then
+            echo "::error::deb suspiciously small (<30MB) — likely truncated"
+            exit 1
+          fi
+          chmod +x "$APPIMAGE"
+          ./"$APPIMAGE" --appimage-extract > /dev/null
+          test -f squashfs-root/AppRun
+          echo "✓ AppImage extracts cleanly and contains AppRun"
+
+      - name: Upload artifacts (manual run)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+          retention-days: 14

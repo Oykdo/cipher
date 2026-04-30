@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <sub>≈ 92 MiB · <a href="#install">install instructions</a> · <a href="CIPHER_PRIVACY_GUARANTEES.md">privacy contract</a> · macOS / Linux: <a href="#build-from-source">build from source</a></sub>
+  <sub>Windows · Linux (AppImage + .deb) · <a href="#install">install instructions</a> · <a href="CIPHER_PRIVACY_GUARANTEES.md">privacy contract</a> · macOS: <a href="#macos">coming with mobile release</a></sub>
 </p>
 
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#status)
@@ -45,11 +45,32 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 2. Run it. Windows SmartScreen will warn you (the binary is unsigned during alpha) — click "More info" → "Run anyway".
 3. Pick an install directory and finish.
 
-### macOS / Linux
+### Linux (available now)
 
-Coming during the alpha via a GitHub Actions CI matrix (Linux runner for `.AppImage` + `.deb`, macOS runner for `.dmg`). The current Windows-only ship is because the maintainer's dev machine is Windows and `mksquashfs` / `hdiutil` aren't available cross-platform — the build itself produces correct output, just needs the right OS to package.
+Two formats are produced from the same CI build, both unsigned during alpha. Pick whichever matches your distro.
 
-Until then, build from source on your own OS using the instructions below.
+**AppImage** (works on most distros, no install required):
+
+```bash
+chmod +x Cipher-1.1.1-x86_64.AppImage
+./Cipher-1.1.1-x86_64.AppImage
+```
+
+**Debian / Ubuntu** (`.deb`):
+
+```bash
+sudo dpkg -i Cipher-1.1.1-amd64.deb
+sudo apt-get install -f   # only if dpkg reports missing dependencies
+cipher                    # launch from anywhere
+```
+
+Both artifacts live on the [latest release](../../releases/latest) page next to the Windows installer.
+
+### macOS
+
+Not yet shipped as a packaged binary. Code-signing macOS apps requires an Apple Developer Program subscription (99 $/year), which we'll subscribe to alongside the iOS App Store release of CipherMobile. One subscription, two platforms.
+
+Until then, Mac users can [build from source](#build-from-source) — the `npm run build:mac` target produces a working (unsigned) `.dmg` and `.zip` when run on macOS.
 
 ---
 

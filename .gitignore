@@ -7,7 +7,10 @@
 # =============================================================================
 node_modules/
 .pnpm-store/
-package-lock.json
+# package-lock.json is committed for reproducible builds (security/audit
+# requirement — see Phase 4 roadmap). yarn.lock and pnpm-lock.yaml stay
+# ignored because the project standardizes on npm; checking in a second
+# lockfile format would let two install paths drift.
 yarn.lock
 pnpm-lock.yaml
 
