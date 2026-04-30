@@ -87,7 +87,7 @@ For paranoid users who want to verify the binary matches the source.
 ### Build
 
 ```bash
-git clone https://github.com/Oykdo/Project_Logos.git cipher
+git clone https://github.com/Oykdo/cipher.git
 cd cipher
 npm install --workspaces
 cd apps/frontend && npm install

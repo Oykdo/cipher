@@ -26,7 +26,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Oykdo/Project_Logos.git"
+    "url": "git+https://github.com/Oykdo/cipher.git"
   },
   "keywords": [
     "secure",
@@ -39,9 +39,9 @@
   "author": "Project Logos",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Oykdo/Project_Logos/issues"
+    "url": "https://github.com/Oykdo/cipher/issues"
   },
-  "homepage": "https://github.com/Oykdo/Project_Logos#readme",
+  "homepage": "https://github.com/Oykdo/cipher#readme",
   "devDependencies": {
     "concurrently": "^8.2.2",
     "electron": "^35.7.5",
@@ -116,7 +116,7 @@
     "publish": {
       "provider": "github",
       "owner": "Oykdo",
-      "repo": "Project_Logos"
+      "repo": "cipher"
     }
   }
 }
