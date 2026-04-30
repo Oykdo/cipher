@@ -117,7 +117,7 @@ Représentation visuelle de votre réseau de confiance :
 
 ```bash
 # Cloner le dépôt
-git clone https://github.com/Oykdo/cipher.git
+git clone https://github.com/Oykdo/Project_Logos.git
 cd cipher
 
 # Installer les dépendances
@@ -429,8 +429,8 @@ Ce projet est sous licence **MIT** - voir le fichier [LICENSE](./LICENSE) pour p
 ## 📞 Contact
 
 - **GitHub** : [@Oykdo](https://github.com/Oykdo)
-- **Dépôt** : [https://github.com/Oykdo/cipher](https://github.com/Oykdo/cipher)
-- **Issues** : [https://github.com/Oykdo/cipher/issues](https://github.com/Oykdo/cipher/issues)
+- **Dépôt** : [https://github.com/Oykdo/Project_Logos](https://github.com/Oykdo/Project_Logos)
+- **Issues** : [https://github.com/Oykdo/Project_Logos/issues](https://github.com/Oykdo/Project_Logos/issues)
 
 ---
 
