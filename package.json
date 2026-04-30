@@ -111,6 +111,7 @@
       ],
       "icon": "assets/icon.png",
       "category": "Network",
+      "maintainer": "Project Logos <jrzg7f2k@proton.me>",
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "publish": {
