@@ -1,6 +1,6 @@
 {
   "name": "cipher",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Cipher - Secure E2E encrypted messenger with Time-Lock and DiceKey",
   "main": "main.js",
   "type": "module",
@@ -113,6 +113,21 @@
       "category": "Network",
       "maintainer": "Project Logos <jrzg7f2k@proton.me>",
       "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libdrm2",
+        "libgbm1",
+        "libsecret-1-0",
+        "libasound2t64 | libasound2"
+      ]
     },
     "publish": {
       "provider": "github",

@@ -41,7 +41,7 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 
 ### Windows (available now)
 
-1. Download `Cipher-Setup-1.1.1.exe` from the [latest release](../../releases/latest).
+1. Download `Cipher-Setup-1.1.2.exe` from the [latest release](../../releases/latest).
 2. Run it. Windows SmartScreen will warn you (the binary is unsigned during alpha) — click "More info" → "Run anyway".
 3. Pick an install directory and finish.
 
@@ -52,14 +52,14 @@ Two formats are produced from the same CI build, both unsigned during alpha. Pic
 **AppImage** (works on most distros, no install required):
 
 ```bash
-chmod +x Cipher-1.1.1-x86_64.AppImage
-./Cipher-1.1.1-x86_64.AppImage
+chmod +x Cipher-1.1.2-x86_64.AppImage
+./Cipher-1.1.2-x86_64.AppImage
 ```
 
 **Debian / Ubuntu** (`.deb`):
 
 ```bash
-sudo dpkg -i Cipher-1.1.1-amd64.deb
+sudo dpkg -i Cipher-1.1.2-amd64.deb
 sudo apt-get install -f   # only if dpkg reports missing dependencies
 cipher                    # launch from anywhere
 ```
