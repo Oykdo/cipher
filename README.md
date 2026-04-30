@@ -4,12 +4,16 @@
 
 <p align="center">
   <a href="https://github.com/Oykdo/cipher/releases/latest">
-    <img src="https://img.shields.io/github/v/release/Oykdo/cipher?include_prereleases&label=%E2%AC%87%20Download%20Cipher%20for%20Windows&style=for-the-badge&color=2ea44f" alt="Download latest Cipher release" height="44" />
+    <img src="https://img.shields.io/github/v/release/Oykdo/cipher?include_prereleases&label=%E2%AC%87%20Download%20for%20Windows&style=for-the-badge&color=0078d4" alt="Download Cipher for Windows" height="44" />
+  </a>
+  &nbsp;
+  <a href="https://github.com/Oykdo/cipher/releases/latest">
+    <img src="https://img.shields.io/github/v/release/Oykdo/cipher?include_prereleases&label=%E2%AC%87%20Download%20for%20Linux&style=for-the-badge&color=f57900" alt="Download Cipher for Linux" height="44" />
   </a>
 </p>
 
 <p align="center">
-  <sub>Windows · Linux (AppImage + .deb) · <a href="#install">install instructions</a> · <a href="CIPHER_PRIVACY_GUARANTEES.md">privacy contract</a> · macOS: <a href="#macos">coming with mobile release</a></sub>
+  <sub>Windows .exe · Linux AppImage + .deb · <a href="#install">install instructions</a> · <a href="CIPHER_PRIVACY_GUARANTEES.md">privacy contract</a> · macOS: <a href="#macos">coming with mobile release</a></sub>
 </p>
 
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#status)
