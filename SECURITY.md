@@ -28,7 +28,7 @@ Send an email to **[security@cipherpulse.io]** with:
 
 ### 🔒 GitHub Security Advisory
 
-1. Go to [https://github.com/Oykdo/Project_Logos/security/advisories](https://github.com/Oykdo/Project_Logos/security/advisories)
+1. Go to [https://github.com/Oykdo/cipher/security/advisories](https://github.com/Oykdo/cipher/security/advisories)
 2. Click "New draft security advisory"
 3. Fill in the details
 4. Submit privately
@@ -156,7 +156,7 @@ We currently do not have a formal bug bounty program, but we greatly appreciate 
 
 Subscribe to security updates:
 - **GitHub Watch**: Click "Watch" → "Custom" → "Security alerts"
-- **Release notes**: Check [Releases](https://github.com/Oykdo/Project_Logos/releases) for security patches
+- **Release notes**: Check [Releases](https://github.com/Oykdo/cipher/releases) for security patches
 
 ---
 

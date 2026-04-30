@@ -1,7 +1,7 @@
 @echo off
 REM ========================================
 REM  Cipher - Dev Launcher
-REM  https://github.com/Oykdo/Project_Logos
+REM  https://github.com/Oykdo/cipher
 REM ========================================
 
 title Cipher Dev Launcher

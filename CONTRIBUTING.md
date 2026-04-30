@@ -137,7 +137,7 @@ git clone https://github.com/YOUR_USERNAME/cipher.git
 cd cipher
 
 # 3. Add upstream remote
-git remote add upstream https://github.com/Oykdo/Project_Logos.git
+git remote add upstream https://github.com/Oykdo/cipher.git
 
 # 4. Install dependencies
 npm install

@@ -3,8 +3,8 @@
 > An end-to-end encrypted messenger where the server stores nothing it doesn't have to.
 
 <p align="center">
-  <a href="https://github.com/Oykdo/Project_Logos/releases/latest">
-    <img src="https://img.shields.io/github/v/release/Oykdo/Project_Logos?include_prereleases&label=%E2%AC%87%20Download%20Cipher%20for%20Windows&style=for-the-badge&color=2ea44f" alt="Download latest Cipher release" height="44" />
+  <a href="https://github.com/Oykdo/cipher/releases/latest">
+    <img src="https://img.shields.io/github/v/release/Oykdo/cipher?include_prereleases&label=%E2%AC%87%20Download%20Cipher%20for%20Windows&style=for-the-badge&color=2ea44f" alt="Download latest Cipher release" height="44" />
   </a>
 </p>
 

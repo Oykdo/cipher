@@ -186,7 +186,7 @@ Famille des **licences permissives** :
 
 ```bash
 # Sur GitHub
-# Allez sur https://github.com/Oykdo/Project_Logos
+# Allez sur https://github.com/Oykdo/cipher
 # Vous devriez voir : "MIT License" à droite
 
 # En local
