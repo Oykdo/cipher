@@ -150,9 +150,6 @@ export function SecuritySettings() {
                         <h3 className="text-base font-semibold text-white">
                             {t("settings.security_settings.details_title")}
                         </h3>
-                        <p className="text-xs text-slate-500 mt-1">
-                            {t("settings.security_settings.details_desc")}
-                        </p>
                     </div>
                     <span
                         className={`flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] transition-transform duration-200 ${

@@ -77,18 +77,36 @@ jobs:
       - name: Build frontend + bridge
         run: npm run build:all
 
+      # Always build with --publish never. The release upload is done in
+      # the separate "Publish to GitHub Release" step below so the Windows
+      # .exe can be code-signed in between (the previous --publish always
+      # approach would have uploaded the unsigned binary directly).
       - name: Package with electron-builder
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
-            PUBLISH_FLAG="always"
-          else
-            PUBLISH_FLAG="never"
-          fi
-          echo "Publish mode: $PUBLISH_FLAG"
-          npx electron-builder ${{ matrix.builder_flag }} --publish "$PUBLISH_FLAG"
+          npx electron-builder ${{ matrix.builder_flag }} --publish never
+
+      # Sign the Windows installer with Azure Trusted Signing.
+      # Skipped silently until the repo variable AZURE_SIGNING_ENABLED is
+      # set to 'true' (so existing builds keep working before an Azure
+      # Trusted Signing account is provisioned). See
+      # docs/azure-trusted-signing.md for the full setup procedure +
+      # the list of secrets / variables this step expects.
+      - name: Sign Windows installer (Azure Trusted Signing)
+        if: matrix.os == 'windows-latest' && vars.AZURE_SIGNING_ENABLED == 'true'
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ vars.AZURE_TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.AZURE_TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_TRUSTED_SIGNING_PROFILE }}
+          files-folder: release
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
 
       - name: Smoke test Linux artifacts
         if: matrix.os == 'ubuntu-latest'
@@ -121,6 +139,17 @@ jobs:
           ./"$APPIMAGE" --appimage-extract > /dev/null
           test -f squashfs-root/AppRun
           echo "✓ AppImage extracts cleanly and contains AppRun"
+
+      # Publish to the GitHub Release on tag push. Replaces the previous
+      # `--publish always` flag on electron-builder so the SIGNED Windows
+      # .exe lands in the release rather than the unsigned one. Linux
+      # artifacts (.AppImage, .deb) ride along through the same step.
+      - name: Publish to GitHub Release (tag only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact_glob }}
+          fail_on_unmatched_files: true
 
       - name: Upload artifacts (manual run)
         if: github.event_name == 'workflow_dispatch'

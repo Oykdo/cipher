@@ -227,7 +227,7 @@ export function GroupConversationModal({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('conversations.search_placeholder')}
               disabled={totalMembers >= GROUP_MAX_MEMBERS}
-              className="input w-full pl-12 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 disabled:opacity-50"
+              className="input w-full !pl-12 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 disabled:opacity-50"
             />
             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-grey pointer-events-none flex items-center justify-center w-5 h-5">
               {searching ? <AtomLoader size="sm" /> : <span className="text-base leading-none">🔍</span>}

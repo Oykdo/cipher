@@ -228,7 +228,7 @@ export function ContributionSettings() {
                                     inputMode="numeric"
                                     value={stripeAmount}
                                     onChange={(e) => setStripeAmount(e.target.value)}
-                                    className="cosmic-input w-full"
+                                    className="cosmic-input cosmic-input-plain w-full"
                                     placeholder={t("settings.contribution_settings.card_amount_placeholder")}
                                     disabled={stripeRedirecting}
                                 />

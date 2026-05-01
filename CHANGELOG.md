@@ -1,5 +1,54 @@
 # Changelog
 
+## v1.2.3 — UI polish + Windows code-signing scaffold
+
+Three small UI fixes plus opt-in scaffolding for Microsoft-validated
+code signing of the Windows installer. No behavior change for the
+backend or the protocol.
+
+### Fixed
+
+- **Group creation modal — search input icon overlap.** The 🔍 icon
+  was rendered on top of the placeholder text. Root cause: `.input`
+  in `fluidCrypto.css:601` uses the shorthand `padding: 0.875rem 1rem`,
+  which has the same CSS specificity as Tailwind's `pl-12` and won
+  the cascade because it loads later. Forced Tailwind's padding-left
+  to win with `!pl-12` in `GroupConversationModal.tsx`.
+- **Settings → Contribution — Stripe amount input felt non-editable.**
+  The input used `cosmic-input` alone, which reserves `padding-left:
+  2.75rem` for an icon that does not exist on this field. The cursor
+  appeared 44 px to the right of the visible left edge, making it
+  look like the input was disabled. Added `cosmic-input-plain` to
+  cancel the reserved padding.
+
+### Changed
+
+- **Settings → Security — "Détails techniques" section.** Title
+  shortened to a single word per locale (`Détails` / `Details` /
+  `Detalles` / `Dettagli` / `Detalhes` / `Детали` / `详情` /
+  `Details`). Removed the dismissive description "Pour les curieux.
+  Rien à faire ici." in all 8 locales (`details_desc` key dropped
+  with the `<p>` that rendered it).
+
+### Added
+
+- **`.github/workflows/release.yml` — opt-in Azure Trusted Signing
+  for the Windows installer.** A new `Sign Windows installer` step
+  signs every `.exe` produced by electron-builder before upload to
+  the GitHub Release. Gated behind the repo variable
+  `AZURE_SIGNING_ENABLED='true'` so the workflow keeps running
+  unsigned until an Azure Trusted Signing account is provisioned.
+  electron-builder switched to `--publish never` and a separate
+  `softprops/action-gh-release@v2` step publishes the (now signed)
+  artifacts on tag push. See `docs/azure-trusted-signing.md` for
+  the full setup procedure (~30 min one-time).
+- **`docs/azure-trusted-signing.md`** — runbook covering Azure
+  account provisioning, identity validation, service-principal
+  creation, the exact list of GitHub secrets / variables to add,
+  signature verification on the user's machine, SmartScreen
+  reputation behavior, cost reality (~$10/month USD), and the
+  emergency disable switch.
+
 ## v1.2.2 — System tray + group classification fix
 
 Polish pass on the 1.2.x line: a system-tray entry-point on the Electron
