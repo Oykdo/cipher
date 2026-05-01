@@ -7,7 +7,7 @@
 ![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)
 
-**Messagerie sécurisée avec chiffrement de bout en bout, verrouillage temporel blockchain et fonctionnalités avancées de confidentialité**
+**Messagerie sécurisée avec chiffrement de bout en bout, conversations de groupe (2-10 membres), pièces jointes chiffrées, et un contrat de confidentialité public et vérifiable.**
 
 [Fonctionnalités](#-fonctionnalités) • [Installation](#-installation) • [Architecture](#-architecture) • [Sécurité](#-sécurité) • [Contribuer](#-contribuer)
 
@@ -19,7 +19,7 @@
 
 ## 📖 À propos
 
-**Cipher** est une application de messagerie sécurisée de nouvelle génération qui combine un chiffrement de qualité militaire avec des fonctionnalités innovantes de confidentialité. Construit sur l'algorithme Double Ratchet du protocole Signal, il garantit une confidentialité persistante tout en offrant des fonctionnalités uniques comme les messages verrouillés temporellement via blockchain et la destruction automatique après lecture.
+**Cipher** est une application de messagerie sécurisée bâtie autour d'un **contrat de confidentialité public** ([`CIPHER_PRIVACY_GUARANTEES.md`](./CIPHER_PRIVACY_GUARANTEES.md)) qui dit, ligne par ligne, ce que le serveur stocke et ce qu'il **ne stocke pas**. Chaque garantie est appliquée par du code et vérifiée par des tests d'invariants en CI. Les conversations 1:1 et de groupe (2-10 membres) sont chiffrées de bout en bout via X3DH + Double Ratchet (e2ee-v2). La destruction après lecture (burn-after-reading) et le verrouillage temporel sont disponibles en option (le time-lock est gardé derrière un feature flag en attendant la migration vers drand/tlock).
 
 ### 🎯 Philosophie
 
@@ -41,13 +41,9 @@
 - **Argon2id** - Hachage de mot de passe résistant en mémoire (backend)
 - **PBKDF2** - Dérivation de clés côté client avec 100 000 itérations
 
-### ⏰ **Messages Time-Lock**
+### ⏰ **Messages Time-Lock** *(opt-in, en transition)*
 
-Les messages peuvent être verrouillés jusqu'à une heure précise grâce à **l'ancrage blockchain** :
-- Intégration Bitcoin pour horodatage inviolable
-- Preuve cryptographique de validité du verrouillage temporel
-- Impossible à déverrouiller avant l'heure prévue (même par vous !)
-- Cas d'usage : annonces programmées, messages posthumes, capsules temporelles
+Verrouillage d'un message jusqu'à une date / heure choisie. **Désactivé par défaut** (`TIMELOCK_ENABLED=false` côté frontend et bridge) : l'implémentation actuelle reposait sur un check côté serveur de hauteur de bloc, ce qu'une revue externe a jugé insuffisamment trustless. Une migration vers **drand / tlock** (timelock encryption AGE) est planifiée pour rendre le verrou cryptographique réellement non-cassable. Pour activer la version actuelle en local : voir `apps/frontend/src/config.ts:49` et le commentaire associé.
 
 ### 🔥 **Burn After Reading**
 
@@ -59,13 +55,14 @@ Messages auto-destructeurs avec minuteurs configurables :
 
 Les messages sont définitivement supprimés de tous les appareils après une seule lecture.
 
-### 🎲 **Authentification DiceKey**
+### 🔑 **Authentification**
 
-Authentification par clé de sécurité physique utilisant le [système DiceKey](https://dicekeys.com) :
-- **775 bits d'entropie** (vs 256 bits pour une seed standard de 24 mots)
+Le flux principal est **mnémonique 12 mots + mot de passe d'appareil** (PBKDF2-SHA256, 600 000 itérations, scellé via `KeyVault` en IndexedDB). Au retour sur l'appareil, seul le mot de passe est nécessaire (Quick Unlock).
+
+L'authentification **DiceKey** ([dicekeys.com](https://dicekeys.com)) reste disponible comme alternative pour les utilisateurs qui possèdent une clé physique :
+- 775 bits d'entropie (vs 256 bits pour une seed standard de 24 mots)
 - Génération de seed basée sur le matériel
-- Immunisé contre les keyloggers et le shoulder surfing
-- Compatible avec le standard BIP-39 (phrase de récupération de 6 mots)
+- Immunisé contre keyloggers et shoulder surfing
 
 ### 🌐 **Communication Peer-to-Peer**
 
@@ -78,23 +75,25 @@ Messagerie directe appareil-à-appareil :
 
 ### 🌍 **Support multilingue**
 
-Internationalisation complète avec traductions natives :
+Internationalisation complète sur **8 langues**, traductions natives :
 - 🇬🇧 English
 - 🇫🇷 Français
 - 🇩🇪 Deutsch
 - 🇪🇸 Español
 - 🇮🇹 Italiano
+- 🇵🇹 Português
+- 🇷🇺 Русский
 - 🇨🇳 中文 (简体)
 
 ### 🛡️ **Confidentialité & Sécurité**
 
 - **Authentification SRP** (Secure Remote Password) - Protocole à divulgation nulle de connaissance
-- **JWT avec Refresh Tokens** - Gestion sécurisée des sessions
+- **JWT avec Refresh Tokens** - Gestion sécurisée des sessions (sans IP ni user-agent stockés)
 - **Protection CSRF** - Prévention des attaques cross-site
 - **Rate Limiting** - Protection contre les attaques par force brute
 - **Content Security Policy** - Atténuation XSS
 - **Force HTTPS** - Couche de transport chiffrée
-- **Logs d'audit** - Suivi des événements de sécurité
+- **Évènements de sécurité en mémoire** - Anneau circulaire (`services/security-events.ts`), pas de logs d'audit persistants côté serveur (supprimés en privacy-l1)
 
 ### 🔍 **Trust Star**
 
@@ -165,9 +164,10 @@ npm install
 cp apps/bridge/.env.example apps/bridge/.env
 # Éditer apps/bridge/.env avec votre configuration
 
-# Exécuter les migrations de base de données
+# Exécuter les migrations de base de données (idempotentes)
 cd apps/bridge
-npm run db:migrate
+npm run db:migrate:groups            # 007 — schéma groups + message_deliveries
+npm run db:migrate:fix-group-type    # 008 — fix legacy rows mal taggées
 cd ../..
 
 # Démarrer les serveurs de développement (Backend + Frontend + Electron)
@@ -217,7 +217,7 @@ npm run build:linux    # Linux (AppImage + DEB)
 ### Structure du projet
 
 ```
-cipher-pulse/
+cipher/
 ├── apps/
 │   ├── bridge/              # API Backend
 │   │   ├── src/
@@ -298,8 +298,8 @@ cipher-pulse/
 | `x3dh_sessions` | Sessions E2EE actives |
 | `settings` | Préférences utilisateur |
 | `attachments` | Métadonnées de fichiers |
-| `refresh_tokens` | Tokens de rafraîchissement JWT |
-| `audit_logs` | Événements de sécurité |
+| `refresh_tokens` | Tokens de rafraîchissement JWT (sans IP ni user-agent) |
+| `message_deliveries` | ACK par-destinataire pour les groupes (depuis 1.2.0) |
 
 ---
 
@@ -336,59 +336,25 @@ cipher-pulse/
 - ❌ Ingénierie sociale
 - ❌ Capture d'écran / keyloggers
 
-### Audit de sécurité
+### Contrat de confidentialité (vérifiable en CI)
 
-Un rapport d'audit de sécurité complet est disponible dans [`SECURITY_AUDIT_REPORT.md`](./SECURITY_AUDIT_REPORT.md).
-
-**Résultats clés :**
-- ✅ Implémentation cryptographique solide
-- ⚠️ Améliorations du contrôle d'accès WebSocket nécessaires (corrigé en v1.0)
-- ⚠️ Migration du stockage de clés vers IndexedDB recommandée (prévu pour v1.1)
+Plutôt qu'un audit ponctuel, Cipher publie un [**contrat de confidentialité**](./CIPHER_PRIVACY_GUARANTEES.md) qui énumère ce que le serveur stocke et ce qu'il **ne stocke pas**, ligne par ligne. Chaque garantie a une contrepartie sous forme de test d'invariants exécuté en CI (`apps/bridge/src/__tests__/privacy-invariants.test.ts`) — toute PR qui violerait une garantie casse le build par construction.
 
 ### Signalement de vulnérabilités
 
-Si vous découvrez une vulnérabilité de sécurité, veuillez envoyer un email à **[security@cipherpulse.io]** (ou créer un advisory de sécurité privé sur GitHub). Ne créez pas d'issues publiques pour les vulnérabilités de sécurité.
+Voir [`SECURITY.md`](./SECURITY.md) pour la procédure complète. En résumé : ouvrez un **GitHub Security Advisory privé** sur https://github.com/Oykdo/cipher/security/advisories. Ne créez pas d'issue publique pour une faille.
 
 ---
 
 ## 📚 Documentation
 
-- [**Guide de déploiement**](./DEPLOYMENT_GUIDE.md) - Instructions de déploiement en production
-- [**Vue d'ensemble des composants**](./COMPONENTS_OVERVIEW.md) - Documentation détaillée de l'architecture
-- [**Audit de sécurité**](./SECURITY_AUDIT_REPORT.md) - Analyse et recommandations de sécurité
-- [**POC DiceKey**](./POC_DICEKEY.md) - Implémentation de l'authentification DiceKey
-- [**POC Time-Lock**](./POC_TIMELOCK_BLOCKCHAIN.md) - Implémentation du verrouillage temporel blockchain
-- [**X3DH + Double Ratchet**](./X3DH_DOUBLE_RATCHET_IMPLEMENTATION_PLAN.md) - Détails du protocole E2EE
-
----
-
-## 🛣️ Roadmap
-
-Les dates sont des estimations et peuvent évoluer selon les priorités (sécurité, stabilité, livraison).
-
-### Version 1.0 (Déc 2025) — Base actuelle
-- [x] Déploiement web (Bridge + Frontend)
-- [x] Base E2EE v2 (X3DH + Double Ratchet)
-- [x] Pièces jointes E2EE + cycle burn-after-reading
-- [x] Time-lock blockchain (hauteur de bloc)
-
-### Version 1.1 (T1 2026) — Stabilité & durcissement sécurité
-- [ ] Migration KeyVault vers IndexedDB (réduction du risque localStorage)
-- [ ] Durcissement WebSocket/Socket.IO (auth + contrôle d'accès + rate limits)
-- [ ] Revue CSP/CORS (réduire les faux positifs, scripts stricts)
-- [ ] Observabilité prod (logs actionnables, health, erreurs)
-
-### Version 1.2 (T2 2026) — UX & fonctionnalités collaboratives
-- [ ] Conversations de groupe (implémentation initiale ; recherche MLS en parallèle)
-- [ ] Accusés de lecture + indicateurs de frappe (opt-in)
-- [ ] Meilleure UX pièces jointes (quotas, cleanup, retries)
-
-### Version 2.0 (S2 2026+) — Recherche / fonctionnalités avancées
-- [ ] Échange de clés hybride post-quantique (Kyber) derrière feature flag
-- [ ] Fédération / interopérabilité (serveur-à-serveur)
-- [ ] Support Tor (option endpoint onion)
-- [ ] Exploration DID / ZK privacy
-- [ ] Appels vocaux & vidéo (chiffrés)
+- [**Contrat de confidentialité**](./CIPHER_PRIVACY_GUARANTEES.md) — ce que le serveur stocke et ne stocke PAS, vérifié en CI
+- [**Changelog**](./CHANGELOG.md) — historique des releases
+- [**Guide contributeur**](./CONTRIBUTING.md) — workflow PR / convention de commit
+- [**Politique de sécurité**](./SECURITY.md) — comment signaler une vulnérabilité
+- [**Notes infra**](./INFRA_NOTES.md) — déploiement Fly + Neon + Render
+- [**Code signing Windows**](./docs/azure-trusted-signing.md) — setup Azure Trusted Signing pour la prochaine release
+- [**CLAUDE.md**](./CLAUDE.md) — guide d'orientation pour les contributeurs assistés par IA
 
 ---
 
@@ -425,7 +391,7 @@ git push origin feature/votre-fonctionnalité
 
 ## 💖 Soutenir le projet
 
-Si vous trouvez Cipher Pulse utile, soutenez son développement :
+Si vous trouvez Cipher utile, soutenez son développement :
 
 ### Dons en cryptomonnaies
 
