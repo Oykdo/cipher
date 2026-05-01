@@ -659,7 +659,7 @@
       "pcs_desc": "Los mensajes pasados permanecen seguros incluso si las claves se comprometen",
       "logout_confirm_default": "¿Está seguro de que desea cerrar sesión?",
       "logout_dialog_title": "¿Cerrar sesión en este dispositivo?",
-      "logout_warning": "Cipher borrará tu contraseña y claves locales. Necesitarás tu frase de recuperación o DiceKey para volver a iniciar sesión."
+      "logout_warning": "Cipher borrará tu contraseña y claves locales. Necesitarás tu frase de recuperación para volver a iniciar sesión."
     },
     "contribution_settings": {
       "title": "Contribuir al proyecto",

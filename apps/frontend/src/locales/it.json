@@ -659,7 +659,7 @@
       "pcs_desc": "I messaggi passati rimangono sicuri anche se le chiavi vengono compromesse",
       "logout_confirm_default": "Sei sicuro di voler disconnetterti?",
       "logout_dialog_title": "Disconnettersi da questo dispositivo?",
-      "logout_warning": "Cipher cancellerà la tua password e le chiavi locali. Per accedere di nuovo ti serviranno la frase di recupero o la DiceKey."
+      "logout_warning": "Cipher cancellerà la tua password e le chiavi locali. Per accedere di nuovo ti servirà la frase di recupero."
     },
     "contribution_settings": {
       "title": "Contribuisci al progetto",

@@ -347,11 +347,15 @@ export async function removeMasterKey(): Promise<boolean> {
 
 /**
  * Emergency wipe - removes all keys
+ *
+ * Logs at info level: this fires on every user-initiated logout, so a
+ * yellow `console.warn` is misleading (the wipe is the expected outcome,
+ * not an anomaly).
  */
 export async function emergencyWipe(): Promise<boolean> {
   const success = await clearAllKeys();
   if (success) {
-    console.warn('🔴 [KeyStore] Emergency wipe completed');
+    console.info('[KeyStore] Emergency wipe completed');
   }
   return success;
 }

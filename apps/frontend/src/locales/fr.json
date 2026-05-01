@@ -742,7 +742,7 @@
       "pcs_desc": "Les messages passés restent sécurisés même si les clés sont compromises",
       "logout_confirm_default": "Êtes-vous sûr de vouloir vous déconnecter ?",
       "logout_dialog_title": "Se déconnecter de cet appareil ?",
-      "logout_warning": "Cipher effacera votre mot de passe et vos clés locales. Vous aurez besoin de votre phrase de récupération ou DiceKey pour vous reconnecter."
+      "logout_warning": "Cipher effacera votre mot de passe et vos clés locales. Vous aurez besoin de votre phrase de récupération pour vous reconnecter."
     },
     "behavior": {
       "title": "Comportement de la fenêtre",

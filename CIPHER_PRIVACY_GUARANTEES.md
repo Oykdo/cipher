@@ -26,7 +26,6 @@ The Cipher server stores **only** the items listed below. Any data not listed he
 |---|---|---|
 | `users.username` | Unique text | Lets a recipient address a known username |
 | `users.id` | UUID | Stable internal identifier |
-| `users.security_tier` | Enum (`standard` / `dice-key`) | Determines the expected key format for this account |
 | `users.discoverable` | Boolean | The user opted in to appear in search |
 | `users.created_at` | Timestamp | Basic anti-spam |
 | `users.srp_salt`, `users.srp_verifier` | Text | Zero-knowledge login — the verifier does not reveal the password |
@@ -77,8 +76,7 @@ Explicit commitment. If any of these appears server-side one day, it is a **crit
 ### User secrets
 
 - ❌ The BIP-39 mnemonic phrase (12-24 words). It never leaves the device.
-- ❌ The master key (DiceKey or derived). Same.
-- ❌ The DiceKey checksums, even encrypted.
+- ❌ The master key derived from it. Same.
 - ❌ The quick-unlock password — neither in clear nor hashed. It lives only in each device's local KeyVault.
 - ❌ Any private key whatsoever.
 
@@ -198,8 +196,7 @@ The user or an independent auditor can verify the guarantees:
 As of this document, **the code is not yet conformant**. The 2026-04-26 audit revealed that the DB stored:
 
 - `users.mnemonic` in clear (the entire BIP-39 phrase)
-- `users.master_key_hex` in clear (DiceKey master key)
-- `users.dicekey_checksums` (to be clarified)
+- `users.master_key_hex` in clear (the derived master key)
 - `messages.sender_plaintext` (sender plaintext copy)
 - Message history without TTL
 - IP + user-agent in `refresh_tokens` and `audit_logs`
@@ -235,4 +232,4 @@ In short: **dropping audit logs reduces our legal surface**, it does not increas
 
 ---
 
-*Document v1.1.1 — created 2026-04-27, updated 2026-04-29 (donations table added in migration 005).*
+*Document v1.1.2 — created 2026-04-27, updated 2026-05-01 (DiceKey references removed: legacy auth path retired pending Eidolon Connect, kept the underlying audit history intact).*

@@ -743,7 +743,7 @@
       "pcs_desc": "Mensagens passadas permanecem seguras mesmo se as chaves forem comprometidas",
       "logout_confirm_default": "Tem certeza de que deseja sair?",
       "logout_dialog_title": "Sair deste dispositivo?",
-      "logout_warning": "O Cipher apagará sua senha e chaves locais. Você precisará da sua frase de recuperação ou DiceKey para entrar novamente."
+      "logout_warning": "O Cipher apagará sua senha e chaves locais. Você precisará da sua frase de recuperação para entrar novamente."
     },
     "behavior": {
       "title": "Comportamento da janela",

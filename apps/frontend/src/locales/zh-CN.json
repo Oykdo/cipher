@@ -659,7 +659,7 @@
       "pcs_desc": "即使密钥被泄露，过去的消息仍然安全",
       "logout_confirm_default": "您确定要退出登录吗？",
       "logout_dialog_title": "在此设备上退出登录？",
-      "logout_warning": "Cipher 将清除您的本地密码和密钥。重新登录需要您的恢复短语或 DiceKey。"
+      "logout_warning": "Cipher 将清除您的本地密码和密钥。重新登录需要您的恢复短语。"
     },
     "contribution_settings": {
       "title": "为项目做贡献",

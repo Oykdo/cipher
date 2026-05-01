@@ -157,7 +157,9 @@ export function clearTemporaryMasterKey(): void {
 export async function emergencyWipeKeys(): Promise<void> {
   secureCache.clear();
   await emergencyWipe();
-  console.warn('[SecureKeyAccess] Emergency wipe completed');
+  // Info level — this fires on every user-initiated logout, so a
+  // `console.warn` would be misleading (the wipe is the expected outcome).
+  console.info('[SecureKeyAccess] Emergency wipe completed');
 }
 
 /**

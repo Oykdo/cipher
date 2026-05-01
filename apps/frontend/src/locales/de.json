@@ -659,7 +659,7 @@
       "pcs_desc": "Vergangene Nachrichten bleiben sicher, selbst wenn Schlüssel kompromittiert werden",
       "logout_confirm_default": "Sind Sie sicher, dass Sie sich abmelden möchten?",
       "logout_dialog_title": "Von diesem Gerät abmelden?",
-      "logout_warning": "Cipher löscht Ihr lokales Passwort und Ihre Schlüssel. Sie benötigen Ihre Wiederherstellungsphrase oder DiceKey, um sich wieder anzumelden."
+      "logout_warning": "Cipher löscht Ihr lokales Passwort und Ihre Schlüssel. Sie benötigen Ihre Wiederherstellungsphrase, um sich wieder anzumelden."
     },
     "contribution_settings": {
       "title": "Zum Projekt beitragen",

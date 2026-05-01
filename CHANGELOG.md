@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.2.9 — DiceKey copy retired + console-noise fix
+
+### Changed
+
+- **`logout_warning` no longer mentions DiceKey** (8 locales). The
+  dialog now reads "you'll need your recovery phrase to log back
+  in" instead of "recovery phrase or DiceKey". DiceKey login was
+  definitively retired pending Eidolon Connect — surfacing it as
+  a return path was misleading. Code-level DiceKey vestiges
+  (~28 files: auth store, KDF helpers, signup screens, locale
+  strings) remain dormant and will be swept in a follow-up; this
+  release is a UI-copy fix only.
+- **`CIPHER_PRIVACY_GUARANTEES.md` cleaned of DiceKey references.**
+  Dropped the `users.security_tier` row from the public-identity
+  table (its only purpose was DiceKey/standard discrimination),
+  removed the "DiceKey checksums" non-storage commitment, and
+  rephrased the historical audit list. Doc bumped to v1.1.2.
+  The doc itself stays public — the transparency contract is
+  the product's differentiator vs Signal/WhatsApp.
+
+### Fixed
+
+- **`emergencyWipe` no longer logs at `console.warn` level.** The
+  `🔴 [KeyStore] Emergency wipe completed` and
+  `[SecureKeyAccess] Emergency wipe completed` lines were warn-level
+  remnants from when the wipe only ran on security incidents. Since
+  v1.2.8 the same path runs on every user-initiated logout, so a
+  yellow console warning is misleading. Downgraded to `console.info`
+  in `lib/keyStore.ts:354` and `lib/secureKeyAccess.ts:160`.
+
 ## v1.2.8 — UX polish: cosmic dialogs, dynamic Stripe currency, full logout
 
 ### Changed

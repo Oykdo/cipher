@@ -743,7 +743,7 @@
       "pcs_desc": "Past messages remain secure even if keys are compromised",
       "logout_confirm_default": "Are you sure you want to log out?",
       "logout_dialog_title": "Log out of this device?",
-      "logout_warning": "Cipher will erase your local password and keys. You'll need your recovery phrase or DiceKey to log back in."
+      "logout_warning": "Cipher will erase your local password and keys. You'll need your recovery phrase to log back in."
     },
     "behavior": {
       "title": "Window behavior",
