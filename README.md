@@ -46,8 +46,40 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 ### Windows (available now)
 
 1. Download `Cipher-Setup-1.2.3.exe` from the [latest release](../../releases/latest).
-2. Run it. Windows SmartScreen will warn you (the binary is unsigned during alpha) — click "More info" → "Run anyway".
+2. Windows SmartScreen will show **"Windows protected your PC — Unrecognized app"**. This is **expected during alpha** — see the box below. Click **"More info"** → **"Run anyway"**.
 3. Pick an install directory and finish.
+
+> **About the SmartScreen / antivirus warning** — please read before running
+>
+> The Windows installer is **not yet code-signed**. SmartScreen and some
+> antivirus engines (Defender, Avast, etc.) flag any unsigned `.exe` they
+> have not seen before. **It is a heuristic, not a malware detection.**
+>
+> Microsoft-validated code signing via **Azure Trusted Signing is planned
+> for the next release** (the workflow scaffolding is already in place,
+> see [`docs/azure-trusted-signing.md`](docs/azure-trusted-signing.md);
+> only the Azure account provisioning is left to do — ETA next week).
+> Once active, SmartScreen will display *"Cipher · Verified Publisher"*
+> and most antivirus warnings will go away on their own as the
+> certificate accumulates reputation.
+>
+> Until then, three ways to convince yourself the binary is safe:
+>
+> 1. **Read the source.** Every line that ends up in the `.exe` is in
+>    this repo. The build is reproducible from
+>    [`.github/workflows/release.yml`](.github/workflows/release.yml);
+>    you can re-run it on a fork and get a byte-identical artifact.
+> 2. **Check it on VirusTotal.** Drop the `.exe` on
+>    [virustotal.com](https://www.virustotal.com) — most engines show
+>    clean. False positives on Electron apps are common (heuristics flag
+>    the embedded Chromium / Node), and you can compare across releases.
+> 3. **Verify the SHA256** matches the value in the GitHub release page.
+>    PowerShell: `Get-FileHash .\Cipher-Setup-1.2.3.exe -Algorithm SHA256`.
+>
+> If your antivirus quarantines the file outright, the fastest fix is
+> a false-positive report to your AV vendor — clears the heuristic for
+> everyone. Defender:
+> [aka.ms/wdsi](https://www.microsoft.com/en-us/wdsi/filesubmission).
 
 ### Linux (available now)
 

@@ -105,7 +105,45 @@ Représentation visuelle de votre réseau de confiance :
 
 ---
 
-## 🚀 Installation
+## 📥 Téléchargement (utilisateurs / testeurs)
+
+Téléchargez `Cipher-Setup-1.2.3.exe` (Windows) ou `Cipher-1.2.3.AppImage` /
+`cipher_1.2.3_amd64.deb` (Linux) depuis la [dernière release](../../releases/latest).
+
+> **À propos de l'avertissement Windows SmartScreen / antivirus** — à lire avant de lancer
+>
+> L'installateur Windows **n'est pas encore signé numériquement**. SmartScreen
+> et certains antivirus (Defender, Avast, etc.) marquent tout `.exe` non
+> signé qu'ils n'ont jamais vu — **c'est une heuristique, pas une détection
+> de malware**.
+>
+> La signature Microsoft via **Azure Trusted Signing est prévue pour la
+> prochaine release** (le workflow CI est déjà en place, voir
+> [`docs/azure-trusted-signing.md`](docs/azure-trusted-signing.md) ;
+> il ne reste qu'à provisionner le compte Azure — ETA semaine prochaine).
+> Une fois actif, SmartScreen affichera *« Cipher · Éditeur vérifié »* et
+> les antivirus se calmeront d'eux-mêmes au fil des installations.
+>
+> En attendant, pour vérifier toi-même que le binaire est sain :
+>
+> 1. **Lis le code source.** Chaque ligne du `.exe` est dans ce dépôt. Le
+>    build est reproductible depuis
+>    [`.github/workflows/release.yml`](.github/workflows/release.yml) —
+>    tu peux le rejouer sur un fork et obtenir un binaire byte-identique.
+> 2. **Soumets-le à VirusTotal** ([virustotal.com](https://www.virustotal.com)).
+>    La plupart des moteurs sont verts. Les faux positifs sur les apps
+>    Electron sont fréquents (les heuristiques flag le Chromium / Node
+>    embarqué).
+> 3. **Vérifie le SHA256** affiché sur la page de release.
+>    PowerShell : `Get-FileHash .\Cipher-Setup-1.2.3.exe -Algorithm SHA256`.
+>
+> Pour cliquer à travers SmartScreen : **« Informations complémentaires »
+> → « Exécuter quand même »**. Pour signaler un faux positif Defender :
+> [aka.ms/wdsi](https://www.microsoft.com/en-us/wdsi/filesubmission).
+
+---
+
+## 🚀 Installation (développeurs)
 
 ### Prérequis
 
