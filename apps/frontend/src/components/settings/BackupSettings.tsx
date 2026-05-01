@@ -188,11 +188,11 @@ export function BackupSettings() {
                 : null;
             const securityTier: 'standard' | 'dice-key' = 'standard';
 
-            // DiceKey accounts pending L1-T13 refactor: checksums export
-            // is temporarily unavailable. The user still has their dice
-            // rolls — the canonical recovery path — so this is degraded
-            // UX, not a security regression.
-            const checksums: string[] | null = null;
+            // DiceKey export is gated by the L1-T13 refactor: the local cache
+            // isn't wired yet, so the dice-key branch below throws with a
+            // clear message rather than producing a broken file. The user
+            // still has their 300 dice rolls — the canonical recovery path —
+            // so this is degraded UX, not a security regression.
 
             // Surface accurate metadata. Created-at is unknown without a
             // server round-trip; we omit it rather than fabricating one.
