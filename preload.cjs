@@ -13,6 +13,15 @@ contextBridge.exposeInMainWorld('electron', {
   selectPsnxFile: () => ipcRenderer.invoke('vault-bridge:select-psnx'),
   openStripeCheckout: (url) => ipcRenderer.invoke('stripe:open-checkout', url),
 
+  // System power-resume signal. Fires after the OS wakes from sleep so
+  // the renderer can force-reset stale WebSocket connections instead of
+  // waiting for Socket.IO's blind retry loop.
+  onPowerResume: (callback) => {
+    const wrapped = () => callback();
+    ipcRenderer.on('power:resume', wrapped);
+    return () => ipcRenderer.removeListener('power:resume', wrapped);
+  },
+
   backupPassword: {
     has: (username) => ipcRenderer.invoke('backup-password:has', username),
     get: (username) => ipcRenderer.invoke('backup-password:get', username),

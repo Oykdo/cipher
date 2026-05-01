@@ -2,7 +2,7 @@
 
 > **Contract with the user.** This document describes what the Cipher server stores, what it does not store, and how anyone can verify the promise holds. Any pull request that contradicts this contract must be rejected.
 
-**Status**: v1.1.1 — ships the "L1 strict" refactor (April 2026 sprint), now with Stripe donation persistence wired end-to-end. Sections marked **[TARGET]** are not yet implemented in the code as of this document; see `## Current scope vs target` at the end of the page.
+**Status**: v1.1.3 — the "L1 strict" privacy refactor (April 2026 sprint) is merged and shipping in production. Stripe donation persistence is wired end-to-end. Every commitment in this document is enforced in code today; the historical pre-refactor state is documented at the end of the page for transparency.
 
 ---
 
@@ -38,9 +38,9 @@ The Cipher server stores **only** the items listed below. Any data not listed he
 
 | Data | Type | TTL |
 |---|---|---|
-| `messages.body` | Opaque E2E ciphertext | **Dual TTL** [TARGET]: 7 days after `delivered_at` (post-pickup grace) **OR** 30 days after `created_at` if never delivered (safety net) |
-| `messages.delivered_at` [TARGET] | Delivery timestamp | Set by the worker when all recipients have acked |
-| `attachments.path` | Ciphertext file on disk | Same policy as messages [TARGET] |
+| `messages.body` | Opaque E2E ciphertext | **Dual TTL**: 7 days after `delivered_at` (post-pickup grace) **OR** 30 days after `created_at` if never delivered (safety net) |
+| `messages.delivered_at` | Delivery timestamp | Set on first recipient fetch (1:1) or once every non-sender has acked (group, via `message_deliveries`) |
+| `attachments.path` | Ciphertext file on disk | Same dual-TTL policy as messages — orphan blobs removed by the purge worker |
 | `refresh_tokens.token_hash` | SHA-256 of the refresh token | 7-day expiration |
 | `conversation_requests` | pending/accepted status | Transient, removed after acceptance |
 
@@ -83,14 +83,14 @@ Explicit commitment. If any of these appears server-side one day, it is a **crit
 ### Conversation content
 
 - ❌ No message plaintext, sender or recipient side (the historical `sender_plaintext` is removed).
-- ❌ No conversation history. Messages delivered and acked by all recipients are **deleted within 7 days** [TARGET]; never-delivered messages are dropped after 30 days.
+- ❌ No conversation history. Messages delivered and acked by all recipients are **deleted within 7 days**; never-delivered messages are dropped after 30 days. Enforced by `services/purge-worker.ts` — runs hourly.
 - ❌ No preview, snippet, or `last_message_text` in clear.
 - ❌ No attached file in clear. Attachments are E2E-encrypted before upload.
 
 ### Personal metadata (PII)
 
-- ❌ No IP address in persistent logs [TARGET].
-- ❌ No user-agent in persistent logs [TARGET].
+- ❌ No IP address in persistent logs. Removed from `refresh_tokens` in migration 002, never written elsewhere.
+- ❌ No user-agent in persistent logs. Same migration.
 - ❌ No geolocation, no device fingerprint.
 - ❌ No analytics tracking, no third-party Sentry/Datadog, no telemetry.
 - ❌ No persistent audit logs of any kind. The `audit_logs` table was dropped (migration 004); operational visibility on active incidents comes from a bounded **in-memory ring buffer** that does not survive a bridge restart and never holds IP / user-agent. See `apps/bridge/src/services/security-events.ts`.
@@ -185,15 +185,15 @@ The user or an independent auditor can verify the guarantees:
 
 1. **Read the SQL schema**: `apps/bridge/scripts/schema_postgresql.sql` is public in the repo. No secret tables.
 2. **Read the route code**: `apps/bridge/src/routes/` is public. No secret INSERT.
-3. **Run the invariants**: `cd apps/bridge && npm run test:invariants` [TARGET].
+3. **Run the invariants**: `cd apps/bridge && npm run test:invariants` (vitest suite enforcing the four properties below — gated on `DATABASE_URL_TEST` so a casual `npm test` does not hit a real DB).
 4. **Inspect your own DB** if you self-host the bridge: `psql -c "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public'"`.
 5. **Reproduce the installer build**: check out the git tag, `npm run build:win`, compare the binary hash with the distributed one.
 
 ---
 
-## Current scope vs target
+## Pre-refactor state (historical, for transparency)
 
-As of this document, **the code is not yet conformant**. The 2026-04-26 audit revealed that the DB stored:
+The 2026-04-26 audit revealed that the production DB previously stored:
 
 - `users.mnemonic` in clear (the entire BIP-39 phrase)
 - `users.master_key_hex` in clear (the derived master key)
@@ -202,9 +202,9 @@ As of this document, **the code is not yet conformant**. The 2026-04-26 audit re
 - IP + user-agent in `refresh_tokens` and `audit_logs`
 - Local JSON backups containing all of the above
 
-The "L1 strict" refactor sprint (April 2026) fixes these. **The Neon production DB will be entirely wiped** when the migrations are applied — no soft migration is possible because the columns to drop hold secrets that should never have existed.
+The "L1 strict" refactor sprint (April 2026) fixed all of the above. The Neon production DB was **entirely wiped** when the migrations were applied — no soft migration was possible because the columns to drop held secrets that should never have existed. The migration trail is public: `apps/bridge/scripts/migrations/002_remove_plaintext_secrets.sql` (drop secrets + PII), `004_drop_audit_logs.sql` (drop the audit_logs table), `003_add_delivered_at.sql` + `services/purge-worker.ts` (dual-TTL retention).
 
-This document describes the **target** post-sprint. The **[TARGET]** sections indicate items that depend on the in-flight refactor. Once the refactor is merged, this paragraph is removed.
+This section is preserved as historical context. Every commitment described in the rest of this document is enforced in production code today.
 
 ---
 
@@ -232,4 +232,4 @@ In short: **dropping audit logs reduces our legal surface**, it does not increas
 
 ---
 
-*Document v1.1.2 — created 2026-04-27, updated 2026-05-01 (DiceKey references removed: legacy auth path retired pending Eidolon Connect, kept the underlying audit history intact).*
+*Document v1.1.3 — created 2026-04-27, updated 2026-05-01 (L1 strict refactor confirmed shipped: all [TARGET] markers removed after code-level verification of `messages.delivered_at`, dual-TTL purge worker, attachments purge, no-PII migrations, and `npm run test:invariants` script).*

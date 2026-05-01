@@ -55,6 +55,10 @@ Messages auto-destructeurs avec minuteurs configurables :
 
 Les messages sont définitivement supprimés de tous les appareils après une seule lecture.
 
+### 🔬 **Recherche en cours**
+
+Une troisième primitive temporelle est à l'étude en complément du time-lock et du burn. Là où le time-lock contrôle *quand un message devient lisible* et le burn *quand il disparaît*, ce troisième axe vise *comment un message se révèle dans le temps*. Pas de calendrier de sortie pour l'instant — le design est prototypé face au contrat de privacy avant tout travail d'implémentation.
+
 ### 🔑 **Authentification**
 
 Le flux principal est **mnémonique 12 mots + mot de passe d'appareil** (PBKDF2-SHA256, 600 000 itérations, scellé via `KeyVault` en IndexedDB). Au retour sur l'appareil, seul le mot de passe est nécessaire (Quick Unlock).

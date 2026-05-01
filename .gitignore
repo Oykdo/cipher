@@ -184,3 +184,12 @@ codebuff.json
 
 # Release notes drafts — kept local, never published via git
 docs/UPDATE_NOTE_*.md
+
+# =============================================================================
+# DESIGN NOTES — kept local, not yet published
+# =============================================================================
+# Forward-looking design / strategy docs we want to keep on disk but not
+# expose on the public repo until the corresponding feature ships and
+# the positioning is finalized.
+META_BURN_HANDOVER.md
+META_BURN_VALUE.md

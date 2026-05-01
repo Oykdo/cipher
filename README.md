@@ -243,6 +243,8 @@ What works today:
 - Time-lock via drand (cryptographic, no server enforcement)
 - Local export of full history to a password-encrypted file
 
+**Research in progress.** A third temporal primitive is being studied as a complement to time-lock and burn. Where time-lock controls *when a message becomes readable* and burn controls *when it stops existing*, this third axis would target *how a message reveals itself across time*. No release timeline yet — the design is being prototyped against the privacy contract before any implementation work begins.
+
 ---
 
 ## Looking for testers

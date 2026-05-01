@@ -1,5 +1,51 @@
 # Changelog
 
+## v1.2.10 — Wake-from-sleep recovery, privacy doc cleanup, research tease
+
+### Fixed
+
+- **WebSocket layers recover cleanly when the PC wakes from sleep.**
+  Chromium emits `ERR_NETWORK_IO_SUSPENDED` on stale sockets after
+  the OS suspends network I/O; the previous Socket.IO reconnect loop
+  retried blindly and burnt its `maxReconnectAttempts` while the NIC
+  was still re-DHCPing. The fix introduces a centralized
+  `useNetworkResume` hook that listens to two signals — `window.online`
+  (browser heuristic) and Electron `power:resume` IPC (forwarded
+  from `powerMonitor.on('resume')` in `main.js`) — and forces a clean
+  reconnect on either. Both the WebRTC signaling client
+  (`lib/p2p/signaling-client.ts`) and the bridge messaging socket
+  (`hooks/useSocketWithRefresh.ts`) plug into this hook, drop their
+  stale socket cleanly (with `removeAllListeners` + `disconnect`),
+  wait for `navigator.onLine === true`, then reopen. No more
+  duplicate `connect_error` log spam after wake.
+
+### Changed
+
+- **`CIPHER_PRIVACY_GUARANTEES.md` cleared of `[TARGET]` markers.**
+  The L1 strict privacy refactor (April 2026) is fully merged and
+  shipping in production: `messages.delivered_at` exists (migration
+  003), the dual-TTL purge worker runs hourly with the documented
+  7-day post-pickup / 30-day max-pending policy
+  (`services/purge-worker.ts`), no IP / user-agent in any persistent
+  table (migrations 002 + 004), and `npm run test:invariants` is a
+  real script. Every commitment in the document is now enforced by
+  code that exists today; the `[TARGET]` markers were stale. The
+  forward-looking *"Current scope vs target"* section was rewritten
+  as a backwards-looking *"Pre-refactor state (historical)"* section
+  for transparency. Doc bumped to v1.1.3.
+- **READMEs (EN + FR) tease a third temporal primitive under
+  research.** Added a one-paragraph note alongside the time-lock
+  and burn descriptions, framing the three axes — *when readable*
+  (time-lock), *when destroyed* (burn), *how it reveals across
+  time* (research). No technical details surfaced; no release
+  timeline committed.
+
+### Internal
+
+- `.gitignore` excludes a new `DESIGN NOTES` block so forward-looking
+  strategy drafts can live in the working tree without ever being
+  picked up by an accidental `git add .`.
+
 ## v1.2.9 — DiceKey copy retired + console-noise fix
 
 ### Changed

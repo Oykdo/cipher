@@ -22,6 +22,7 @@
 import { io, Socket } from 'socket.io-client';
 
 import { debugLogger } from "../debugLogger";
+import { subscribeToNetworkResume, waitForNetwork } from '../../hooks/useNetworkResume';
 export interface SignalingServerHealth {
   url: string;
   healthy: boolean;
@@ -50,6 +51,7 @@ export class SignalingClient {
   private healthCheckTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 3;
+  private unsubscribeResume: (() => void) | null = null;
 
   constructor(options: SignalingClientOptions) {
     this.options = {
@@ -57,7 +59,7 @@ export class SignalingClient {
       healthCheckInterval: 30000,
       ...options,
     };
-    
+
     // Initialize server list
     const servers = options.urls?.length ? options.urls : [options.url];
     servers.forEach(url => {
@@ -68,6 +70,49 @@ export class SignalingClient {
         lastCheck: 0,
       });
     });
+
+    // Force a clean reconnect when the OS wakes from sleep or the
+    // browser reports network is back. Without this, Chromium's
+    // ERR_NETWORK_IO_SUSPENDED on the stale socket triggers blind
+    // retries while the NIC is still re-DHCPing.
+    this.unsubscribeResume = subscribeToNetworkResume(() => {
+      void this.handleNetworkResume();
+    });
+  }
+
+  /**
+   * Triggered after a system wake or `online` event. Drops the dead
+   * socket, resets the retry counter, waits for `navigator.onLine`,
+   * then reconnects.
+   */
+  private async handleNetworkResume(): Promise<void> {
+    debugLogger.info('🔄 [SIGNALING] network resumed — forcing clean reconnect');
+    this.cleanupSocket();
+    this.connected = false;
+    this.reconnectAttempts = 0;
+    await waitForNetwork();
+    try {
+      await this.connect();
+    } catch (err) {
+      console.warn('⚠️ [SIGNALING] reconnect after resume failed', err);
+    }
+  }
+
+  /**
+   * Tear down the current socket without throwing. Removes all listeners
+   * first so Socket.IO's internal reconnection logic can't keep firing
+   * orphan events on a stale instance.
+   */
+  private cleanupSocket(): void {
+    if (this.socket) {
+      try {
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      } catch {
+        // best-effort
+      }
+      this.socket = null;
+    }
   }
 
   /**
@@ -118,6 +163,13 @@ export class SignalingClient {
     return new Promise((resolve, reject) => {
       const startTime = Date.now();
       debugLogger.websocket('[SIGNALING]...', serverUrl);
+
+      // Drop any stale socket before opening a fresh one. Without this,
+      // a previous `io()` call's internal reconnection loop keeps firing
+      // events even after we replaced `this.socket` — that's what
+      // produced the duplicate `connect_error` lines after wake-from-
+      // sleep in the console traces.
+      this.cleanupSocket();
 
       const timeout = setTimeout(() => {
         reject(new Error(`Connection timeout to ${serverUrl}`));
@@ -213,9 +265,13 @@ export class SignalingClient {
 
     this.reconnectAttempts++;
     debugLogger.debug(`🔄 [SIGNALING] Reconnecting... (attempt ${this.reconnectAttempts});`);
-    
+
     setTimeout(async () => {
       try {
+        // Don't burn a retry while the OS is still bringing the
+        // interface back up after sleep. waitForNetwork resolves
+        // immediately if the browser already reports online.
+        await waitForNetwork();
         await this.connectToServer(this.currentServerUrl);
       } catch {
         this.handleDisconnect();
@@ -308,8 +364,11 @@ export class SignalingClient {
   disconnect(): void {
     debugLogger.websocket('[SIGNALING]...');
     this.stopHealthChecks();
-    this.socket?.disconnect();
-    this.socket = null;
+    if (this.unsubscribeResume) {
+      this.unsubscribeResume();
+      this.unsubscribeResume = null;
+    }
+    this.cleanupSocket();
     this.connected = false;
     this.currentServerUrl = '';
   }

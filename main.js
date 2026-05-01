@@ -1,5 +1,5 @@
 import electron from 'electron';
-const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, safeStorage, shell } = electron;
+const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, powerMonitor, safeStorage, shell } = electron;
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fork, spawn } from 'node:child_process';
@@ -531,6 +531,18 @@ if (!gotTheLock) {
       await startBackend();
       await createWindow();
       createTray();
+
+      // Forward OS power-resume events to the renderer so the WebSocket
+      // layers can drop their dead sockets and reconnect cleanly. Without
+      // this, Chromium emits ERR_NETWORK_IO_SUSPENDED on the stale socket
+      // after wake-from-sleep and Socket.IO retries blindly while the
+      // network is still coming back up.
+      powerMonitor.on('resume', () => {
+        console.info('[main] power: system resumed, notifying renderer');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('power:resume');
+        }
+      });
     } catch (error) {
       console.error('Failed to start application:', error);
       app.quit();

@@ -16,6 +16,7 @@ import { useAuthStore } from '../store/auth';
 
 import { debugLogger } from "../lib/debugLogger";
 import { SOCKET_BASE_URL } from '../config';
+import { useNetworkResume, waitForNetwork } from './useNetworkResume';
 
 const SOCKET_URL = SOCKET_BASE_URL;
 
@@ -160,6 +161,19 @@ export function useSocketWithRefresh(): UseSocketWithRefreshReturn {
       disconnect();
     };
   }, [token]); // Reconnect when token changes
+
+  // Effect: force a clean reconnect when the OS wakes from sleep or
+  // the browser reports the network is back. Without this, Chromium
+  // emits ERR_NETWORK_IO_SUSPENDED on the stale socket and Socket.IO's
+  // built-in retry takes longer to recover than a forced reset.
+  useNetworkResume(() => {
+    if (!token) return;
+    debugLogger.debug('[useSocket] network resumed, forcing reconnect');
+    void waitForNetwork().then(() => {
+      disconnect();
+      connect();
+    });
+  });
 
   return {
     socket: socketRef.current,
