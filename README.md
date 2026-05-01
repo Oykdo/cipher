@@ -45,7 +45,7 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 
 ### Windows (available now)
 
-1. Download `Cipher-Setup-1.2.6.exe` from the [latest release](../../releases/latest).
+1. Download `Cipher-Setup-1.2.7.exe` from the [latest release](../../releases/latest).
 2. Windows SmartScreen will show **"Windows protected your PC — Unrecognized app"**. This is **expected during alpha** — see the box below. Click **"More info"** → **"Run anyway"**.
 3. Pick an install directory and finish.
 
@@ -85,7 +85,7 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 >
 >    ```powershell
 >    # Windows — print the local hash, eyeball-match the line in SHA256SUMS.txt
->    Get-FileHash .\Cipher-Setup-1.2.6.exe -Algorithm SHA256
+>    Get-FileHash .\Cipher-Setup-1.2.7.exe -Algorithm SHA256
 >    ```
 >
 >    `SHA256SUMS.txt` is generated inside the GitHub Actions runner from
@@ -104,14 +104,14 @@ Two formats are produced from the same CI build, both unsigned during alpha. Pic
 **AppImage** (works on most distros, no install required):
 
 ```bash
-chmod +x Cipher-1.2.6-x86_64.AppImage
-./Cipher-1.2.6-x86_64.AppImage
+chmod +x Cipher-1.2.7-x86_64.AppImage
+./Cipher-1.2.7-x86_64.AppImage
 ```
 
 **Debian / Ubuntu** (`.deb`):
 
 ```bash
-sudo dpkg -i Cipher-1.2.6-amd64.deb
+sudo dpkg -i Cipher-1.2.7-amd64.deb
 sudo apt-get install -f   # only if dpkg reports missing dependencies
 cipher                    # launch from anywhere
 ```

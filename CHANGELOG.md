@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.2.7 — Stripe donation cap raised + actionable error messages
+
+### Changed
+
+- **Donation cap raised from 2 500 EUR to 10 000 EUR per
+  transaction.** `apps/bridge/src/routes/stripe.ts` Zod schema for
+  `amountCents` had `max(250_000)` which was a tighter guardrail
+  than necessary — donors trying to give 3 000 EUR or more were
+  silently bounced with a generic "Invalid request". Bumped to
+  `max(1_000_000)` (= 10 000 EUR). Anyone wanting more can split
+  the payment or contact the project, which is probably someone
+  worth knowing personally anyway.
+
+### Fixed
+
+- **Stripe checkout error message now explains what is wrong.**
+  The bridge previously returned `"error": "Invalid request",
+  "code": "INVALID_REQUEST"` for every Zod failure, leaving the
+  donor staring at a generic message. The handler now surfaces the
+  first Zod issue's `message`, so the frontend renders the actual
+  cause — e.g. *"Amount must be at most 10000 EUR — for larger
+  donations, please make multiple payments or contact the project"*
+  instead of *"Invalid request (INVALID_REQUEST)"*. Same change
+  also covers the floor (1 EUR minimum).
+
+### Notes
+
+- Bridge **must be re-deployed on Fly** for v1.2.7 to take effect
+  (`cd apps/bridge && fly deploy --remote-only`). The frontend
+  binary `.exe` from v1.2.6 will pick up the new error message
+  automatically because the wording lives server-side.
+
 ## v1.2.6 — Tray icon really fixed + Stripe layout + SHA256SUMS
 
 Hotfix release covering three small but visible regressions, plus

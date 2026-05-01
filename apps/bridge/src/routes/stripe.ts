@@ -48,8 +48,25 @@ async function updateDonationStatusByPaymentIntent(paymentIntentId: string, stat
   );
 }
 
+// Donation cap = 10 000 EUR / transaction. Below 1 EUR Stripe itself
+// rejects (its minimum charge is around 0.50 EUR depending on currency),
+// above 10 000 EUR is a deliberate guardrail against typos rather than
+// a Stripe limit (Stripe accepts up to ~999 999.99 per transaction).
+// A donor wanting to give more than 10 000 EUR can split the payment
+// or contact the project directly — and is probably someone we want
+// to know.
+const AMOUNT_CENTS_MIN = 100;
+const AMOUNT_CENTS_MAX = 1_000_000;
+
 const createCheckoutSchema = z.object({
-  amountCents: z.coerce.number().int().min(100).max(250_000),
+  amountCents: z.coerce
+    .number()
+    .int('Amount must be a whole number of cents')
+    .min(AMOUNT_CENTS_MIN, `Amount must be at least ${AMOUNT_CENTS_MIN / 100} EUR`)
+    .max(
+      AMOUNT_CENTS_MAX,
+      `Amount must be at most ${AMOUNT_CENTS_MAX / 100} EUR — for larger donations, please make multiple payments or contact the project`,
+    ),
   currency: z
     .string()
     .trim()
@@ -82,9 +99,14 @@ export async function stripeRoutes(app: FastifyInstance) {
 
     const parsed = createCheckoutSchema.safeParse((request.body ?? {}) as unknown);
     if (!parsed.success) {
+      // Surface the most actionable Zod message (typically the cap or
+      // floor on amountCents) so the frontend can display "Amount must
+      // be at most 10000 EUR" instead of an opaque INVALID_REQUEST.
+      const firstIssue = parsed.error.issues[0];
+      const message = firstIssue?.message || 'Invalid request';
       reply.code(400);
       return {
-        error: 'Invalid request',
+        error: message,
         code: 'INVALID_REQUEST',
         issues: parsed.error.issues,
       };

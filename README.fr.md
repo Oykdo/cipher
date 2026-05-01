@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.2.6-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.7-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)
@@ -103,8 +103,8 @@ Représentation visuelle de votre réseau de confiance :
 
 ## 📥 Téléchargement (utilisateurs / testeurs)
 
-Téléchargez `Cipher-Setup-1.2.6.exe` (Windows) ou `Cipher-1.2.6.AppImage` /
-`cipher_1.2.6_amd64.deb` (Linux) depuis la [dernière release](../../releases/latest).
+Téléchargez `Cipher-Setup-1.2.7.exe` (Windows) ou `Cipher-1.2.7.AppImage` /
+`cipher_1.2.7_amd64.deb` (Linux) depuis la [dernière release](../../releases/latest).
 
 > **À propos de l'avertissement Windows SmartScreen / antivirus** — à lire avant de lancer
 >
@@ -142,7 +142,7 @@ Téléchargez `Cipher-Setup-1.2.6.exe` (Windows) ou `Cipher-1.2.6.AppImage` /
 >
 >    ```powershell
 >    # Windows — affiche le hash local, compare visuellement avec la ligne dans SHA256SUMS.txt
->    Get-FileHash .\Cipher-Setup-1.2.6.exe -Algorithm SHA256
+>    Get-FileHash .\Cipher-Setup-1.2.7.exe -Algorithm SHA256
 >    ```
 >
 >    `SHA256SUMS.txt` est généré dans le runner GitHub Actions à partir
