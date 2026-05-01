@@ -52,7 +52,9 @@ export function useSocket({ token, autoConnect = true }: UseSocketOptions): UseS
     try {
       const socket = io(SOCKET_URL, {
         auth: { token },
-        transports: ['polling', 'websocket'], // ✅ Try polling first, then upgrade to websocket
+        // Prefer the websocket transport so call signaling latency stays low.
+        // Polling is kept as a fallback for networks that block WS upgrades.
+        transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,

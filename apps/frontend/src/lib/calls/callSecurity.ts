@@ -1,4 +1,7 @@
-export const CALL_SIGNATURE_MAX_AGE_MS = 120000;
+// 10 minutes. Wide enough to tolerate slow accept-on-incoming, clock skew
+// between peers, and high-RTT signaling on mobile/VPN networks; narrow
+// enough to keep the replay-protection cache bounded.
+export const CALL_SIGNATURE_MAX_AGE_MS = 600000;
 
 export interface SignedEnvelopePayload {
   eventName: string;

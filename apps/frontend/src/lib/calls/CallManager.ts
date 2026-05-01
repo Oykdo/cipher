@@ -10,6 +10,7 @@ import {
   isSignatureFresh,
   serializeSignedPayload,
 } from './callSecurity';
+import { getIceServers } from './iceConfig';
 import { debugLogger } from '../debugLogger';
 
 export type CallMediaType = 'audio' | 'video';
@@ -596,11 +597,7 @@ export class CallManager {
     }
 
     const peerConnection = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-      ],
+      iceServers: getIceServers(),
       encodedInsertableStreams: this.supportsInsertableStreams(),
     });
 

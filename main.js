@@ -652,6 +652,38 @@ async function createWindow() {
     icon: path.join(__dirname, 'assets', 'icon.png')
   });
 
+  // Audio/video calls need microphone + camera. Without an explicit handler,
+  // Electron 28+ silent-denies the getUserMedia prompt and the renderer just
+  // sees a generic "Permission denied" — which is what the alpha tester hit.
+  // Allow `media` only for our own origins (Vite dev server, packaged
+  // file://, hosted bridge); deny everything else (notifications, geolocation,
+  // etc.) by default.
+  const mediaAllowedOrigins = new Set([
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:4000',
+    'http://localhost:4001',
+    'https://cipher-bridge.fly.dev',
+  ]);
+  const isMediaOriginAllowed = (origin) => {
+    if (!origin) return false;
+    if (origin === 'file://') return true;
+    return mediaAllowedOrigins.has(origin);
+  };
+  mainWindow.webContents.session.setPermissionRequestHandler((_wc, permission, callback, details) => {
+    if (permission === 'media') {
+      callback(isMediaOriginAllowed(details?.requestingUrl ? new URL(details.requestingUrl).origin : null));
+      return;
+    }
+    callback(false);
+  });
+  mainWindow.webContents.session.setPermissionCheckHandler((_wc, permission, requestingOrigin) => {
+    if (permission === 'media') {
+      return isMediaOriginAllowed(requestingOrigin);
+    }
+    return false;
+  });
+
   // Security: deny every popup by default, except the canonical Eidolon
   // hologram viewer which ships as a self-contained HTML page served by the
   // local bridge at /api/v2/vault/viewer/avatar_<hex>.html. Those open in the
