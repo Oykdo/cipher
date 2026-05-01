@@ -1,5 +1,78 @@
 # Changelog
 
+## v1.2.5 — Real-world WebRTC reliability
+
+A tester running v1.1.3 reported audio/video calls failing across
+networks on 2026-05-01. The audit found that the call stack worked
+locally but had no path to traverse symmetric NAT, no permission
+plumbing on Electron 28+, and a signature freshness window too tight
+for slow accept-on-ring on real mobile networks. None of these are
+visible when both peers sit on the same LAN, which is why the
+regression had survived to v1.2.4.
+
+### Fixed
+
+- **Cross-NAT calls** — `apps/frontend/src/lib/calls/CallManager.ts`
+  and `apps/frontend/src/lib/p2p/webrtc.ts` listed only Google STUN
+  servers. Behind symmetric NAT, corporate firewalls, or 4G/5G with
+  carrier-grade NAT, ICE silently failed and the call hung on
+  "connecting". Centralised the ICE configuration in
+  `apps/frontend/src/lib/calls/iceConfig.ts` with a public Open
+  Relay TURN fallback (Metered) and `VITE_TURN_URL` /
+  `VITE_TURN_USERNAME` / `VITE_TURN_CREDENTIAL` env overrides for
+  production deployments that want a dedicated relay (coturn,
+  Twilio NTS, Metered paid).
+- **Signaling latency on restricted networks** —
+  `apps/frontend/src/hooks/useSocket.ts` opened Socket.IO with
+  `transports: ['polling', 'websocket']`, doubling round-trip time
+  on networks that allow WS upgrades. Flipped to websocket-first;
+  polling kept as the fallback.
+- **Stale call signatures on slow accept** —
+  `apps/frontend/src/lib/calls/callSecurity.ts` capped signature
+  freshness at 120s, which was too tight when the callee took a
+  while to pick up on a high-RTT mobile network. Bumped to 600s;
+  the `ReplayProtectionCache` TTL follows the same constant.
+- **Silent getUserMedia denial on Electron 28+** — `main.js` had no
+  `setPermissionRequestHandler` for `media`, so Chromium rejected
+  the mic/camera prompt without surfacing it to the renderer. Added
+  an allowlist scoped to the project's own origins (Vite dev,
+  `file://` packaged build, `https://cipher-bridge.fly.dev`).
+- **Invisible (but clickable) Windows tray icon** — `main.js` was
+  loading the 512×512 `assets/icon.png` for the tray, which the
+  Windows shell couldn't downscale cleanly and left a "ghost slot"
+  in the system tray (visible space, no glyph). Switched to the
+  multi-resolution `assets/icon.ico` on Windows so the shell picks
+  the right size for the current DPI; Linux keeps the PNG but now
+  resized to 22 px before being passed to `Tray()`.
+
+### Changed
+
+- **`apps/frontend/.env.production` gains optional `VITE_TURN_*`
+  variables.** Operators can point Cipher at their own TURN relay
+  by setting these three values; the public Open Relay fallback
+  applies when they are unset. This is the recommended path for any
+  deployment expecting more than a handful of concurrent calls —
+  the public relay is shared with the entire WebRTC ecosystem and
+  saturates under load.
+
+### Internal
+
+- Removed the unused `checksums` placeholder in
+  `apps/frontend/src/components/settings/BackupSettings.tsx`. The
+  DiceKey export path it was reserved for throws before reaching
+  it (L1-T13 refactor pending). The unused declaration was the
+  only remaining `tsc --noEmit` failure on master.
+
+### Notes for testers
+
+- The v1.2.5 installer must be redistributed to existing testers —
+  the call fix is entirely in the frontend bundle baked into the
+  `.exe` / `.AppImage`, so v1.1.3 testers will not pick it up
+  automatically. The bridge on `cipher-bridge.fly.dev` is
+  unchanged and does **not** need redeployment.
+- Fly.io deployment of the bridge remains a manual `flyctl deploy`
+  step (no GitHub Action wires it up). Skip it for v1.2.5.
+
 ## v1.2.4 — Time-Lock activated (drand/tlock)
 
 The drand/tlock client integration that has been sitting dark since

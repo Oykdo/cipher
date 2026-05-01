@@ -739,8 +739,19 @@ function createTray() {
   if (process.platform === 'darwin') return;
 
   try {
-    const iconPath = path.join(__dirname, 'assets', 'icon.png');
-    const image = nativeImage.createFromPath(iconPath);
+    // Windows tray expects 16/32 px; the 512×512 PNG produced an
+    // invisible-but-clickable empty slot (the system-tray "ghost icon"
+    // bug — visible space, no glyph). Prefer the multi-resolution .ico
+    // on Windows: it carries the right sizes and Windows picks the one
+    // matching the current DPI. Linux still uses the PNG (no .ico
+    // convention), but resized to 22 px as a defense-in-depth — some
+    // Linux DEs also dislike a 512 px source image.
+    const iconFile = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+    const iconPath = path.join(__dirname, 'assets', iconFile);
+    let image = nativeImage.createFromPath(iconPath);
+    if (process.platform !== 'win32' && !image.isEmpty()) {
+      image = image.resize({ width: 22, height: 22 });
+    }
     tray = new Tray(image);
     tray.setToolTip(getTrayStrings().tooltip);
     rebuildTrayMenu();

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.2.4-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.5-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)
@@ -106,8 +106,8 @@ Représentation visuelle de votre réseau de confiance :
 
 ## 📥 Téléchargement (utilisateurs / testeurs)
 
-Téléchargez `Cipher-Setup-1.2.4.exe` (Windows) ou `Cipher-1.2.4.AppImage` /
-`cipher_1.2.4_amd64.deb` (Linux) depuis la [dernière release](../../releases/latest).
+Téléchargez `Cipher-Setup-1.2.5.exe` (Windows) ou `Cipher-1.2.5.AppImage` /
+`cipher_1.2.5_amd64.deb` (Linux) depuis la [dernière release](../../releases/latest).
 
 > **À propos de l'avertissement Windows SmartScreen / antivirus** — à lire avant de lancer
 >
@@ -134,7 +134,7 @@ Téléchargez `Cipher-Setup-1.2.4.exe` (Windows) ou `Cipher-1.2.4.AppImage` /
 >    Electron sont fréquents (les heuristiques flag le Chromium / Node
 >    embarqué).
 > 3. **Vérifie le SHA256** affiché sur la page de release.
->    PowerShell : `Get-FileHash .\Cipher-Setup-1.2.4.exe -Algorithm SHA256`.
+>    PowerShell : `Get-FileHash .\Cipher-Setup-1.2.5.exe -Algorithm SHA256`.
 >
 > Pour cliquer à travers SmartScreen : **« Informations complémentaires »
 > → « Exécuter quand même »**. Pour signaler un faux positif Defender :
