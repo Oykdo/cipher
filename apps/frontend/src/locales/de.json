@@ -332,6 +332,8 @@
     "accept": "Akzeptieren",
     "reject": "Ablehnen",
     "request_sent": "Anfrage gesendet! Der Benutzer muss sie akzeptieren, bevor Sie chatten können.",
+    "invitation_sent_title": "Einladung gesendet!",
+    "invitation_sent_body": "@{{username}} wird sie im Anfragen-Bereich sehen. Wir benachrichtigen Sie, sobald sie angenommen wird.",
     "error_sending_request": "Fehler beim Senden der Anfrage",
     "error_accepting_request": "Fehler beim Akzeptieren der Anfrage",
     "error_rejecting_request": "Fehler beim Ablehnen der Anfrage",
@@ -656,7 +658,8 @@
       "pcs_label": "Post-Compromise Security",
       "pcs_desc": "Vergangene Nachrichten bleiben sicher, selbst wenn Schlüssel kompromittiert werden",
       "logout_confirm_default": "Sind Sie sicher, dass Sie sich abmelden möchten?",
-      "logout_warning": "Das Abmelden entfernt Ihre lokale Sitzung. Sie benötigen Ihre Wiederherstellungsphrase oder DiceKey, um sich erneut anzumelden."
+      "logout_dialog_title": "Von diesem Gerät abmelden?",
+      "logout_warning": "Cipher löscht Ihr lokales Passwort und Ihre Schlüssel. Sie benötigen Ihre Wiederherstellungsphrase oder DiceKey, um sich wieder anzumelden."
     },
     "contribution_settings": {
       "title": "Zum Projekt beitragen",
@@ -666,6 +669,7 @@
       "card_title": "Kartenzahlung (Stripe)",
       "card_amount_label": "Betrag",
       "card_amount_placeholder": "z. B. 5",
+      "card_currency_label": "Währung",
       "card_pay_button": "Mit Karte bezahlen",
       "card_redirecting": "Weiterleitung…",
       "card_invalid_amount": "Bitte geben Sie einen gültigen Betrag ein.",
@@ -708,8 +712,8 @@
     "behavior": {
       "title": "Fensterverhalten",
       "minimize_to_tray": {
-        "label": "Cipher im Infobereich aktiv halten",
-        "description": "Wenn Sie das Fenster schließen, bleibt Cipher im Infobereich. Klicken Sie auf das Symbol, um es wieder zu öffnen, oder klicken Sie mit der rechten Maustaste, um zu beenden. Unter GNOME ist möglicherweise die AppIndicator-Erweiterung erforderlich."
+        "label": "Beim Schließen im Hintergrund weiterlaufen",
+        "description": "Cipher bleibt aktiv, damit Sie keine Nachrichten verpassen. Über das Symbol neben der Uhr wieder öffnen."
       }
     }
   },

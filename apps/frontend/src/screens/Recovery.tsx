@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import { fetchWithRefresh } from '../services/api-interceptor';
 import TrustStarWidget from '../components/TrustStarWidget';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
 interface RecoveryLocationState {
   reason?: string;
@@ -21,15 +22,14 @@ export default function Recovery() {
   const [isMarkingLost, setIsMarkingLost] = useState(false);
   const [markError, setMarkError] = useState<string | null>(null);
   const [markSuccess, setMarkSuccess] = useState(false);
+  const [showMarkLostDialog, setShowMarkLostDialog] = useState(false);
 
   const reasonText = state?.reason === 'MISSING_MASTER_KEY'
     ? t('recovery.reason_missing_key')
     : t('recovery.reason_default');
 
   const handleMarkKeyLost = async () => {
-    const confirmed = window.confirm(t('recovery.confirm_mark_lost'));
-    if (!confirmed) return;
-
+    setShowMarkLostDialog(false);
     setIsMarkingLost(true);
     setMarkError(null);
 
@@ -118,7 +118,7 @@ export default function Recovery() {
 
           <button
             type="button"
-            onClick={handleMarkKeyLost}
+            onClick={() => setShowMarkLostDialog(true)}
             disabled={isMarkingLost || markSuccess}
             className="inline-flex items-center px-4 py-2 rounded-lg text-xs font-semibold border border-red-500/70 text-red-50 bg-red-700/80 hover:bg-red-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
@@ -144,6 +144,16 @@ export default function Recovery() {
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showMarkLostDialog}
+        onOpenChange={setShowMarkLostDialog}
+        title={t('recovery.mark_key_lost')}
+        description={t('recovery.confirm_mark_lost')}
+        confirmLabel={t('recovery.mark_key_lost_button')}
+        destructive
+        onConfirm={handleMarkKeyLost}
+      />
     </div>
   );
 }

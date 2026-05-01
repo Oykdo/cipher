@@ -332,6 +332,8 @@
     "accept": "Aceptar",
     "reject": "Rechazar",
     "request_sent": "¡Solicitud enviada! El usuario debe aceptarla antes de poder chatear.",
+    "invitation_sent_title": "¡Invitación enviada!",
+    "invitation_sent_body": "@{{username}} la verá en su panel de solicitudes. Te avisaremos en cuanto la acepte.",
     "error_sending_request": "Error al enviar la solicitud",
     "error_accepting_request": "Error al aceptar la solicitud",
     "error_rejecting_request": "Error al rechazar la solicitud",
@@ -656,7 +658,8 @@
       "pcs_label": "Post-Compromise Security",
       "pcs_desc": "Los mensajes pasados permanecen seguros incluso si las claves se comprometen",
       "logout_confirm_default": "¿Está seguro de que desea cerrar sesión?",
-      "logout_warning": "Cerrar sesión eliminará su sesión local. Necesitará su frase de recuperación o DiceKey para iniciar sesión nuevamente."
+      "logout_dialog_title": "¿Cerrar sesión en este dispositivo?",
+      "logout_warning": "Cipher borrará tu contraseña y claves locales. Necesitarás tu frase de recuperación o DiceKey para volver a iniciar sesión."
     },
     "contribution_settings": {
       "title": "Contribuir al proyecto",
@@ -666,6 +669,7 @@
       "card_title": "Pago con tarjeta (Stripe)",
       "card_amount_label": "Importe",
       "card_amount_placeholder": "ej. 5",
+      "card_currency_label": "Moneda",
       "card_pay_button": "Pagar con tarjeta",
       "card_redirecting": "Redirigiendo…",
       "card_invalid_amount": "Por favor, introduce un importe válido.",
@@ -708,8 +712,8 @@
     "behavior": {
       "title": "Comportamiento de la ventana",
       "minimize_to_tray": {
-        "label": "Mantener Cipher en la bandeja del sistema",
-        "description": "Cuando cierras la ventana, Cipher permanece en la bandeja del sistema. Haz clic en el icono para reabrir, o clic derecho para Salir. En GNOME, puede ser necesaria la extensión AppIndicator."
+        "label": "Seguir en segundo plano al cerrar",
+        "description": "Cipher permanece activo para que no te pierdas mensajes. Vuelve a abrirlo desde el icono junto al reloj."
       }
     }
   },

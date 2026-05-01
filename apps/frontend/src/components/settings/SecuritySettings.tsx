@@ -8,6 +8,8 @@ import { formatVaultHandle } from "../../lib/vaultHandle";
 import { EIDOLON_CONNECT_ENABLED } from "../../config";
 import { emergencyWipeKeys } from "../../lib/secureKeyAccess";
 import { clearAllDecryptedCache, flushPendingWrites as flushDecryptedCacheWrites } from "../../lib/e2ee/decryptedMessageCache";
+import { clearLocalAccount } from "../../lib/localStorage";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../ui/Dialog";
 
 export function SecuritySettings() {
     const { t } = useTranslation();
@@ -16,6 +18,8 @@ export function SecuritySettings() {
     const user = useAuthStore((state) => state.session?.user);
     const { settings, updateSettings, isUpdating } = useSettings();
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+    const [loggingOut, setLoggingOut] = useState(false);
 
     const linkedVault = user?.linkedVault;
     const discoverable = settings?.privacy?.discoverable ?? true;
@@ -48,7 +52,7 @@ export function SecuritySettings() {
     };
 
     const handleLogout = async () => {
-        if (!confirm(t("settings.security_settings.logout_confirm_default"))) return;
+        setLoggingOut(true);
 
         // Mirror the privacy-l1 logout sequence used in Conversations.tsx:
         // flush decrypted cache → wipe master key → clear session → navigate.
@@ -67,6 +71,15 @@ export function SecuritySettings() {
             await emergencyWipeKeys();
         } catch (err) {
             console.error("[logout] emergencyWipeKeys failed:", err);
+        }
+        // Erase the local fingerprint (pwd_<username> + known account entry)
+        // so the Quick Unlock bandeau no longer offers this device.
+        if (user?.username) {
+            try {
+                clearLocalAccount(user.username);
+            } catch (err) {
+                console.error("[logout] clearLocalAccount failed:", err);
+            }
         }
         clearSession();
         navigate("/", { replace: true });
@@ -205,12 +218,43 @@ export function SecuritySettings() {
                 </div>
 
                 <button
-                    onClick={handleLogout}
+                    onClick={() => setShowLogoutDialog(true)}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-red-700"
                 >
                     <span>{t("settings.security_settings.logout")}</span>
                 </button>
             </div>
+
+            <Dialog open={showLogoutDialog} onOpenChange={(open) => !loggingOut && setShowLogoutDialog(open)}>
+                <DialogContent size="sm" className="border-red-500/30">
+                    <DialogHeader>
+                        <DialogTitle className="text-red-300">
+                            {t("settings.security_settings.logout_dialog_title")}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {t("settings.security_settings.logout_warning")}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            onClick={() => setShowLogoutDialog(false)}
+                            disabled={loggingOut}
+                            className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-white/[0.08] disabled:opacity-60"
+                        >
+                            {t("common.cancel")}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void handleLogout()}
+                            disabled={loggingOut}
+                            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+                        >
+                            {t("settings.security_settings.logout")}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

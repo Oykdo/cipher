@@ -358,6 +358,8 @@
     "accept": "Aceitar",
     "reject": "Recusar",
     "request_sent": "Solicitação enviada! O usuário precisa aceitar antes de vocês conversarem.",
+    "invitation_sent_title": "Convite enviado!",
+    "invitation_sent_body": "@{{username}} verá no painel de solicitações. Avisaremos assim que aceitar.",
     "error_sending_request": "Erro ao enviar solicitação",
     "error_accepting_request": "Erro ao aceitar solicitação",
     "error_rejecting_request": "Erro ao recusar solicitação",
@@ -488,6 +490,7 @@
       "card_desc": "Faça uma contribuição com cartão via Stripe Checkout.",
       "card_amount_label": "Valor",
       "card_amount_placeholder": "ex.: 5",
+      "card_currency_label": "Moeda",
       "card_pay_button": "Pagar com cartão",
       "card_redirecting": "Redirecionando…",
       "card_invalid_amount": "Por favor, digite um valor válido.",
@@ -739,13 +742,14 @@
       "pcs_label": "Post-Compromise Security",
       "pcs_desc": "Mensagens passadas permanecem seguras mesmo se as chaves forem comprometidas",
       "logout_confirm_default": "Tem certeza de que deseja sair?",
-      "logout_warning": "Sair removerá sua sessão local. Você precisará da sua frase de recuperação ou DiceKey para entrar novamente."
+      "logout_dialog_title": "Sair deste dispositivo?",
+      "logout_warning": "O Cipher apagará sua senha e chaves locais. Você precisará da sua frase de recuperação ou DiceKey para entrar novamente."
     },
     "behavior": {
       "title": "Comportamento da janela",
       "minimize_to_tray": {
-        "label": "Manter o Cipher na bandeja do sistema",
-        "description": "Quando você fecha a janela, o Cipher permanece na bandeja do sistema. Clique no ícone para reabrir, ou clique com o botão direito para Sair. No GNOME, pode ser necessária a extensão AppIndicator."
+        "label": "Continuar em segundo plano ao fechar",
+        "description": "O Cipher permanece ativo para que você não perca mensagens. Reabra-o pelo ícone perto do relógio."
       }
     }
   },

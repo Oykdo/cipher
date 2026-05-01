@@ -19,6 +19,7 @@ export function FingerprintDisplay({
   showQR = true,
 }: FingerprintDisplayProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (showQR && fingerprint) {
@@ -95,11 +96,12 @@ export function FingerprintDisplay({
         <button
           onClick={() => {
             navigator.clipboard.writeText(fingerprint.replace(/\s/g, ''));
-            alert('Fingerprint copied to clipboard!');
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 2000);
           }}
           className="btn btn-secondary"
         >
-          📋 Copy Fingerprint
+          {copied ? '✓ Copied!' : '📋 Copy Fingerprint'}
         </button>
       </div>
     </div>

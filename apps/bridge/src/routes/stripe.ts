@@ -48,25 +48,18 @@ async function updateDonationStatusByPaymentIntent(paymentIntentId: string, stat
   );
 }
 
-// Donation cap = 10 000 EUR / transaction. Below 1 EUR Stripe itself
-// rejects (its minimum charge is around 0.50 EUR depending on currency),
-// above 10 000 EUR is a deliberate guardrail against typos rather than
-// a Stripe limit (Stripe accepts up to ~999 999.99 per transaction).
-// A donor wanting to give more than 10 000 EUR can split the payment
-// or contact the project directly — and is probably someone we want
-// to know.
+// Donation cap = 10 000 (currency-units) / transaction. Below 1 unit
+// Stripe itself rejects (its minimum charge is around 0.50 EUR/USD
+// depending on currency), above 10 000 is a deliberate guardrail
+// against typos rather than a Stripe limit (Stripe accepts up to
+// ~999 999.99 per transaction). A donor wanting to give more can
+// split the payment or contact the project directly — and is
+// probably someone we want to know.
 const AMOUNT_CENTS_MIN = 100;
 const AMOUNT_CENTS_MAX = 1_000_000;
 
 const createCheckoutSchema = z.object({
-  amountCents: z.coerce
-    .number()
-    .int('Amount must be a whole number of cents')
-    .min(AMOUNT_CENTS_MIN, `Amount must be at least ${AMOUNT_CENTS_MIN / 100} EUR`)
-    .max(
-      AMOUNT_CENTS_MAX,
-      `Amount must be at most ${AMOUNT_CENTS_MAX / 100} EUR — for larger donations, please make multiple payments or contact the project`,
-    ),
+  amountCents: z.coerce.number().int('Amount must be a whole number of cents'),
   currency: z
     .string()
     .trim()
@@ -113,6 +106,23 @@ export async function stripeRoutes(app: FastifyInstance) {
     }
 
     const { amountCents, currency, email } = parsed.data;
+    const currencyUpper = currency.toUpperCase();
+
+    if (amountCents < AMOUNT_CENTS_MIN) {
+      reply.code(400);
+      return {
+        error: `Amount must be at least ${AMOUNT_CENTS_MIN / 100} ${currencyUpper}`,
+        code: 'AMOUNT_TOO_LOW',
+      };
+    }
+    if (amountCents > AMOUNT_CENTS_MAX) {
+      reply.code(400);
+      return {
+        error: `Amount must be at most ${AMOUNT_CENTS_MAX / 100} ${currencyUpper} — for larger donations, please make multiple payments or contact the project`,
+        code: 'AMOUNT_TOO_HIGH',
+      };
+    }
+
     const stripe = new Stripe(secretKey);
 
     const frontendUrl = getFrontendUrl(app);

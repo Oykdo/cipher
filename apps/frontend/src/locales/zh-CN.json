@@ -332,6 +332,8 @@
     "accept": "接受",
     "reject": "拒绝",
     "request_sent": "请求已发送！用户必须接受后才能聊天。",
+    "invitation_sent_title": "邀请已发送！",
+    "invitation_sent_body": "@{{username}} 将在他们的请求面板中看到。一旦接受，我们会通知您。",
     "error_sending_request": "发送请求时出错",
     "error_accepting_request": "接受请求时出错",
     "error_rejecting_request": "拒绝请求时出错",
@@ -656,7 +658,8 @@
       "pcs_label": "妥协后安全",
       "pcs_desc": "即使密钥被泄露，过去的消息仍然安全",
       "logout_confirm_default": "您确定要退出登录吗？",
-      "logout_warning": "退出登录将删除您的本地会话。您需要使用恢复短语或DiceKey重新登录。"
+      "logout_dialog_title": "在此设备上退出登录？",
+      "logout_warning": "Cipher 将清除您的本地密码和密钥。重新登录需要您的恢复短语或 DiceKey。"
     },
     "contribution_settings": {
       "title": "为项目做贡献",
@@ -666,6 +669,7 @@
       "card_title": "信用卡支付 (Stripe)",
       "card_amount_label": "金额",
       "card_amount_placeholder": "例如 5",
+      "card_currency_label": "货币",
       "card_pay_button": "用信用卡支付",
       "card_redirecting": "重定向中…",
       "card_invalid_amount": "请输入有效金额。",
@@ -708,8 +712,8 @@
     "behavior": {
       "title": "窗口行为",
       "minimize_to_tray": {
-        "label": "在系统托盘中保持 Cipher 运行",
-        "description": "关闭窗口时，Cipher 将保留在系统托盘中。单击托盘图标重新打开，或右键单击以退出。在 GNOME 上可能需要 AppIndicator 扩展。"
+        "label": "关闭时在后台继续运行",
+        "description": "Cipher 保持活动状态，以免错过消息。点击时钟旁边的图标即可重新打开窗口。"
       }
     }
   },

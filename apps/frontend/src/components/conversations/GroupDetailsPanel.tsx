@@ -30,6 +30,7 @@ import { isConversationOwner } from '../../lib/conversations/helpers';
 import { debugLogger } from '../../lib/debugLogger';
 import type { UserSearchResult } from '../UserSearch';
 import { AtomLoader } from '../ui';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 const GROUP_MAX_MEMBERS = 10;
 
@@ -69,6 +70,9 @@ export function GroupDetailsPanel({
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
   const [showAddSearch, setShowAddSearch] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState<ConversationMemberV3 | null>(null);
+  const [pendingLeave, setPendingLeave] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(false);
 
   // ============================================================================
   // ADD MEMBER (owner only)
@@ -162,16 +166,15 @@ export function GroupDetailsPanel({
   // ============================================================================
   // REMOVE MEMBER (owner only)
   // ============================================================================
-  async function handleRemoveMember(member: ConversationMemberV3) {
+  function requestRemoveMember(member: ConversationMemberV3) {
     if (working) return;
-    const confirmed = window.confirm(
-      t('conversations.group.remove_member_confirm', {
-        username: member.username,
-        defaultValue: `Remove ${member.username} from the group?`,
-      }),
-    );
-    if (!confirmed) return;
+    setPendingRemove(member);
+  }
 
+  async function confirmRemoveMember() {
+    if (!pendingRemove) return;
+    const member = pendingRemove;
+    setPendingRemove(null);
     setWorking(true);
     setError('');
     try {
@@ -193,16 +196,8 @@ export function GroupDetailsPanel({
   // ============================================================================
   // LEAVE (non-owner only)
   // ============================================================================
-  async function handleLeave() {
-    if (working) return;
-    const confirmed = window.confirm(
-      t('conversations.group.leave_group_confirm', {
-        defaultValue:
-          'Leave this group? You will no longer receive its messages.',
-      }),
-    );
-    if (!confirmed) return;
-
+  async function confirmLeave() {
+    setPendingLeave(false);
     setWorking(true);
     setError('');
     try {
@@ -224,16 +219,8 @@ export function GroupDetailsPanel({
   // ============================================================================
   // DELETE (owner only)
   // ============================================================================
-  async function handleDelete() {
-    if (working) return;
-    const confirmed = window.confirm(
-      t('conversations.group.delete_group_confirm', {
-        defaultValue:
-          'Permanently delete this group? This action cannot be undone.',
-      }),
-    );
-    if (!confirmed) return;
-
+  async function confirmDelete() {
+    setPendingDelete(false);
     setWorking(true);
     setError('');
     try {
@@ -319,7 +306,7 @@ export function GroupDetailsPanel({
                 </span>
                 {isOwner && !memberIsOwner && !memberIsSelf && (
                   <button
-                    onClick={() => handleRemoveMember(member)}
+                    onClick={() => requestRemoveMember(member)}
                     disabled={working}
                     className="text-xs text-red-400 hover:text-red-300 disabled:opacity-40"
                   >
@@ -405,7 +392,7 @@ export function GroupDetailsPanel({
         <div className="border-t border-quantum-cyan/20 pt-4 space-y-2">
           {isOwner ? (
             <button
-              onClick={handleDelete}
+              onClick={() => setPendingDelete(true)}
               disabled={working}
               className="btn w-full bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500/25 disabled:opacity-50"
             >
@@ -416,7 +403,7 @@ export function GroupDetailsPanel({
             </button>
           ) : (
             <button
-              onClick={handleLeave}
+              onClick={() => setPendingLeave(true)}
               disabled={working}
               className="btn w-full bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25 disabled:opacity-50"
             >
@@ -428,6 +415,55 @@ export function GroupDetailsPanel({
           )}
         </div>
       </motion.div>
+
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        onOpenChange={(open) => !open && setPendingRemove(null)}
+        title={t('conversations.group.remove_member_title', {
+          defaultValue: 'Remove member?',
+        })}
+        description={t('conversations.group.remove_member_confirm', {
+          username: pendingRemove?.username ?? '',
+          defaultValue: `Remove ${pendingRemove?.username ?? ''} from the group?`,
+        })}
+        confirmLabel={t('common.delete')}
+        destructive
+        onConfirm={confirmRemoveMember}
+      />
+
+      <ConfirmDialog
+        open={pendingLeave}
+        onOpenChange={setPendingLeave}
+        title={t('conversations.group.leave_group_title', {
+          defaultValue: 'Leave this group?',
+        })}
+        description={t('conversations.group.leave_group_confirm', {
+          defaultValue:
+            'Leave this group? You will no longer receive its messages.',
+        })}
+        confirmLabel={t('conversations.group.leave_group_button', {
+          defaultValue: 'Leave group',
+        })}
+        destructive
+        onConfirm={confirmLeave}
+      />
+
+      <ConfirmDialog
+        open={pendingDelete}
+        onOpenChange={setPendingDelete}
+        title={t('conversations.group.delete_group_title', {
+          defaultValue: 'Delete group?',
+        })}
+        description={t('conversations.group.delete_group_confirm', {
+          defaultValue:
+            'Permanently delete this group? This action cannot be undone.',
+        })}
+        confirmLabel={t('conversations.group.delete_group_button', {
+          defaultValue: 'Delete group',
+        })}
+        destructive
+        onConfirm={confirmDelete}
+      />
     </motion.div>
   );
 }

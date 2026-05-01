@@ -332,6 +332,8 @@
     "accept": "Accetta",
     "reject": "Rifiuta",
     "request_sent": "Richiesta inviata! L'utente deve accettarla prima di poter chattare.",
+    "invitation_sent_title": "Invito inviato!",
+    "invitation_sent_body": "@{{username}} lo vedrà nel suo pannello richieste. Ti avviseremo non appena lo accetterà.",
     "error_sending_request": "Errore nell'invio della richiesta",
     "error_accepting_request": "Errore nell'accettazione della richiesta",
     "error_rejecting_request": "Errore nel rifiuto della richiesta",
@@ -656,7 +658,8 @@
       "pcs_label": "Post-Compromise Security",
       "pcs_desc": "I messaggi passati rimangono sicuri anche se le chiavi vengono compromesse",
       "logout_confirm_default": "Sei sicuro di voler disconnetterti?",
-      "logout_warning": "La disconnessione rimuoverà la tua sessione locale. Avrai bisogno della tua frase di recupero o DiceKey per accedere nuovamente."
+      "logout_dialog_title": "Disconnettersi da questo dispositivo?",
+      "logout_warning": "Cipher cancellerà la tua password e le chiavi locali. Per accedere di nuovo ti serviranno la frase di recupero o la DiceKey."
     },
     "contribution_settings": {
       "title": "Contribuisci al progetto",
@@ -666,6 +669,7 @@
       "card_title": "Pagamento con carta (Stripe)",
       "card_amount_label": "Importo",
       "card_amount_placeholder": "es. 5",
+      "card_currency_label": "Valuta",
       "card_pay_button": "Paga con carta",
       "card_redirecting": "Reindirizzamento…",
       "card_invalid_amount": "Inserisci un importo valido.",
@@ -708,8 +712,8 @@
     "behavior": {
       "title": "Comportamento della finestra",
       "minimize_to_tray": {
-        "label": "Mantieni Cipher attivo nell'area di notifica",
-        "description": "Quando chiudi la finestra, Cipher resta nell'area di notifica. Fai clic sull'icona per riaprire, o clic destro per Esci. Su GNOME potrebbe servire l'estensione AppIndicator."
+        "label": "Continua in background alla chiusura",
+        "description": "Cipher resta attivo per non farti perdere messaggi. Riaprilo dall'icona vicino all'orologio."
       }
     }
   },

@@ -30,8 +30,11 @@ export function ContributionSettings() {
     const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
     const [integrityOk, setIntegrityOk] = useState(true);
     const [stripeAmount, setStripeAmount] = useState("5");
+    const [stripeCurrency, setStripeCurrency] = useState("eur");
     const [stripeRedirecting, setStripeRedirecting] = useState(false);
     const [stripeError, setStripeError] = useState<string | null>(null);
+
+    const stripeCurrencies = ["eur", "usd", "gbp", "chf", "cad", "aud"] as const;
 
     const cryptoAddresses: Record<string, CryptoAddress> = useMemo(
         () => ({
@@ -141,7 +144,7 @@ export function ContributionSettings() {
                     "Content-Type": "application/json",
                     Accept: "application/json",
                 },
-                body: JSON.stringify({ amountCents, currency: "eur" }),
+                body: JSON.stringify({ amountCents, currency: stripeCurrency }),
                 credentials: "include",
             });
 
@@ -242,7 +245,19 @@ export function ContributionSettings() {
                                     placeholder={t("settings.contribution_settings.card_amount_placeholder")}
                                     disabled={stripeRedirecting}
                                 />
-                                <span className="text-slate-200">EUR</span>
+                                <select
+                                    value={stripeCurrency}
+                                    onChange={(e) => setStripeCurrency(e.target.value)}
+                                    disabled={stripeRedirecting}
+                                    aria-label={t("settings.contribution_settings.card_currency_label")}
+                                    className="cosmic-input cosmic-input-plain w-auto cursor-pointer pr-2"
+                                >
+                                    {stripeCurrencies.map((c) => (
+                                        <option key={c} value={c} className="bg-slate-900 text-white">
+                                            {c.toUpperCase()}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 

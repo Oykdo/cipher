@@ -24,6 +24,7 @@ export default function P2PChat() {
   const [targetPeerId, setTargetPeerId] = useState('');
   const [targetPeerUsername, setTargetPeerUsername] = useState('');
   const [conversationId] = useState('demo-conversation');
+  const [sendError, setSendError] = useState<string | null>(null);
 
   // Initialize P2P
   const { sendMessage, onlinePeers, isInitialized, connectToPeer } = useP2P({
@@ -59,6 +60,7 @@ export default function P2PChat() {
   const handleSendMessage = async () => {
     if (!messageText.trim() || !targetPeerId || !targetPeerUsername) return;
 
+    setSendError(null);
     try {
       // Add to local messages
       setMessages((prev) => [
@@ -75,7 +77,7 @@ export default function P2PChat() {
       setMessageText('');
     } catch (error) {
       console.error('Failed to send message:', error);
-      alert('Failed to send message: ' + (error as Error).message);
+      setSendError('Failed to send message: ' + (error as Error).message);
     }
   };
 
@@ -222,6 +224,11 @@ export default function P2PChat() {
           {!targetPeerId && (
             <div className="mt-2 text-yellow-400 text-sm">
               ⚠️ No peer connected. Open this page in another browser window.
+            </div>
+          )}
+          {sendError && (
+            <div className="mt-2 text-red-400 text-sm">
+              ❌ {sendError}
             </div>
           )}
         </div>

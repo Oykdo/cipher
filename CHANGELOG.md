@@ -1,5 +1,54 @@
 # Changelog
 
+## v1.2.8 — UX polish: cosmic dialogs, dynamic Stripe currency, full logout
+
+### Changed
+
+- **Logout in Danger Zone** now uses a cosmic Dialog (replaces the
+  native browser confirm) and properly clears the local fingerprint
+  (`pwd_<username>` + known-account entry). Quick Unlock no longer
+  offers the device after a real logout — the previous behaviour
+  left the password hash in `localStorage`, so the bandeau on
+  Landing.tsx kept resurrecting the account.
+- **All native `window.confirm` (×5) and `alert()` (×6) replaced.**
+  Group destructive actions (remove member / leave / delete),
+  recovery flow, Quick Unlock cache reset, and the safety-number
+  verification revoke now go through the new ConfirmDialog
+  primitive. Send-failure errors and the E2EE init warning surface
+  via inline banners. Fingerprint copy uses an inline "Copied!"
+  pattern (2 s).
+- **Tray-behavior settings text rewritten across 8 locales.** The
+  previous wording leaned on jargon ("system tray / barre des
+  tâches / Infobereich") and a GNOME/AppIndicator footnote that
+  was noise for >99 % of users. Replaced with a one-liner that
+  explains the *why* ("Cipher stays active so you don't miss
+  messages") and a one-liner pointer ("reopen from the icon near
+  the clock").
+- **Stripe contribution: currency dropdown** (EUR / USD / GBP / CHF
+  / CAD / AUD) instead of a hard-coded EUR span. The bridge already
+  accepted the `currency` field; the frontend now actually exposes
+  the choice, and the server-side cap message reflects the picked
+  currency (e.g. *"Amount must be at most 10000 USD"*) instead of
+  always saying EUR.
+
+### Added
+
+- `components/ui/ConfirmDialog.tsx` — reusable Radix-based confirm
+  primitive with `destructive` (red) and `hideCancel`
+  (acknowledgment-only) variants. Wraps the existing Dialog
+  component for a11y / focus-trap.
+- `components/conversations/InvitationSentModal.tsx` — cosmic-styled
+  feedback modal shown after sending a conversation request
+  (animated check icon, halo glow, framer-motion spring entrance).
+
+### Internal
+
+- `SafetyNumberVerification.tsx` flagged inactive in its file
+  header. The component is in the codebase since the initial
+  commit but has never been imported anywhere; the polish in this
+  release is intended as a design reference for a future
+  "verify this contact" screen (desktop or mobile).
+
 ## v1.2.7 — Stripe donation cap raised + actionable error messages
 
 ### Changed

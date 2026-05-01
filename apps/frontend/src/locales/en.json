@@ -358,6 +358,8 @@
     "accept": "Accept",
     "reject": "Reject",
     "request_sent": "Request sent! The user must accept it before you can chat.",
+    "invitation_sent_title": "Invitation sent!",
+    "invitation_sent_body": "@{{username}} will see it in their requests panel. We'll let you know as soon as they accept.",
     "error_sending_request": "Error sending request",
     "error_accepting_request": "Error accepting request",
     "error_rejecting_request": "Error rejecting request",
@@ -488,6 +490,7 @@
       "card_desc": "Make a contribution by card via Stripe Checkout.",
       "card_amount_label": "Amount",
       "card_amount_placeholder": "e.g. 5",
+      "card_currency_label": "Currency",
       "card_pay_button": "Pay with card",
       "card_redirecting": "Redirecting…",
       "card_invalid_amount": "Please enter a valid amount.",
@@ -739,13 +742,14 @@
       "pcs_label": "Post-Compromise Security",
       "pcs_desc": "Past messages remain secure even if keys are compromised",
       "logout_confirm_default": "Are you sure you want to log out?",
-      "logout_warning": "Logging out will remove your local session. You will need your recovery phrase or DiceKey to log in again."
+      "logout_dialog_title": "Log out of this device?",
+      "logout_warning": "Cipher will erase your local password and keys. You'll need your recovery phrase or DiceKey to log back in."
     },
     "behavior": {
       "title": "Window behavior",
       "minimize_to_tray": {
-        "label": "Keep Cipher running in the system tray",
-        "description": "When you close the window, Cipher stays in the tray. Click the tray icon to reopen, or right-click for Quit. On GNOME you may need the AppIndicator extension."
+        "label": "Keep running in background when window is closed",
+        "description": "Cipher stays active so you don't miss messages. Reopen it from the icon near the clock."
       }
     }
   },

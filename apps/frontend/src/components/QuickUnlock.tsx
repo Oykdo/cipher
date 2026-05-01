@@ -12,6 +12,7 @@ import { setSessionMasterKey } from '../lib/masterKeyResolver';
 import { setTemporaryMasterKey } from '../lib/secureKeyAccess';
 import * as srp from 'secure-remote-password/client';
 import { debugLogger } from "../lib/debugLogger";
+import { ConfirmDialog } from './ui/ConfirmDialog';
 import '../styles/fluidCrypto.css';
 
 interface QuickUnlockProps {
@@ -30,6 +31,7 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [hasPassword, setHasPassword] = useState(true);
+  const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
   const linkedVault = useAuthStore((state) => state.session?.user?.linkedVault);
 
   useEffect(() => {
@@ -173,7 +175,14 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
         debugLogger.debug('[QuickUnlock] E2EE initialized successfully');
       } catch (e2eeError) {
         console.error('[QuickUnlock] E2EE initialization failed:', e2eeError);
-        alert('Warning: E2EE initialization failed. Encryption may not work properly. Please try logging out and back in.');
+        // Surface to the user via the existing inline error banner — the
+        // session is technically valid (SRP succeeded) but encryption may
+        // fail. Better to let them choose to retry/full-login than block
+        // navigation with a modal.
+        setError(t('quick_unlock.e2ee_init_warning', {
+          defaultValue:
+            'Encryption initialization failed. Some messages may not work — try logging out and back in.',
+        }));
       }
 
       navigate('/conversations');
@@ -185,14 +194,13 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
     }
   };
 
-  const handleClearCache = () => {
-    if (confirm(t('settings.security_settings.clear_cache_confirm'))) {
-      clearLocalAccount(account.username);
-      setHasPassword(false);
-      setError('');
-      if (onAccountDeleted) {
-        onAccountDeleted();
-      }
+  const confirmClearCache = () => {
+    setShowClearCacheDialog(false);
+    clearLocalAccount(account.username);
+    setHasPassword(false);
+    setError('');
+    if (onAccountDeleted) {
+      onAccountDeleted();
     }
   };
 
@@ -236,7 +244,7 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
             </div>
 
             <button
-              onClick={handleClearCache}
+              onClick={() => setShowClearCacheDialog(true)}
               className="p-2 text-soft-grey hover:text-error-glow transition-colors opacity-0 group-hover:opacity-100"
               title={t('settings.security_settings.forget_account')}
             >
@@ -352,6 +360,16 @@ export default function QuickUnlock({ account, onSwitchAccount, onCreateNew, onA
           {linkedVault ? t('quick_unlock.footer_eidolon', t('quick_unlock.footer')) : t('quick_unlock.footer')}
         </p>
       </div>
+
+      <ConfirmDialog
+        open={showClearCacheDialog}
+        onOpenChange={setShowClearCacheDialog}
+        title={t('settings.security_settings.forget_account', { defaultValue: 'Forget this account' })}
+        description={t('settings.security_settings.clear_cache_confirm')}
+        confirmLabel={t('settings.security_settings.forget_account', { defaultValue: 'Forget' })}
+        destructive
+        onConfirm={confirmClearCache}
+      />
     </motion.div>
   );
 }

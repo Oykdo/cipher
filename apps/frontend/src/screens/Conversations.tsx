@@ -21,6 +21,7 @@ import { useX3DHHandshake } from '../hooks/useX3DHHandshake';
 import { useSocketEvent, useConversationRoom, useTypingIndicator } from '../hooks/useSocket';
 import UserSearch, { type UserSearchResult } from '../components/UserSearch';
 import { GroupConversationModal } from '../components/conversations/GroupConversationModal';
+import { InvitationSentModal } from '../components/conversations/InvitationSentModal';
 import { GroupDetailsPanel } from '../components/conversations/GroupDetailsPanel';
 import { ConversationList } from '../components/conversations/ConversationList';
 import { ChatHeader, type ConnectionMode } from '../components/conversations/ChatHeader';
@@ -99,6 +100,7 @@ export default function Conversations() {
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
   const [showGroupDetailsForId, setShowGroupDetailsForId] = useState<string | null>(null);
   const [creatingConv, setCreatingConv] = useState(false);
+  const [invitationSentTo, setInvitationSentTo] = useState<string | null>(null);
 
   // Online status tracking
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
@@ -1005,11 +1007,9 @@ export default function Conversations() {
       // navigate away and back.
       setRequestsRefreshKey((k) => k + 1);
 
-      // Show success message
-      alert(t('conversations.request_sent'));
-
-      // Close modal
+      // Close search modal, then surface a cosmic-styled confirmation.
       setShowNewConvModal(false);
+      setInvitationSentTo(selectedUser.username);
     } catch (err: any) {
       console.error('Failed to send conversation request:', err);
       setError(err.message || t('conversations.error_sending_request'));
@@ -1436,7 +1436,10 @@ export default function Conversations() {
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
       setMessageBody(plaintextBody);
 
-      alert(err.message || t('conversations.error_sending_message'));
+      // Surface via the existing inline `error` banner instead of a
+      // blocking native alert. The user has just lost their tempId
+      // optimistic message — restoring the body is enough to recover.
+      setError(err.message || t('conversations.error_sending_message'));
     } finally {
       setSendingMessage(false);
     }
@@ -2003,6 +2006,12 @@ export default function Conversations() {
             />
           );
         })()}
+        {invitationSentTo && (
+          <InvitationSentModal
+            username={invitationSentTo}
+            onClose={() => setInvitationSentTo(null)}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

@@ -348,6 +348,8 @@
     "accept": "Accepter",
     "reject": "Refuser",
     "request_sent": "Demande envoyée ! L'utilisateur doit l'accepter avant de pouvoir discuter.",
+    "invitation_sent_title": "Invitation envoyée !",
+    "invitation_sent_body": "@{{username}} la verra dans son panneau de demandes. Nous vous préviendrons dès l'acceptation.",
     "error_sending_request": "Erreur lors de l'envoi de la demande",
     "error_accepting_request": "Erreur lors de l'acceptation de la demande",
     "error_rejecting_request": "Erreur lors du rejet de la demande",
@@ -476,6 +478,7 @@
       "card_desc": "Faites une contribution par carte via Stripe Checkout.",
       "card_amount_label": "Montant",
       "card_amount_placeholder": "ex. 5",
+      "card_currency_label": "Devise",
       "card_pay_button": "Payer par carte",
       "card_redirecting": "Redirection…",
       "card_invalid_amount": "Veuillez saisir un montant valide.",
@@ -738,13 +741,14 @@
       "pcs_label": "Post-Compromise Security",
       "pcs_desc": "Les messages passés restent sécurisés même si les clés sont compromises",
       "logout_confirm_default": "Êtes-vous sûr de vouloir vous déconnecter ?",
-      "logout_warning": "La déconnexion supprimera votre session locale. Vous aurez besoin de votre phrase de récupération ou DiceKey pour vous reconnecter."
+      "logout_dialog_title": "Se déconnecter de cet appareil ?",
+      "logout_warning": "Cipher effacera votre mot de passe et vos clés locales. Vous aurez besoin de votre phrase de récupération ou DiceKey pour vous reconnecter."
     },
     "behavior": {
       "title": "Comportement de la fenêtre",
       "minimize_to_tray": {
-        "label": "Conserver Cipher dans la barre des tâches",
-        "description": "Quand vous fermez la fenêtre, Cipher reste dans la barre des tâches. Cliquez sur l'icône pour rouvrir, ou clic droit pour Quitter. Sur GNOME, l'extension AppIndicator peut être requise."
+        "label": "Continuer en arrière-plan à la fermeture",
+        "description": "Cipher reste actif pour ne pas manquer de messages. Rouvrez-le via l'icône près de l'horloge."
       }
     }
   },

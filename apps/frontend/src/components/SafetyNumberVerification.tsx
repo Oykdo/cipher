@@ -3,6 +3,10 @@
  *
  * Implements Signal-style Safety Numbers for out-of-band public key verification.
  * Allows users to verify they are communicating with the intended person.
+ *
+ * STATUS: Inactive — design reference for a future "Verify this contact"
+ * screen (desktop or mobile). Mobile will need to swap qr-scanner for
+ * expo-camera; the crypto layer in `shared/identity.ts` is reusable as-is.
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -18,6 +22,7 @@ import {
 } from '../shared/identity';
 import { Button } from './ui/Button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/Dialog';
+import { ConfirmDialog } from './ui/ConfirmDialog';
 import { logger } from '../lib/logger';
 
 interface SafetyNumberVerificationProps {
@@ -43,6 +48,13 @@ export function SafetyNumberVerification({
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showMyQRCode, setShowMyQRCode] = useState(false);
   const [verified, setVerified] = useState(isVerified);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [verificationFeedback, setVerificationFeedback] = useState<
+    | { kind: 'success'; identifier: string }
+    | { kind: 'mismatch'; expected: string; scanned: string }
+    | null
+  >(null);
+  const [showRevokeDialog, setShowRevokeDialog] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
 
@@ -85,9 +97,10 @@ export function SafetyNumberVerification({
 
       await scannerRef.current.start();
       setShowQRScanner(true);
+      setScanError(null);
     } catch (error) {
       logger.error('Failed to start QR scanner', error);
-      alert('Impossible de démarrer la caméra. Vérifiez les permissions.');
+      setScanError('Impossible de démarrer la caméra. Vérifiez les permissions.');
     }
   };
 
@@ -104,11 +117,12 @@ export function SafetyNumberVerification({
   // Handle QR Code scanned
   const handleQRScanned = (qrData: string) => {
     stopQRScanner();
+    setScanError(null);
 
     const parsed = parseQRCodeData(qrData);
 
     if (!parsed) {
-      alert('❌ QR Code invalide');
+      setScanError('QR Code invalide.');
       return;
     }
 
@@ -116,14 +130,13 @@ export function SafetyNumberVerification({
     if (verifyPublicKeyMatch(parsed.publicKey, remotePublicKey)) {
       setVerified(true);
       onVerificationChange?.(true);
-      alert(`✅ Vérification réussie!\n\nContact: ${parsed.identifier}`);
+      setVerificationFeedback({ kind: 'success', identifier: parsed.identifier });
     } else {
-      alert(
-        `⚠️ ATTENTION: CLÉS NE CORRESPONDENT PAS!\n\n` +
-        `Attendu: ${remoteIdentifier}\n` +
-        `Scanné: ${parsed.identifier}\n\n` +
-        `Possible attaque MITM! Ne partagez PAS de données sensibles.`
-      );
+      setVerificationFeedback({
+        kind: 'mismatch',
+        expected: remoteIdentifier,
+        scanned: parsed.identifier,
+      });
     }
   };
 
@@ -202,12 +215,7 @@ export function SafetyNumberVerification({
 
         {verified && (
           <Button
-            onClick={() => {
-              if (confirm('Êtes-vous sûr de vouloir révoquer la vérification de ce contact?')) {
-                setVerified(false);
-                onVerificationChange?.(false);
-              }
-            }}
+            onClick={() => setShowRevokeDialog(true)}
             variant="outline"
             className="w-full text-orange-600"
           >
@@ -215,6 +223,13 @@ export function SafetyNumberVerification({
           </Button>
         )}
       </div>
+
+      {/* Inline scan error (camera failure, invalid QR) */}
+      {scanError && (
+        <div className="mt-4 p-3 rounded-lg border border-red-500/40 bg-red-500/10 text-sm text-red-300">
+          ❌ {scanError}
+        </div>
+      )}
 
       {/* QR Scanner Dialog */}
       <Dialog open={showQRScanner} onOpenChange={(open) => !open && stopQRScanner()}>
@@ -278,6 +293,50 @@ export function SafetyNumberVerification({
           </p>
         </div>
       )}
+
+      {/* Revoke verification confirm */}
+      <ConfirmDialog
+        open={showRevokeDialog}
+        onOpenChange={setShowRevokeDialog}
+        title="Révoquer la vérification ?"
+        description="Le contact ne sera plus marqué comme vérifié. Vous devrez scanner à nouveau son QR Code pour le re-vérifier."
+        confirmLabel="Révoquer"
+        destructive
+        onConfirm={() => {
+          setShowRevokeDialog(false);
+          setVerified(false);
+          onVerificationChange?.(false);
+        }}
+      />
+
+      {/* Verification feedback (success or MITM warning — must acknowledge) */}
+      <ConfirmDialog
+        open={verificationFeedback?.kind === 'success'}
+        onOpenChange={(open) => !open && setVerificationFeedback(null)}
+        title="✅ Vérification réussie"
+        description={
+          verificationFeedback?.kind === 'success'
+            ? `Contact: ${verificationFeedback.identifier}`
+            : ''
+        }
+        hideCancel
+        onConfirm={() => setVerificationFeedback(null)}
+      />
+
+      <ConfirmDialog
+        open={verificationFeedback?.kind === 'mismatch'}
+        onOpenChange={(open) => !open && setVerificationFeedback(null)}
+        title="⚠️ Clés ne correspondent pas !"
+        description={
+          verificationFeedback?.kind === 'mismatch'
+            ? `Attendu : ${verificationFeedback.expected}\nScanné : ${verificationFeedback.scanned}\n\nPossible attaque MITM. Ne partagez pas de données sensibles.`
+            : ''
+        }
+        hideCancel
+        destructive
+        confirmLabel="J'ai compris"
+        onConfirm={() => setVerificationFeedback(null)}
+      />
     </div>
   );
 }
