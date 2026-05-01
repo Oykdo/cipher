@@ -104,6 +104,12 @@ declare global {
         }>;
         delete: (vaultId: string) => Promise<{ ok: boolean; error?: string }>;
       };
+      tray?: {
+        getPref: () => Promise<{ minimizeToTray: boolean; firstCloseShown: boolean; locale: string }>;
+        setPref: (patch: { minimizeToTray?: boolean }) => Promise<{ minimizeToTray: boolean; firstCloseShown: boolean; locale: string }>;
+        setLocale: (locale: string) => Promise<string>;
+        quitNow: () => Promise<void>;
+      };
       platform?: string;
       versions?: {
         node: string;

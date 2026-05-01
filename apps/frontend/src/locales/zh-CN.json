@@ -316,6 +316,7 @@
     "write_encrypted": "编写加密消息...",
     "init_crypto": "正在初始化加密...",
     "new_conversation_button": "➕ 新对话",
+    "direct_section": "1:1 对话",
     "no_conversations": "没有对话",
     "click_new_to_start": "点击“新对话”开始",
     "search_error": "搜索时出错",
@@ -347,6 +348,7 @@
     "has_archived_messages": "此对话包含来自备份的已存档消息。前往设置 > 备份查看它们。",
     "unknown_user": "未知",
     "group": {
+      "section_title": "群组",
       "create_button": "创建群组",
       "modal_title": "新建群组",
       "name_placeholder": "群组名称（可选）",
@@ -703,7 +705,21 @@
       "share_twitter": "在Twitter上分享",
       "share_reddit": "在Reddit上分享",
       "thank_you": "感谢您的支持！💝"
+    },
+    "behavior": {
+      "title": "窗口行为",
+      "minimize_to_tray": {
+        "label": "在系统托盘中保持 Cipher 运行",
+        "description": "关闭窗口时，Cipher 将保留在系统托盘中。单击托盘图标重新打开，或右键单击以退出。在 GNOME 上可能需要 AppIndicator 扩展。"
+      }
     }
+  },
+  "tray": {
+    "tooltip": "Cipher",
+    "show": "显示 Cipher",
+    "quit": "退出 Cipher",
+    "first_time_balloon_title": "Cipher 仍在运行",
+    "first_time_balloon_body": "Cipher 仍在系统托盘中运行。右键单击图标以退出。"
   },
   "discover": {
     "title": "🌠 探索Cipher",

@@ -1,10 +1,10 @@
 import electron from 'electron';
-const { app, BrowserWindow, ipcMain, safeStorage, shell } = electron;
+const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, safeStorage, shell } = electron;
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fork, spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,7 +12,55 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow = null;
 let backendProcess = null;
+let tray = null;
+let isQuitting = false;
 const VAULT_BRIDGE_FILE = 'eidolon_cipher_bridge.json';
+
+// Tray prefs live in userData (machine-bound, not account-bound). Loaded
+// synchronously at startup so the close handler can read them without an
+// async dance.
+const TRAY_PREFS_DEFAULT = { minimizeToTray: false, firstCloseShown: false, locale: 'en' };
+let trayPrefs = { ...TRAY_PREFS_DEFAULT };
+
+function trayPrefsPath() {
+  return path.join(app.getPath('userData'), 'tray-prefs.json');
+}
+
+function loadTrayPrefs() {
+  try {
+    const raw = readFileSync(trayPrefsPath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    trayPrefs = { ...TRAY_PREFS_DEFAULT, ...parsed };
+  } catch {
+    trayPrefs = { ...TRAY_PREFS_DEFAULT };
+  }
+}
+
+function saveTrayPrefs() {
+  try {
+    writeFileSync(trayPrefsPath(), JSON.stringify(trayPrefs), 'utf8');
+  } catch (err) {
+    console.error('[tray] Failed to save prefs:', err);
+  }
+}
+
+// Tray menu strings — bundled here because the main process cannot reach
+// react-i18next. Keep these in sync with the 8 locale JSON files. EN is the
+// fallback; locales without a native string fall through to EN.
+const TRAY_STRINGS = {
+  en: { tooltip: 'Cipher', show: 'Show Cipher', quit: 'Quit Cipher', balloonTitle: 'Cipher keeps running', balloonBody: 'Cipher is still running in the system tray. Right-click the icon to quit.' },
+  fr: { tooltip: 'Cipher', show: 'Afficher Cipher', quit: 'Quitter Cipher', balloonTitle: 'Cipher continue de tourner', balloonBody: 'Cipher reste actif dans la barre des tâches. Clic droit sur l’icône pour quitter.' },
+  de: { tooltip: 'Cipher', show: 'Cipher anzeigen', quit: 'Cipher beenden', balloonTitle: 'Cipher läuft weiter', balloonBody: 'Cipher läuft noch im Infobereich. Rechtsklick auf das Symbol zum Beenden.' },
+  es: { tooltip: 'Cipher', show: 'Mostrar Cipher', quit: 'Salir de Cipher', balloonTitle: 'Cipher sigue funcionando', balloonBody: 'Cipher sigue activo en la bandeja del sistema. Clic derecho en el icono para salir.' },
+  it: { tooltip: 'Cipher', show: 'Mostra Cipher', quit: 'Esci da Cipher', balloonTitle: 'Cipher è ancora attivo', balloonBody: 'Cipher è ancora in esecuzione nell’area di notifica. Clic destro sull’icona per uscire.' },
+  pt: { tooltip: 'Cipher', show: 'Mostrar Cipher', quit: 'Sair do Cipher', balloonTitle: 'Cipher continua em execução', balloonBody: 'O Cipher ainda está em execução na bandeja do sistema. Clique com o botão direito no ícone para sair.' },
+  ru: { tooltip: 'Cipher', show: 'Показать Cipher', quit: 'Выйти из Cipher', balloonTitle: 'Cipher продолжает работу', balloonBody: 'Cipher всё ещё работает в системном трее. Щёлкните по значку правой кнопкой, чтобы выйти.' },
+  'zh-CN': { tooltip: 'Cipher', show: '显示 Cipher', quit: '退出 Cipher', balloonTitle: 'Cipher 仍在运行', balloonBody: 'Cipher 仍在系统托盘中运行。右键单击图标以退出。' },
+};
+
+function getTrayStrings() {
+  return TRAY_STRINGS[trayPrefs.locale] || TRAY_STRINGS.en;
+}
 
 // Load bridge env files so the main process (and child Python subprocesses
 // that inherit process.env) see EIDOLON_CONNECT_SESSION_SECRET,
@@ -471,6 +519,7 @@ if (!gotTheLock) {
 } else {
   app.on('second-instance', () => {
     if (mainWindow) {
+      if (!mainWindow.isVisible()) mainWindow.show();
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
@@ -478,8 +527,10 @@ if (!gotTheLock) {
 
   app.whenReady().then(async () => {
     try {
+      loadTrayPrefs();
       await startBackend();
       await createWindow();
+      createTray();
     } catch (error) {
       console.error('Failed to start application:', error);
       app.quit();
@@ -627,6 +678,18 @@ async function createWindow() {
     }
   });
 
+  // Tray-aware close: when minimizeToTray is on, the X button hides the
+  // window instead of letting it close. The real exit path is the tray
+  // menu's "Quit" item (or auto-update / OS shutdown), which sets
+  // isQuitting = true before calling app.quit().
+  mainWindow.on('close', (e) => {
+    if (trayPrefs.minimizeToTray && !isQuitting && process.platform !== 'darwin') {
+      e.preventDefault();
+      mainWindow.hide();
+      maybeShowFirstCloseBalloon();
+    }
+  });
+
   // Load app
   if (app.isPackaged) {
     await mainWindow.loadFile(path.join(__dirname, 'apps', 'frontend', 'dist', 'index.html'));
@@ -637,13 +700,101 @@ async function createWindow() {
   }
 }
 
+function createTray() {
+  // Tray is a Windows + Linux feature here. macOS dock already provides the
+  // "stays alive" behavior natively; status-bar items are a separate design
+  // and deferred with the macOS packaging.
+  if (process.platform === 'darwin') return;
+
+  try {
+    const iconPath = path.join(__dirname, 'assets', 'icon.png');
+    const image = nativeImage.createFromPath(iconPath);
+    tray = new Tray(image);
+    tray.setToolTip(getTrayStrings().tooltip);
+    rebuildTrayMenu();
+
+    // Single click toggles visibility on Windows (canonical UX). On Linux
+    // the click event is unreliable across desktops, so right-click +
+    // context menu is the supported interaction.
+    tray.on('click', () => {
+      if (!mainWindow) return;
+      if (mainWindow.isVisible() && !mainWindow.isMinimized()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+  } catch (err) {
+    console.error('[tray] Failed to create tray icon:', err);
+    tray = null;
+  }
+}
+
+function rebuildTrayMenu() {
+  if (!tray) return;
+  const s = getTrayStrings();
+  const menu = Menu.buildFromTemplate([
+    {
+      label: s.show,
+      click: () => {
+        if (!mainWindow) return;
+        mainWindow.show();
+        mainWindow.focus();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: s.quit,
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+  tray.setContextMenu(menu);
+  tray.setToolTip(s.tooltip);
+}
+
+function maybeShowFirstCloseBalloon() {
+  if (trayPrefs.firstCloseShown) return;
+  const s = getTrayStrings();
+  try {
+    if (process.platform === 'win32' && tray && typeof tray.displayBalloon === 'function') {
+      tray.displayBalloon({ title: s.balloonTitle, content: s.balloonBody, iconType: 'info' });
+    } else if (Notification.isSupported()) {
+      new Notification({ title: s.balloonTitle, body: s.balloonBody }).show();
+    }
+  } catch (err) {
+    console.error('[tray] Failed to show first-close balloon:', err);
+  }
+  trayPrefs.firstCloseShown = true;
+  saveTrayPrefs();
+}
+
 app.on('window-all-closed', () => {
+  // When minimizeToTray is on, this never fires (windows are hidden, not
+  // closed). When off, it fires and we behave as before — kill backend +
+  // quit on non-darwin.
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  // Single source of truth for shutdown — runs on tray Quit, OS shutdown,
+  // auto-update relaunch, Cmd+Q, etc.
+  isQuitting = true;
   if (backendProcess) {
     backendProcess.kill();
     backendProcess = null;
   }
-  if (process.platform !== 'darwin') {
-    app.quit();
+});
+
+app.on('will-quit', () => {
+  if (tray) {
+    try { tray.destroy(); } catch { /* ignore */ }
+    tray = null;
   }
 });
 
@@ -655,6 +806,30 @@ app.on('activate', () => {
 
 // Handle IPC if needed
 ipcMain.handle('get-app-path', () => app.getPath('userData'));
+
+// Tray prefs IPC — owned by main process, persisted to userData/tray-prefs.json.
+// Renderer reads on Settings panel mount and writes on toggle change.
+ipcMain.handle('tray.getPref', () => ({ ...trayPrefs }));
+ipcMain.handle('tray.setPref', (_event, patch) => {
+  if (!patch || typeof patch !== 'object') return { ...trayPrefs };
+  if (typeof patch.minimizeToTray === 'boolean') {
+    trayPrefs.minimizeToTray = patch.minimizeToTray;
+  }
+  saveTrayPrefs();
+  return { ...trayPrefs };
+});
+ipcMain.handle('tray.setLocale', (_event, locale) => {
+  if (typeof locale === 'string' && TRAY_STRINGS[locale]) {
+    trayPrefs.locale = locale;
+    saveTrayPrefs();
+    rebuildTrayMenu();
+  }
+  return trayPrefs.locale;
+});
+ipcMain.handle('tray.quitNow', () => {
+  isQuitting = true;
+  app.quit();
+});
 
 function getVaultBridgeCandidates() {
   return [

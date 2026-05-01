@@ -133,16 +133,31 @@ export function ConversationList({
           <div className="space-y-1 p-2">
             {directConversations.length > 0 && (
               <section className="space-y-1">
-                <h2 className="px-2 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-grey">
-                  {t('conversations.direct_section', { defaultValue: '1:1 conversations' })}
+                <h2 className="flex items-center gap-2 px-2 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-grey">
+                  <span aria-hidden="true">👤</span>
+                  <span>{t('conversations.direct_section', { defaultValue: '1:1 conversations' })}</span>
+                  <span className="ml-auto rounded-full bg-quantum-cyan/10 text-quantum-cyan px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal">
+                    {directConversations.length}
+                  </span>
                 </h2>
                 {directConversations.map(renderConversation)}
               </section>
             )}
+            {directConversations.length > 0 && groupConversations.length > 0 && (
+              <hr
+                role="separator"
+                aria-hidden="true"
+                className="my-3 mx-2 border-0 h-px bg-gradient-to-r from-transparent via-quantum-cyan/30 to-transparent"
+              />
+            )}
             {groupConversations.length > 0 && (
               <section className="space-y-1">
-                <h2 className="px-2 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-grey">
-                  {t('conversations.group.section_title', { defaultValue: 'Groups' })}
+                <h2 className="flex items-center gap-2 px-2 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-grey">
+                  <span aria-hidden="true">👥</span>
+                  <span>{t('conversations.group.section_title', { defaultValue: 'Groups' })}</span>
+                  <span className="ml-auto rounded-full bg-quantum-cyan/10 text-quantum-cyan px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal">
+                    {groupConversations.length}
+                  </span>
                 </h2>
                 {groupConversations.map(renderConversation)}
               </section>

@@ -1,5 +1,64 @@
 # Changelog
 
+## v1.2.2 — System tray + group classification fix
+
+Polish pass on the 1.2.x line: a system-tray entry-point on the Electron
+desktop, a fix for legacy group conversations being misclassified as
+1:1, and a perf pass on the chat scroll. No protocol or wire-format
+change — direct (1:1) and group conversations remain compatible with
+1.2.0 / 1.2.1 clients.
+
+### Added
+
+- **System tray support** (Electron). Closing the window minimizes
+  Cipher to the system tray instead of quitting; the tray icon offers
+  Open / Quit. New toggle in Settings → General → "Window behavior"
+  (`minimize_to_tray`, persisted in userData by the main process).
+  Tray menu locale is mirrored from the renderer at startup and on
+  every `i18n.languageChanged`. New IPC surface
+  `window.electron.tray.{getPref, setPref, setLocale, quitNow}`
+  exposed via `preload.cjs`.
+- **`db:migrate:fix-group-type`** npm script + migration
+  `008_fix_legacy_group_type.sql`. Promotes any `conversations` row
+  with a group-only signal (`created_by IS NOT NULL`,
+  `encrypted_title IS NOT NULL`, or `> 2` members) back to
+  `type='group'`. Idempotent. Bumps `schema_version` to `2.5.1`.
+
+### Fixed
+
+- **Group conversations rendered under "1:1 CONVERSATIONS"** with the
+  fallback title "Untitled group" / "Groupe sans nom". Root cause:
+  rows whose `type` column was left at the DEFAULT `'direct'` despite
+  carrying group-only fields. `lib/conversations/helpers.ts` now
+  infers an `effectiveType()` from `createdBy`, `encryptedTitle`, and
+  `memberCount > 2`. All call-sites
+  (`isGroupConversation`, `isDirectConversation`, `isConversationOwner`,
+  `getDirectPeer`, `getConversationTitle`) route through this helper.
+  Migration 008 fixes the same rows server-side.
+- **Forced-reflow violation (~38–44 ms) on every message arrival.**
+  Auto-scroll in `Conversations.tsx` rewritten: replaced
+  `scrollIntoView({ behavior: 'smooth' })` (whose per-frame layout
+  reads were the dominant cost) with a single direct write
+  `container.scrollTop = container.scrollHeight`, deferred to
+  `requestAnimationFrame`. Force-pins to the bottom on conversation
+  switch; otherwise only when the user is already within 200 px of
+  the bottom — no longer yanks them out of an upward read.
+- **Logout flow on Settings → Security**. Replaced
+  `window.location.href = '/'` (which crashed under a Zustand
+  re-render race against a null session) with the same
+  flush-cache → wipe-keys → clear-session → navigate sequence used in
+  `Conversations.tsx`.
+
+### Changed
+
+- **Sidebar conversation list** (`ConversationList.tsx`). Each section
+  now carries an icon (👤 / 👥), a count pill, and a horizontal
+  separator between the 1:1 and Group sections. Visual disambiguation
+  no longer relies on text alone.
+- **i18n**: added `conversations.direct_section` and
+  `conversations.group.section_title` to all 8 locales (en, fr, de,
+  es, it, pt, ru, zh-CN). Native translations, not EN-mirror.
+
 ## v1.2.1 — i18n top-up
 
 ### Changed

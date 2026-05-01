@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { useSettings } from "../../hooks/useSettings";
 import { useAuthStore } from "../../store/auth";
 import { AppLockSection } from "./AppLockSection";
 import { formatVaultHandle } from "../../lib/vaultHandle";
 import { EIDOLON_CONNECT_ENABLED } from "../../config";
+import { emergencyWipeKeys } from "../../lib/secureKeyAccess";
+import { clearAllDecryptedCache, flushPendingWrites as flushDecryptedCacheWrites } from "../../lib/e2ee/decryptedMessageCache";
 
 export function SecuritySettings() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const clearSession = useAuthStore((state) => state.clearSession);
     const user = useAuthStore((state) => state.session?.user);
     const { settings, updateSettings, isUpdating } = useSettings();
@@ -43,11 +47,29 @@ export function SecuritySettings() {
         });
     };
 
-    const handleLogout = () => {
-        if (confirm(t("settings.security_settings.logout_confirm_default"))) {
-            clearSession();
-            window.location.href = "/";
+    const handleLogout = async () => {
+        if (!confirm(t("settings.security_settings.logout_confirm_default"))) return;
+
+        // Mirror the privacy-l1 logout sequence used in Conversations.tsx:
+        // flush decrypted cache → wipe master key → clear session → navigate.
+        // Replaces the previous `window.location.href = '/'` hard reload,
+        // which crashed under a Zustand re-render race with a null session.
+        clearAllDecryptedCache();
+        try {
+            await Promise.race([
+                flushDecryptedCacheWrites(),
+                new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+            ]);
+        } catch {
+            // best-effort
         }
+        try {
+            await emergencyWipeKeys();
+        } catch (err) {
+            console.error("[logout] emergencyWipeKeys failed:", err);
+        }
+        clearSession();
+        navigate("/", { replace: true });
     };
 
     const handle = formatVaultHandle(linkedVault?.vaultName, linkedVault?.vaultNumber);

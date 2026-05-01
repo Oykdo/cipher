@@ -1,5 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from './store/auth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { proactiveTokenRefresh } from './services/api-interceptor';
@@ -46,6 +47,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   const session = useAuthStore((state) => state.session);
+  const { i18n } = useTranslation();
   // Consider authenticated if both user and token exist
   const isAuthenticated = !!session?.user?.id && !!session?.accessToken;
 
@@ -54,6 +56,22 @@ function App() {
   // feature is disabled in Settings, and fully gated behind the Eidolon flag
   // (the PIN feature ships with the Eidolon release).
   useAppLockActivity();
+
+  // Mirror the i18n locale into the Electron main process so the system-tray
+  // menu (built at startup, before the renderer is up) can render in the
+  // user's language on the next launch.
+  useEffect(() => {
+    const setTrayLocale = (lng: string) => {
+      window.electron?.tray?.setLocale(lng).catch(() => {
+        /* main may not be ready yet — non-fatal */
+      });
+    };
+    setTrayLocale(i18n.language);
+    i18n.on('languageChanged', setTrayLocale);
+    return () => {
+      i18n.off('languageChanged', setTrayLocale);
+    };
+  }, [i18n]);
 
   // Initialize e2ee-v2 keys automatically for logged-in users
   const keyInit = useKeyInitialization();

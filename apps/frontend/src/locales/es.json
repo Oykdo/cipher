@@ -316,6 +316,7 @@
     "write_encrypted": "Escribir un mensaje cifrado...",
     "init_crypto": "Inicializando cifrado...",
     "new_conversation_button": "➕ Nueva conversación",
+    "direct_section": "Conversaciones 1:1",
     "no_conversations": "Sin conversaciones",
     "click_new_to_start": "Haz clic en \"Nueva conversación\" para empezar",
     "search_error": "Error durante la búsqueda",
@@ -347,6 +348,7 @@
     "has_archived_messages": "Esta conversacion contiene mensajes archivados de una copia de seguridad. Ve a Ajustes > Copia de seguridad para verlos.",
     "unknown_user": "Desconocido",
     "group": {
+      "section_title": "Grupos",
       "create_button": "Crear grupo",
       "modal_title": "Nuevo grupo",
       "name_placeholder": "Nombre del grupo (opcional)",
@@ -703,7 +705,21 @@
       "share_twitter": "Compartir en Twitter",
       "share_reddit": "Compartir en Reddit",
       "thank_you": "¡Gracias por su apoyo! 💝"
+    },
+    "behavior": {
+      "title": "Comportamiento de la ventana",
+      "minimize_to_tray": {
+        "label": "Mantener Cipher en la bandeja del sistema",
+        "description": "Cuando cierras la ventana, Cipher permanece en la bandeja del sistema. Haz clic en el icono para reabrir, o clic derecho para Salir. En GNOME, puede ser necesaria la extensión AppIndicator."
+      }
     }
+  },
+  "tray": {
+    "tooltip": "Cipher",
+    "show": "Mostrar Cipher",
+    "quit": "Salir de Cipher",
+    "first_time_balloon_title": "Cipher sigue funcionando",
+    "first_time_balloon_body": "Cipher sigue activo en la bandeja del sistema. Clic derecho en el icono para salir."
   },
   "discover": {
     "title": "🌠 Descubrir Cipher",

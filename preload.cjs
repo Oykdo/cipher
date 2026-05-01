@@ -30,6 +30,15 @@ contextBridge.exposeInMainWorld('electron', {
     list: () => ipcRenderer.invoke('stored-bundle:list'),
     delete: (vaultId) => ipcRenderer.invoke('stored-bundle:delete', vaultId),
   },
+
+  // System tray controls. Owned by main; pref persisted in userData.
+  // Hidden when running in a non-Electron context (web).
+  tray: {
+    getPref: () => ipcRenderer.invoke('tray.getPref'),
+    setPref: (patch) => ipcRenderer.invoke('tray.setPref', patch),
+    setLocale: (locale) => ipcRenderer.invoke('tray.setLocale', locale),
+    quitNow: () => ipcRenderer.invoke('tray.quitNow'),
+  },
   
   // Add more APIs as needed
   platform: process.platform,

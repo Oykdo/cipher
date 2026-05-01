@@ -316,6 +316,7 @@
     "write_encrypted": "Scrivi un messaggio crittografato...",
     "init_crypto": "Inizializzazione crittografia...",
     "new_conversation_button": "➕ Nuova conversazione",
+    "direct_section": "Conversazioni 1:1",
     "no_conversations": "Nessuna conversazione",
     "click_new_to_start": "Clicca su \"Nuova conversazione\" per iniziare",
     "search_error": "Errore durante la ricerca",
@@ -347,6 +348,7 @@
     "has_archived_messages": "Questa conversazione contiene messaggi archiviati da un backup. Vai su Impostazioni > Backup per visualizzarli.",
     "unknown_user": "Sconosciuto",
     "group": {
+      "section_title": "Gruppi",
       "create_button": "Crea gruppo",
       "modal_title": "Nuovo gruppo",
       "name_placeholder": "Nome del gruppo (opzionale)",
@@ -703,7 +705,21 @@
       "share_twitter": "Condividi su Twitter",
       "share_reddit": "Condividi su Reddit",
       "thank_you": "Grazie per il tuo supporto! 💝"
+    },
+    "behavior": {
+      "title": "Comportamento della finestra",
+      "minimize_to_tray": {
+        "label": "Mantieni Cipher attivo nell'area di notifica",
+        "description": "Quando chiudi la finestra, Cipher resta nell'area di notifica. Fai clic sull'icona per riaprire, o clic destro per Esci. Su GNOME potrebbe servire l'estensione AppIndicator."
+      }
     }
+  },
+  "tray": {
+    "tooltip": "Cipher",
+    "show": "Mostra Cipher",
+    "quit": "Esci da Cipher",
+    "first_time_balloon_title": "Cipher è ancora attivo",
+    "first_time_balloon_body": "Cipher è ancora in esecuzione nell'area di notifica. Clic destro sull'icona per uscire."
   },
   "discover": {
     "title": "🌠 Scopri Cipher",

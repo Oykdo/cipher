@@ -332,6 +332,7 @@
     "write_encrypted": "Écrire un message chiffré...",
     "init_crypto": "Initialisation du chiffrement...",
     "new_conversation_button": "➕ Nouvelle conversation",
+    "direct_section": "Conversations 1:1",
     "no_conversations": "Aucune conversation",
     "click_new_to_start": "Cliquez sur \"Nouvelle conversation\" pour commencer",
     "search_error": "Erreur lors de la recherche",
@@ -365,6 +366,7 @@
     "has_archived_messages": "Cette conversation contient des messages archivés provenant d'une sauvegarde. Allez dans Paramètres > Sauvegarde pour les consulter.",
     "unknown_user": "Inconnu",
     "group": {
+      "section_title": "Groupes",
       "create_button": "Créer un groupe",
       "modal_title": "Nouveau groupe",
       "name_placeholder": "Nom du groupe (optionnel)",
@@ -738,7 +740,21 @@
       "pcs_desc": "Les messages passés restent sécurisés même si les clés sont compromises",
       "logout_confirm_default": "Êtes-vous sûr de vouloir vous déconnecter ?",
       "logout_warning": "La déconnexion supprimera votre session locale. Vous aurez besoin de votre phrase de récupération ou DiceKey pour vous reconnecter."
+    },
+    "behavior": {
+      "title": "Comportement de la fenêtre",
+      "minimize_to_tray": {
+        "label": "Conserver Cipher dans la barre des tâches",
+        "description": "Quand vous fermez la fenêtre, Cipher reste dans la barre des tâches. Cliquez sur l'icône pour rouvrir, ou clic droit pour Quitter. Sur GNOME, l'extension AppIndicator peut être requise."
+      }
     }
+  },
+  "tray": {
+    "tooltip": "Cipher",
+    "show": "Afficher Cipher",
+    "quit": "Quitter Cipher",
+    "first_time_balloon_title": "Cipher continue de tourner",
+    "first_time_balloon_body": "Cipher reste actif dans la barre des tâches. Clic droit sur l'icône pour quitter."
   },
   "discover": {
     "title": "🌠 Découvrir Cipher",

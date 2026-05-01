@@ -342,6 +342,7 @@
     "write_encrypted": "Write an encrypted message...",
     "init_crypto": "Initializing encryption...",
     "new_conversation_button": "➕ New Conversation",
+    "direct_section": "1:1 conversations",
     "no_conversations": "No conversations",
     "click_new_to_start": "Click \"New Conversation\" to start",
     "search_error": "Error during search",
@@ -377,6 +378,7 @@
     "has_archived_messages": "This conversation has archived messages from a backup. Go to Settings > Backup to view them.",
     "unknown_user": "Unknown",
     "group": {
+      "section_title": "Groups",
       "create_button": "Create group",
       "modal_title": "New group",
       "name_placeholder": "Group name (optional)",
@@ -739,7 +741,21 @@
       "pcs_desc": "Past messages remain secure even if keys are compromised",
       "logout_confirm_default": "Are you sure you want to log out?",
       "logout_warning": "Logging out will remove your local session. You will need your recovery phrase or DiceKey to log in again."
+    },
+    "behavior": {
+      "title": "Window behavior",
+      "minimize_to_tray": {
+        "label": "Keep Cipher running in the system tray",
+        "description": "When you close the window, Cipher stays in the tray. Click the tray icon to reopen, or right-click for Quit. On GNOME you may need the AppIndicator extension."
+      }
     }
+  },
+  "tray": {
+    "tooltip": "Cipher",
+    "show": "Show Cipher",
+    "quit": "Quit Cipher",
+    "first_time_balloon_title": "Cipher keeps running",
+    "first_time_balloon_body": "Cipher is still running in the system tray. Right-click the icon to quit."
   },
   "discover": {
     "title": "🌠 Discover Cipher",

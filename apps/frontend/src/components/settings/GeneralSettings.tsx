@@ -16,6 +16,34 @@ export function GeneralSettings() {
     const [error, setError] = useState<string | null>(null);
     const [stats, setStats] = useState({ conversationsCount: 0, messagesSent: 0 });
 
+    // Tray pref is owned by the Electron main process — read on mount, write on toggle.
+    // Hidden when running outside Electron (window.electron undefined).
+    const trayApi = typeof window !== "undefined" ? window.electron?.tray : undefined;
+    const [minimizeToTray, setMinimizeToTray] = useState<boolean | null>(null);
+    const [trayUpdating, setTrayUpdating] = useState(false);
+
+    useEffect(() => {
+        if (!trayApi) return;
+        let cancelled = false;
+        trayApi.getPref().then((pref) => {
+            if (!cancelled) setMinimizeToTray(pref.minimizeToTray);
+        }).catch(() => { /* non-fatal */ });
+        return () => { cancelled = true; };
+    }, [trayApi]);
+
+    const handleToggleMinimizeToTray = async (checked: boolean) => {
+        if (!trayApi) return;
+        setTrayUpdating(true);
+        try {
+            const next = await trayApi.setPref({ minimizeToTray: checked });
+            setMinimizeToTray(next.minimizeToTray);
+        } catch {
+            // keep previous state on failure
+        } finally {
+            setTrayUpdating(false);
+        }
+    };
+
     const hasAccessToken = !!session?.accessToken;
     const linkedVault = session?.user?.linkedVault;
     const fingerprint = useVaultFingerprint();
@@ -193,6 +221,41 @@ export function GeneralSettings() {
                     <LanguageSelector />
                 </div>
             </div>
+
+            {trayApi && minimizeToTray !== null && (
+                <div>
+                    <h2 className="mb-4 text-xl font-semibold text-white">
+                        {t("settings.behavior.title", { defaultValue: "Window behavior" })}
+                    </h2>
+                    <div className="cosmic-glass-card rounded-3xl border border-white/10 p-5 shadow-[0_12px_40px_rgba(2,6,23,0.18)]">
+                        <label className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                                <div className="font-medium text-white">
+                                    {t("settings.behavior.minimize_to_tray.label", {
+                                        defaultValue: "Keep Cipher running in the system tray",
+                                    })}
+                                </div>
+                                <p className="mt-1 text-sm text-slate-400">
+                                    {t("settings.behavior.minimize_to_tray.description", {
+                                        defaultValue:
+                                            "When you close the window, Cipher stays in the tray. Click the tray icon to reopen, or right-click for Quit. On GNOME you may need the AppIndicator extension.",
+                                    })}
+                                </p>
+                            </div>
+                            <div className="relative shrink-0">
+                                <input
+                                    type="checkbox"
+                                    checked={minimizeToTray}
+                                    onChange={(e) => handleToggleMinimizeToTray(e.target.checked)}
+                                    disabled={trayUpdating}
+                                    className="peer sr-only"
+                                />
+                                <div className="h-6 w-12 rounded-full bg-slate-700 transition peer-checked:bg-cyan-500 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-6" />
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            )}
 
             {userDetails && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

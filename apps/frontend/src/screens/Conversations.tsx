@@ -32,6 +32,7 @@ import { decryptReceivedMessage } from '../lib/e2ee/messagingIntegration';
 import { encryptOutgoing, GroupEncryptionError } from '../lib/messaging/encryptionDispatch';
 import { getEncryptionModePreference } from '../lib/e2ee/sessionManager';
 import { getCachedDecryptedMessage, cacheDecryptedMessage, clearAllDecryptedCache, flushPendingWrites as flushDecryptedCacheWrites } from '../lib/e2ee/decryptedMessageCache';
+import { emergencyWipeKeys } from '../lib/secureKeyAccess';
 import { hasUserKeys, loadUserKeys } from '../lib/e2ee/keyManager';
 import { getCurrentE2EEKeyPair } from '../lib/e2ee/e2eeService';
 import CosmicConstellationLogo from '../components/CosmicConstellationLogo';
@@ -141,6 +142,7 @@ export default function Conversations() {
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prevConvIdForScrollRef = useRef<string | null>(null);
 
   // Crypto helpers
   const { decryptIncomingMessage, encryptMessage } = useConversationMessages(session);
@@ -248,10 +250,34 @@ export default function Conversations() {
     return () => { cancelled = true; };
   }, [selectedConvId]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom. Avoids the "Forced reflow" Violation by:
+  //   1. Deferring to rAF so React's commit + style/layout has settled.
+  //   2. Writing scrollTop directly instead of `scrollIntoView({behavior:'smooth'})`,
+  //      whose per-frame layout reads were the dominant cost (~40ms).
+  //   3. On a conversation switch, pinning to bottom unconditionally;
+  //      otherwise only when the user is already near the bottom (so we
+  //      don't yank them out of an upward read).
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    const end = messagesEndRef.current;
+    const container = end?.parentElement;
+    if (!end || !container) return;
+
+    const isConvSwitch = prevConvIdForScrollRef.current !== selectedConvId;
+    prevConvIdForScrollRef.current = selectedConvId;
+
+    const id = requestAnimationFrame(() => {
+      if (isConvSwitch) {
+        container.scrollTop = container.scrollHeight;
+        return;
+      }
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      if (distanceFromBottom < 200) {
+        container.scrollTop = container.scrollHeight;
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [messages, selectedConvId]);
 
   // Clear screen-reader announcement after it has been read
   useEffect(() => {
@@ -1585,8 +1611,24 @@ export default function Conversations() {
       // Best-effort: any leftover entries are still sealed by the
       // master key, which is cleared on the next line.
     }
+
+    // Explicit security wipe before navigation. With the hard reload
+    // (window.location.href) we used to rely on the beforeunload listener
+    // in secureKeyAccess.ts to clear the secure cache. We now navigate
+    // via react-router instead — beforeunload won't fire, so wipe here.
+    try {
+      await emergencyWipeKeys();
+    } catch (err) {
+      console.error('[logout] emergencyWipeKeys failed:', err);
+    }
+
+    // React 18 batches both the Zustand update and the router navigation.
+    // Routes will diff to '/' and unmount Conversations in the same render
+    // pass, so this component never re-renders with a null session — which
+    // used to crash with `Cannot read properties of null` and surface as
+    // the ErrorBoundary "Oops!" screen.
     clearSession();
-    window.location.href = '/';
+    navigate('/', { replace: true });
   };
 
   // ============================================================================
