@@ -73,8 +73,24 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 >    [virustotal.com](https://www.virustotal.com) — most engines show
 >    clean. False positives on Electron apps are common (heuristics flag
 >    the embedded Chromium / Node), and you can compare across releases.
-> 3. **Verify the SHA256** matches the value in the GitHub release page.
->    PowerShell: `Get-FileHash .\Cipher-Setup-1.2.6.exe -Algorithm SHA256`.
+> 3. **Verify the SHA256** against `SHA256SUMS.txt` published next to
+>    the binaries on the [release page](../../releases/latest). Open
+>    that file in your browser, then compare the line for your
+>    download:
+>
+>    ```bash
+>    # Linux — one-shot verification of every artifact in the file
+>    sha256sum -c SHA256SUMS.txt
+>    ```
+>
+>    ```powershell
+>    # Windows — print the local hash, eyeball-match the line in SHA256SUMS.txt
+>    Get-FileHash .\Cipher-Setup-1.2.6.exe -Algorithm SHA256
+>    ```
+>
+>    `SHA256SUMS.txt` is generated inside the GitHub Actions runner from
+>    the binaries it just built and published in the same job — there is
+>    no human in the loop between the build and the upload.
 >
 > If your antivirus quarantines the file outright, the fastest fix is
 > a false-positive report to your AV vendor — clears the heuristic for

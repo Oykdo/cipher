@@ -130,8 +130,24 @@ Téléchargez `Cipher-Setup-1.2.6.exe` (Windows) ou `Cipher-1.2.6.AppImage` /
 >    La plupart des moteurs sont verts. Les faux positifs sur les apps
 >    Electron sont fréquents (les heuristiques flag le Chromium / Node
 >    embarqué).
-> 3. **Vérifie le SHA256** affiché sur la page de release.
->    PowerShell : `Get-FileHash .\Cipher-Setup-1.2.6.exe -Algorithm SHA256`.
+> 3. **Vérifie le SHA256** contre le fichier `SHA256SUMS.txt` publié à
+>    côté des binaires sur la [page release](../../releases/latest).
+>    Ouvre-le dans le navigateur, puis compare la ligne correspondant à
+>    ton téléchargement :
+>
+>    ```bash
+>    # Linux — vérifie tous les artifacts d'un coup
+>    sha256sum -c SHA256SUMS.txt
+>    ```
+>
+>    ```powershell
+>    # Windows — affiche le hash local, compare visuellement avec la ligne dans SHA256SUMS.txt
+>    Get-FileHash .\Cipher-Setup-1.2.6.exe -Algorithm SHA256
+>    ```
+>
+>    `SHA256SUMS.txt` est généré dans le runner GitHub Actions à partir
+>    des binaires qu'il vient de builder et de publier dans le même job
+>    — aucun humain n'intervient entre le build et l'upload.
 >
 > Pour cliquer à travers SmartScreen : **« Informations complémentaires »
 > → « Exécuter quand même »**. Pour signaler un faux positif Defender :
