@@ -215,8 +215,18 @@ export function ContributionSettings() {
                         {t("settings.contribution_settings.card_title")}
                     </h3>
 
+                    {/*
+                      Layout note: the .cosmic-cta class declares
+                      `width: 100%`, which in a flex-row context becomes
+                      `flex-basis: 100%` and starves the input wrapper
+                      down to its number-spinner intrinsic width. We
+                      override with `sm:!w-auto` on the button (auto
+                      width = sized to its label at sm+ breakpoint, full
+                      width on mobile flex-col) and pin a sensible
+                      `min-w` on the input wrapper as a defense.
+                    */}
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-                        <div className="flex-1">
+                        <div className="flex-1 sm:min-w-[200px]">
                             <label className="text-xs uppercase tracking-[0.24em] text-slate-400">
                                 {t("settings.contribution_settings.card_amount_label")}
                             </label>
@@ -239,7 +249,7 @@ export function ContributionSettings() {
                         <button
                             onClick={() => void startStripeCheckout()}
                             disabled={stripeRedirecting}
-                            className={stripeRedirecting ? "cosmic-cta opacity-70" : "cosmic-cta"}
+                            className={stripeRedirecting ? "cosmic-cta sm:!w-auto opacity-70" : "cosmic-cta sm:!w-auto"}
                         >
                             {stripeRedirecting
                                 ? t("settings.contribution_settings.card_redirecting")

@@ -1,5 +1,60 @@
 # Changelog
 
+## v1.2.6 — Tray icon really fixed + Stripe layout + SHA256SUMS
+
+Hotfix release covering three small but visible regressions, plus
+re-instating SHA256 verification metadata on the GitHub release page
+that I quietly dropped in v1.2.3 when the publish flow was rewired.
+
+### Fixed
+
+- **Windows tray icon: actually packaged this time.** v1.2.5 switched
+  the runtime tray icon path from `assets/icon.png` to `assets/icon.ico`,
+  but the electron-builder `files` array in the root `package.json`
+  was never updated to include `assets/`. Inside the packaged `.exe`,
+  `path.join(__dirname, 'assets', 'icon.ico')` resolved to a path
+  that did not exist, so `nativeImage.createFromPath()` returned an
+  empty image and the tray rendered as a clickable-but-invisible
+  ghost slot — the same symptom v1.2.5 was supposed to fix. Added
+  `assets/icon.ico`, `assets/icon.png`, and `assets/icon.icns` to
+  the build files allowlist.
+- **Settings → Contribution: Stripe amount input squeezed to the
+  number-spinner only.** v1.2.3 fixed the cursor-positioning bug
+  with `cosmic-input-plain`, but the surrounding flex layout still
+  starved the input. Root cause: the `.cosmic-cta` button class
+  declares `width: 100%`, which in a flex-row context becomes
+  `flex-basis: 100%` and steals all the available width from the
+  sibling `flex-1` input wrapper. Override with `sm:!w-auto` on the
+  button (auto width at sm+ breakpoint, full width on mobile
+  flex-col) and pin a `sm:min-w-[200px]` on the input wrapper as a
+  defense-in-depth.
+
+### Added
+
+- **`SHA256SUMS.txt` published next to the binaries on every
+  release.** A new `Generate SHA256SUMS.txt` step in `release.yml`
+  runs `sha256sum` (Linux native + Git Bash on windows-latest) over
+  the freshly built artifacts and emits a standard one-line-per-file
+  manifest, then includes it in the upload glob alongside the .exe
+  / .AppImage / .deb. Closes the gap created in v1.2.3 when
+  electron-builder's `--publish always` (which used to publish
+  `latest.yml` with SHA512 hashes) was replaced by a manual upload
+  glob that did not pick those files up. Restores the
+  `Get-FileHash` / `sha256sum -c` verification path the README
+  promised.
+
+### Changed
+
+- **README.fr — `DiceKey` mention removed from the auth section.**
+  The active flow is mnemonic + KeyVault password; DiceKey was
+  documented as a fallback alternative but the project plan is to
+  replace that secondary path with the **Eidolon vault** (when
+  CipherMobile lands). Demoting the DiceKey paragraph and
+  pointing forward keeps the doc honest without naming an
+  ecosystem that is not yet shipped.
+- **`LISEZ-MOI.txt`** — removed the "DiceKey : Clé physique
+  Dice-Key (6 mots)" line from the auth quickstart.
+
 ## v1.2.5 — Real-world WebRTC reliability
 
 A tester running v1.1.3 reported audio/video calls failing across

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.2.5-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.6-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)
@@ -59,10 +59,7 @@ Les messages sont définitivement supprimés de tous les appareils après une se
 
 Le flux principal est **mnémonique 12 mots + mot de passe d'appareil** (PBKDF2-SHA256, 600 000 itérations, scellé via `KeyVault` en IndexedDB). Au retour sur l'appareil, seul le mot de passe est nécessaire (Quick Unlock).
 
-L'authentification **DiceKey** ([dicekeys.com](https://dicekeys.com)) reste disponible comme alternative pour les utilisateurs qui possèdent une clé physique :
-- 775 bits d'entropie (vs 256 bits pour une seed standard de 24 mots)
-- Génération de seed basée sur le matériel
-- Immunisé contre keyloggers et shoulder surfing
+Une seconde voie d'authentification basée sur le **vault de l'écosystème Eidolon** est prévue pour la suite. Elle remplacera l'ancienne piste alternative basée sur la clé physique.
 
 ### 🌐 **Communication Peer-to-Peer**
 
@@ -106,8 +103,8 @@ Représentation visuelle de votre réseau de confiance :
 
 ## 📥 Téléchargement (utilisateurs / testeurs)
 
-Téléchargez `Cipher-Setup-1.2.5.exe` (Windows) ou `Cipher-1.2.5.AppImage` /
-`cipher_1.2.5_amd64.deb` (Linux) depuis la [dernière release](../../releases/latest).
+Téléchargez `Cipher-Setup-1.2.6.exe` (Windows) ou `Cipher-1.2.6.AppImage` /
+`cipher_1.2.6_amd64.deb` (Linux) depuis la [dernière release](../../releases/latest).
 
 > **À propos de l'avertissement Windows SmartScreen / antivirus** — à lire avant de lancer
 >
@@ -134,7 +131,7 @@ Téléchargez `Cipher-Setup-1.2.5.exe` (Windows) ou `Cipher-1.2.5.AppImage` /
 >    Electron sont fréquents (les heuristiques flag le Chromium / Node
 >    embarqué).
 > 3. **Vérifie le SHA256** affiché sur la page de release.
->    PowerShell : `Get-FileHash .\Cipher-Setup-1.2.5.exe -Algorithm SHA256`.
+>    PowerShell : `Get-FileHash .\Cipher-Setup-1.2.6.exe -Algorithm SHA256`.
 >
 > Pour cliquer à travers SmartScreen : **« Informations complémentaires »
 > → « Exécuter quand même »**. Pour signaler un faux positif Defender :

@@ -45,7 +45,7 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 
 ### Windows (available now)
 
-1. Download `Cipher-Setup-1.2.5.exe` from the [latest release](../../releases/latest).
+1. Download `Cipher-Setup-1.2.6.exe` from the [latest release](../../releases/latest).
 2. Windows SmartScreen will show **"Windows protected your PC — Unrecognized app"**. This is **expected during alpha** — see the box below. Click **"More info"** → **"Run anyway"**.
 3. Pick an install directory and finish.
 
@@ -74,7 +74,7 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 >    clean. False positives on Electron apps are common (heuristics flag
 >    the embedded Chromium / Node), and you can compare across releases.
 > 3. **Verify the SHA256** matches the value in the GitHub release page.
->    PowerShell: `Get-FileHash .\Cipher-Setup-1.2.5.exe -Algorithm SHA256`.
+>    PowerShell: `Get-FileHash .\Cipher-Setup-1.2.6.exe -Algorithm SHA256`.
 >
 > If your antivirus quarantines the file outright, the fastest fix is
 > a false-positive report to your AV vendor — clears the heuristic for
@@ -88,14 +88,14 @@ Two formats are produced from the same CI build, both unsigned during alpha. Pic
 **AppImage** (works on most distros, no install required):
 
 ```bash
-chmod +x Cipher-1.2.5-x86_64.AppImage
-./Cipher-1.2.5-x86_64.AppImage
+chmod +x Cipher-1.2.6-x86_64.AppImage
+./Cipher-1.2.6-x86_64.AppImage
 ```
 
 **Debian / Ubuntu** (`.deb`):
 
 ```bash
-sudo dpkg -i Cipher-1.2.5-amd64.deb
+sudo dpkg -i Cipher-1.2.6-amd64.deb
 sudo apt-get install -f   # only if dpkg reports missing dependencies
 cipher                    # launch from anywhere
 ```

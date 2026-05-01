@@ -67,9 +67,9 @@ Lors du premier lancement :
   → Le message s'autodétruira après lecture
   → Choix : 5s, 30s, 1min, 5min
 
-▸ Authentification avancée 🎲
-  → Standard : Phrase BIP-39 (12 ou 24 mots)
-  → DiceKey : Clé physique Dice-Key (6 mots)
+▸ Authentification 🔑
+  → Mnémonique 12 mots + mot de passe d'appareil
+  → Quick Unlock au retour (mot de passe seul)
 
 
 ┌──────────────────────────────────────────────────────────────────────────┐

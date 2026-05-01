@@ -26,10 +26,13 @@ jobs:
             artifact_glob: |
               release/*.AppImage
               release/*.deb
+              release/SHA256SUMS.txt
           - os: windows-latest
             builder_flag: --win
             artifact_name: cipher-windows
-            artifact_glob: release/*.exe
+            artifact_glob: |
+              release/*.exe
+              release/SHA256SUMS.txt
 
     runs-on: ${{ matrix.os }}
 
@@ -139,6 +142,25 @@ jobs:
           ./"$APPIMAGE" --appimage-extract > /dev/null
           test -f squashfs-root/AppRun
           echo "✓ AppImage extracts cleanly and contains AppRun"
+
+      # Generate a per-platform SHA256SUMS.txt next to the binaries so a
+      # tester can verify their download with `sha256sum -c SHA256SUMS.txt`
+      # (Linux) or `Get-FileHash` (Windows). Standard one-line-per-file
+      # format. Both runners ship coreutils' sha256sum (Linux native +
+      # Git Bash on windows-latest), so the same script runs on both jobs.
+      - name: Generate SHA256SUMS.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release
+          case "${RUNNER_OS}" in
+            Linux)   sha256sum *.AppImage *.deb > SHA256SUMS.txt ;;
+            Windows) sha256sum *.exe > SHA256SUMS.txt ;;
+            *) echo "::error::Unsupported runner OS: ${RUNNER_OS}"; exit 1 ;;
+          esac
+          echo "::group::SHA256SUMS.txt"
+          cat SHA256SUMS.txt
+          echo "::endgroup::"
 
       # Publish to the GitHub Release on tag push. Replaces the previous
       # `--publish always` flag on electron-builder so the SIGNED Windows

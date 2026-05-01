@@ -1,6 +1,6 @@
 {
   "name": "cipher",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "Cipher - Secure E2E encrypted messenger with Time-Lock and DiceKey",
   "main": "main.js",
   "type": "module",
@@ -64,7 +64,10 @@
       "apps/bridge/node_modules/**/*",
       "apps/bridge/.env.production",
       "node_modules/**/*",
-      "package.json"
+      "package.json",
+      "assets/icon.ico",
+      "assets/icon.png",
+      "assets/icon.icns"
     ],
     "extraResources": [
       {
