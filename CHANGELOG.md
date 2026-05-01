@@ -1,5 +1,46 @@
 # Changelog
 
+## v1.2.4 — Time-Lock activated (drand/tlock)
+
+The drand/tlock client integration that has been sitting dark since
+v1.1 is now lit. Time-locked messages encrypt their plaintext with
+identity-based encryption (BLS12-381) towards a future drand round
+on the League of Entropy mainnet beacon. The lock is **cryptographic,
+not server-enforced** — neither a modified client nor a compromised
+server can serve the message early. Recipients see a countdown and
+the ciphertext decrypts itself the moment drand publishes the round
+signature.
+
+### Changed
+
+- **`TIMELOCK_ENABLED` feature flag retired.** Removed from
+  `apps/frontend/src/config.ts`, `apps/bridge/src/config.ts`,
+  `apps/frontend/src/components/conversations/MessageInput.tsx`
+  (the Time-Lock pill is now permanent in the composer),
+  `apps/frontend/src/screens/Conversations.tsx`, and the bridge
+  message-send route. The corresponding env vars
+  (`TIMELOCK_ENABLED` server-side, `VITE_TIMELOCK_ENABLED`
+  client-side) and the `fly.toml` env entry were dropped.
+- **Bridge server-side gate removed.** `apps/bridge/src/routes/messages.ts`
+  no longer rejects `unlockBlockHeight` with HTTP 403. The field
+  (still named `unlockBlockHeight` for backwards-compat with the
+  DB column `unlock_block_height` — semantically a drand round
+  number) is shape-validated and stored opaquely.
+- **`docs/azure-trusted-signing.md` stays the only un-shipped piece
+  of the alpha release pipeline** — Azure account provisioning is
+  still pending (ETA next week per the v1.2.3 note); when active,
+  the v1.2.4 `.exe` and onwards will be Microsoft-signed.
+
+### Notes
+
+- The drand/tlock decryption side (`TlockGate` component, `lib/tlock.ts`,
+  `tlock-js` dependency, `looksLikeTlockCiphertext` heuristic) was
+  already shipped in earlier versions, just gated behind the now-removed
+  flag. No behaviour change for messages received without
+  `unlock_block_height`.
+- DB schema unchanged: the `unlock_block_height` column still exists
+  and now holds a drand round number. No migration needed.
+
 ## v1.2.3 — UI polish + Windows code-signing scaffold
 
 Three small UI fixes plus opt-in scaffolding for Microsoft-validated

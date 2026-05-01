@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'crypto';
 import { getDatabase } from '../db/database.js';
 import { ConversationIdSchema } from '../validation/securitySchemas.js';
-import { config } from '../config.js';
 
 const db = getDatabase();
 
@@ -198,16 +197,13 @@ export async function messageRoutes(fastify: FastifyInstance) {
       }
 
       // Time-lock: the field historically carried a Bitcoin block height
-      // but now holds a drand round number (tlock migration). The server
-      // passes it through — the cryptographic lock is enforced client-side.
+      // but now holds a drand round number (tlock migration shipped in
+      // v1.2.4). The server passes it through opaquely — the actual lock
+      // is BLS12-381 identity-based encryption towards a future drand
+      // round, enforced cryptographically by the client (see
+      // apps/frontend/src/lib/tlock.ts). Server-side validation is just
+      // shape-checking.
       if (unlockBlockHeight !== undefined) {
-        if (!config.timelockEnabled) {
-          reply.code(403);
-          return {
-            error:
-              'Time-locked messages are temporarily disabled. Enable TIMELOCK_ENABLED once the drand/tlock integration is validated.',
-          };
-        }
         if (
           typeof unlockBlockHeight !== 'number' ||
           !Number.isInteger(unlockBlockHeight) ||

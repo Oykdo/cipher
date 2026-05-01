@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.2.3-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.4-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)
@@ -19,7 +19,7 @@
 
 ## 📖 À propos
 
-**Cipher** est une application de messagerie sécurisée bâtie autour d'un **contrat de confidentialité public** ([`CIPHER_PRIVACY_GUARANTEES.md`](./CIPHER_PRIVACY_GUARANTEES.md)) qui dit, ligne par ligne, ce que le serveur stocke et ce qu'il **ne stocke pas**. Chaque garantie est appliquée par du code et vérifiée par des tests d'invariants en CI. Les conversations 1:1 et de groupe (2-10 membres) sont chiffrées de bout en bout via X3DH + Double Ratchet (e2ee-v2). La destruction après lecture (burn-after-reading) et le verrouillage temporel sont disponibles en option (le time-lock est gardé derrière un feature flag en attendant la migration vers drand/tlock).
+**Cipher** est une application de messagerie sécurisée bâtie autour d'un **contrat de confidentialité public** ([`CIPHER_PRIVACY_GUARANTEES.md`](./CIPHER_PRIVACY_GUARANTEES.md)) qui dit, ligne par ligne, ce que le serveur stocke et ce qu'il **ne stocke pas**. Chaque garantie est appliquée par du code et vérifiée par des tests d'invariants en CI. Les conversations 1:1 et de groupe (2-10 membres) sont chiffrées de bout en bout via X3DH + Double Ratchet (e2ee-v2). La destruction après lecture (burn-after-reading) et le verrouillage temporel cryptographique (drand/tlock) sont disponibles en option par message.
 
 ### 🎯 Philosophie
 
@@ -41,9 +41,9 @@
 - **Argon2id** - Hachage de mot de passe résistant en mémoire (backend)
 - **PBKDF2** - Dérivation de clés côté client avec 100 000 itérations
 
-### ⏰ **Messages Time-Lock** *(opt-in, en transition)*
+### ⏰ **Messages Time-Lock**
 
-Verrouillage d'un message jusqu'à une date / heure choisie. **Désactivé par défaut** (`TIMELOCK_ENABLED=false` côté frontend et bridge) : l'implémentation actuelle reposait sur un check côté serveur de hauteur de bloc, ce qu'une revue externe a jugé insuffisamment trustless. Une migration vers **drand / tlock** (timelock encryption AGE) est planifiée pour rendre le verrou cryptographique réellement non-cassable. Pour activer la version actuelle en local : voir `apps/frontend/src/config.ts:49` et le commentaire associé.
+Verrouillage cryptographique d'un message jusqu'à une date / heure choisie, via **drand + tlock** (timelock encryption AGE, BLS12-381 IBE vers un round futur du beacon League of Entropy). Le verrou est **cryptographique, pas server-enforced** — ni un client modifié ni un serveur compromis ne peut servir le message en avance. Le destinataire voit un compte à rebours ; le message se déchiffre tout seul à la milliseconde où drand publie la signature du round cible. Voir `apps/frontend/src/lib/tlock.ts` pour l'implémentation.
 
 ### 🔥 **Burn After Reading**
 
@@ -106,8 +106,8 @@ Représentation visuelle de votre réseau de confiance :
 
 ## 📥 Téléchargement (utilisateurs / testeurs)
 
-Téléchargez `Cipher-Setup-1.2.3.exe` (Windows) ou `Cipher-1.2.3.AppImage` /
-`cipher_1.2.3_amd64.deb` (Linux) depuis la [dernière release](../../releases/latest).
+Téléchargez `Cipher-Setup-1.2.4.exe` (Windows) ou `Cipher-1.2.4.AppImage` /
+`cipher_1.2.4_amd64.deb` (Linux) depuis la [dernière release](../../releases/latest).
 
 > **À propos de l'avertissement Windows SmartScreen / antivirus** — à lire avant de lancer
 >
@@ -134,7 +134,7 @@ Téléchargez `Cipher-Setup-1.2.3.exe` (Windows) ou `Cipher-1.2.3.AppImage` /
 >    Electron sont fréquents (les heuristiques flag le Chromium / Node
 >    embarqué).
 > 3. **Vérifie le SHA256** affiché sur la page de release.
->    PowerShell : `Get-FileHash .\Cipher-Setup-1.2.3.exe -Algorithm SHA256`.
+>    PowerShell : `Get-FileHash .\Cipher-Setup-1.2.4.exe -Algorithm SHA256`.
 >
 > Pour cliquer à travers SmartScreen : **« Informations complémentaires »
 > → « Exécuter quand même »**. Pour signaler un faux positif Defender :

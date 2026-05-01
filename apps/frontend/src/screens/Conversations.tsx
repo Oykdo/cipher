@@ -41,7 +41,7 @@ import { hasArchivedMessages } from '../lib/backup';
 import ConversationRequests from '../components/ConversationRequests';
 import { useP2P } from '../hooks/useP2P';
 import { useConversationCall } from '../hooks/useConversationCall';
-import { P2P_CONFIG, SIGNALING_SERVERS, TIMELOCK_ENABLED } from '../config';
+import { P2P_CONFIG, SIGNALING_SERVERS } from '../config';
 import { encryptKeyToRound, scheduleLockAt } from '../lib/tlock';
 import { debugLogger } from "../lib/debugLogger";
 import { encryptAttachment, type EncryptedAttachment, type SecurityMode } from '../lib/attachment';
@@ -1093,7 +1093,6 @@ export default function Conversations() {
     if (!messageBody.trim() && !selectedFile) return;
 
     console.log('[tlock/send] entry', {
-      TIMELOCK_ENABLED,
       timeLockEnabled,
       timeLockDate,
       timeLockTime,
@@ -1251,12 +1250,11 @@ export default function Conversations() {
       let effectiveTextBody = plaintextBody;
       let drandUnlockRound: number | undefined;
       console.log('[tlock] send path state', {
-        TIMELOCK_ENABLED,
         timeLockEnabled,
         timeLockDate,
         timeLockTime,
       });
-      if (TIMELOCK_ENABLED && timeLockEnabled && timeLockDate && timeLockTime) {
+      if (timeLockEnabled && timeLockDate && timeLockTime) {
         try {
           const unlockAtMs = new Date(`${timeLockDate}T${timeLockTime}`).getTime();
           console.log('[tlock] target unlock timestamp', new Date(unlockAtMs).toISOString());

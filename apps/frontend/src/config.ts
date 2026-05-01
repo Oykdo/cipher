@@ -42,12 +42,10 @@ export const EIDOLON_CONNECT_SESSION_SECRET =
 export const EIDOLON_CONNECT_ENABLED =
   import.meta.env.VITE_EIDOLON_CONNECT_ENABLED === 'true';
 
-// Legacy time-lock feature (server-enforced blockchain gate) is disabled
-// until the tlock/drand migration ships a truly trustless timelock.
-// When false, the frontend hides the time-lock UI and the backend rejects
-// messages carrying unlockBlockHeight.
-export const TIMELOCK_ENABLED =
-  import.meta.env.VITE_TIMELOCK_ENABLED === 'true';
+// Time-lock now uses drand/tlock (BLS12-381 identity-based encryption to a
+// future drand round) — see lib/tlock.ts. The lock is cryptographic, not
+// server-enforced, so it ships unconditionally. The previous
+// VITE_TIMELOCK_ENABLED flag was retired in v1.2.4.
 
 export const WS_BASE_URL = import.meta.env.PROD
   ? pickProdUrl(import.meta.env.VITE_WS_BASE_URL, DEFAULT_WS_BASE_URL)
