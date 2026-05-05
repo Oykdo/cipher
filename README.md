@@ -1,6 +1,8 @@
-                                  # Cipher
+<h1 align="center">Cipher</h1>
 
-> An end-to-end encrypted messenger where the server stores nothing it doesn't have to.
+<p align="center">
+  <em>An end-to-end encrypted messenger where the server stores nothing it doesn't have to.</em>
+</p>
 
 <p align="center">
   <a href="https://github.com/Oykdo/cipher/releases/latest">
@@ -16,9 +18,11 @@
   <sub>Windows .exe · Linux AppImage + .deb · <a href="#install">install instructions</a> · <a href="CIPHER_PRIVACY_GUARANTEES.md">privacy contract</a> · macOS: <a href="#macos">coming with mobile release</a></sub>
 </p>
 
-[![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#status)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Privacy contract](https://img.shields.io/badge/privacy-contract-green.svg)](CIPHER_PRIVACY_GUARANTEES.md)
+<p align="center">
+  <a href="#status"><img src="https://img.shields.io/badge/status-alpha-orange.svg" alt="Status: alpha" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
+  <a href="CIPHER_PRIVACY_GUARANTEES.md"><img src="https://img.shields.io/badge/privacy-contract-green.svg" alt="Privacy contract" /></a>
+</p>
 
 Cipher is a desktop messenger built around a privacy contract — a public document that says, line by line, what the server stores, what it does NOT store, and how anyone can verify the promise. Every claim is enforced by code and checked by automated tests in CI.
 
