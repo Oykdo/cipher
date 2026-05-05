@@ -1,4 +1,4 @@
-# Cipher
+                                  # Cipher
 
 > An end-to-end encrypted messenger where the server stores nothing it doesn't have to.
 
