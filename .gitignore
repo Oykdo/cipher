@@ -176,6 +176,7 @@ assets/eidolon-installer/*
 *.example.js
 codebuff.json
 .factory/
+scripts/
 
 # =============================================================================
 # ARCHIVE (Development logs - not for production)
