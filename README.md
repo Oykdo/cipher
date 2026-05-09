@@ -298,3 +298,9 @@ Bug reports are very welcome at this stage. Be specific: which OS, which build, 
 ([`README.fr.md`](README.fr.md)) is the historical dev-focused doc and predates this
 rewrite — it is being kept while it remains useful but the canonical product description
 is here.*
+
+---
+
+## Contact
+
+jrzg7f2k@proton.me
