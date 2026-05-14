@@ -1,5 +1,60 @@
 # Changelog
 
+## v1.3.0 — Eidolon Connect goes live: vault resonance sphere
+
+### Added
+
+- **Vault resonance sphere is now live in production.** The header
+  orb is no longer a static placeholder: it pulls `resonance_score`
+  and `operational_entropy` from
+  `https://eidolon-connect.xyz/connect/vault/economy/{vault_id}`
+  (new endpoint on the Eidolon Connect VPS) every 30 seconds and
+  drives the Three.js shader in real time. Higher resonance →
+  faster orbital rotation and brighter halo; higher entropy →
+  visible crackle ring.
+- **Activity-driven resonance boosts.** A new
+  `lib/vaultActivity.ts` helper pings
+  `POST /connect/vault/economy/{vault_id}/activity` on login
+  (QuickConnect / LoginNew / SignupFluid) and on every outgoing
+  message (Conversations). Each ping adds +2 to `resonance_base`
+  on the server. Both layers enforce a 24-hour cooldown
+  (client: `localStorage`-persisted throttle map; server:
+  `last_activity_at` check returning 429) so logging in/out
+  repeatedly cannot farm the metric.
+- **Tier is derived client-side from `vaultNumber`.** The yield
+  formula in `useVaultMetrics.ts` now maps the founder ordinal
+  to its rank directly (`1–33 supreme`, `34–100 elite`,
+  `101–1000 veteran`, `1001–10000 pioneer`, else `standard`)
+  so a vault holder always sees the correct daily yield even
+  before the public-vault registry has them indexed.
+
+### Changed
+
+- **`EIDOLON_CONNECT_ENABLED` flipped to `true`** in both the
+  bridge (`apps/bridge/fly.toml`) and the frontend
+  (`apps/frontend/.env.production`). The "coming soon" gate is
+  retired — Eidolon Connect is the production identity layer.
+- **Eidolon Connect handshake no longer requires HMAC at the
+  client.** `lib/eidolonConnect.ts` first tries
+  `GET /connect/apps/{app_id}` (unauthenticated) and only falls
+  through to the HMAC-signed `POST /connect/apps/register` if the
+  app is unknown. `cipher.desktop` is now pre-registered and
+  approved on the VPS, so this path is taken on every launch.
+- **Local Eidolon dev fallback removed from
+  `useVaultMetrics`.** The hook no longer attempts the Electron
+  IPC `getEidolonVaultMetrics` route and goes straight to the VPS.
+  `config.ts` no longer falls back to `http://127.0.0.1:8000`
+  in dev mode either.
+
+### Fixed
+
+- **PIN lock overlay missed on cold start.** A race between the
+  Zustand `appLock` store init and `localStorage` becoming
+  available on Electron cold start could let the app render
+  unlocked. `App.tsx` now calls `refreshStatus()` once after
+  mount, and the store re-asserts `isLocked: true` whenever
+  `pinEnabled` is on, so the overlay always appears.
+
 ## v1.2.10 — Wake-from-sleep recovery, privacy doc cleanup, research tease
 
 ### Fixed
