@@ -51,6 +51,7 @@ import { loadPendingBurnAcks, removePendingBurnAck, upsertPendingBurnAck } from 
 import { clearKeyCache } from '../lib/encryption';
 import VaultResonanceWidget from '../components/VaultResonanceWidget';
 import { useVaultMetrics } from '../hooks/useVaultMetrics';
+import { pingVaultActivity } from '../lib/vaultActivity';
 import '../styles/fluidCrypto.css';
 
 type ViewMode = 'list' | 'chat';
@@ -1366,6 +1367,8 @@ export default function Conversations() {
       // Send encrypted message via server
       const sentMessage = await apiv2.sendMessage(selectedConvId, encryptedBody, options);
       console.log(`[SEND] Server returned message with ID: ${sentMessage.id}`);
+
+      pingVaultActivity(linkedVault?.vaultId);
 
       // CRITICAL: Cache the plaintext for this message ID
       // This ensures we can display it on reload without re-decryption

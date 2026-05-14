@@ -50,8 +50,10 @@ export const useAppLockStore = create<AppLockStoreState>((set, get) => ({
     set((prev) => ({
       pinEnabled: s.pinEnabled,
       biometricEnabled: s.biometricEnabled,
-      // Don't force isLocked=true retroactively; let the caller decide.
-      isLocked: prev.isLocked,
+      // On cold start, if PIN is enabled but we missed it during module init,
+      // force lock. This handles race conditions where localStorage wasn't
+      // ready when the store was first created.
+      isLocked: s.pinEnabled ? true : prev.isLocked,
     }));
   },
   lock: () => set({ isLocked: true }),

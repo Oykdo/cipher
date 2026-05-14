@@ -25,6 +25,7 @@ import {
 } from '../config';
 import { createEidolonConnectSession, ensureEidolonConnectRegistration } from '../lib/eidolonConnect';
 import { readVaultBridgeContext, type VaultBridgeContext } from '../lib/vaultBridge';
+import { pingVaultActivity } from '../lib/vaultActivity';
 import {
   openPublicEidolonInfo,
   type EidolonDesktopResult,
@@ -181,6 +182,7 @@ export default function SignupFluid() {
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
       });
+      pingVaultActivity(data.vaultBridge?.vaultId);
       navigate('/conversations');
     } catch (connectError) {
       setVaultError(getErrorMessage(connectError, t('signup.vault_signup_complete_error')));

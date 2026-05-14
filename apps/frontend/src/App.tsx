@@ -7,6 +7,7 @@ import { proactiveTokenRefresh } from './services/api-interceptor';
 import { useKeyInitialization } from './hooks/useKeyInitialization';
 import { AppLockOverlay } from './components/AppLockOverlay';
 import { useAppLockActivity } from './hooks/useAppLockActivity';
+import { useAppLockStore } from './store/appLock';
 import { EIDOLON_CONNECT_ENABLED } from './config';
 
 const Landing = lazy(() => import('./screens/Landing'));
@@ -56,6 +57,17 @@ function App() {
   // feature is disabled in Settings, and fully gated behind the Eidolon flag
   // (the PIN feature ships with the Eidolon release).
   useAppLockActivity();
+  const refreshAppLockStatus = useAppLockStore((s) => s.refreshStatus);
+
+  // Re-check PIN status on mount — handles race condition where the Zustand
+  // store was initialized before localStorage was fully available (Electron
+  // cold start). This ensures the lock overlay appears even if we missed
+  // the initial check.
+  useEffect(() => {
+    if (EIDOLON_CONNECT_ENABLED) {
+      refreshAppLockStatus();
+    }
+  }, [refreshAppLockStatus]);
 
   // Mirror the i18n locale into the Electron main process so the system-tray
   // menu (built at startup, before the renderer is up) can render in the

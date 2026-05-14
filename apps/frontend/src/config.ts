@@ -31,8 +31,10 @@ export const API_SUPPORTS_LOCAL_PSNX = isLocalhostUrl(API_BASE_URL);
 
 export const EIDOLON_CONNECT_APP_ID =
   import.meta.env.VITE_EIDOLON_CONNECT_APP_ID || 'cipher.desktop';
+// Always use production Eidolon Connect server (local dev server is deprecated)
+const DEFAULT_EIDOLON_CONNECT_URL = 'https://eidolon-connect.xyz';
 export const EIDOLON_CONNECT_BASE_URL =
-  import.meta.env.VITE_EIDOLON_CONNECT_URL || 'http://127.0.0.1:8000';
+  import.meta.env.VITE_EIDOLON_CONNECT_URL || DEFAULT_EIDOLON_CONNECT_URL;
 export const EIDOLON_CONNECT_SESSION_SECRET =
   import.meta.env.VITE_EIDOLON_CONNECT_SESSION_SECRET || '';
 

@@ -50,6 +50,9 @@ import {
   computeSrpPasswordSetup,
 } from '../lib/srpSeed';
 import { getErrorMessage } from '../lib/errors';
+import { readVaultBridgeContext } from '../lib/vaultBridge';
+import { pingVaultActivity } from '../lib/vaultActivity';
+import { EIDOLON_CONNECT_APP_ID } from '../config';
 
 export default function QuickConnect() {
   const { t } = useTranslation();
@@ -294,6 +297,27 @@ function UnlockForm({
       }
       const data = await verifyResp.json();
 
+      // Read vault bridge context to restore linkedVault for metrics widget
+      let linkedVault: {
+        appId: string;
+        vaultId: string;
+        vaultNumber?: number | null;
+        vaultName?: string | null;
+        source?: string;
+      } | undefined;
+      try {
+        const bridgeResult = await readVaultBridgeContext();
+        if (bridgeResult.ok && bridgeResult.context?.vault_id) {
+          linkedVault = {
+            appId: EIDOLON_CONNECT_APP_ID,
+            vaultId: bridgeResult.context.vault_id,
+            vaultNumber: bridgeResult.context.vault_number,
+            vaultName: bridgeResult.context.vault_name,
+            source: bridgeResult.context.source,
+          };
+        }
+      } catch { /* non-blocking */ }
+
       // Set the session BEFORE initializeE2EE — publishKeyBundleToServer fires
       // inside initializeE2EE and needs session.accessToken in the store, else
       // authFetchV2WithRefresh throws "No access token in session".
@@ -302,10 +326,13 @@ function UnlockForm({
           id: data.user.id,
           username: data.user.username,
           securityTier: data.user.securityTier,
+          linkedVault,
         },
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
       });
+
+      pingVaultActivity(linkedVault?.vaultId);
 
       try { await initializeE2EE(data.user.username); } catch { /* non-blocking */ }
 
@@ -496,15 +523,39 @@ function ProvisionForm({
         console.warn('[quick-connect] SRP password setup failed', srpErr);
       }
 
+      // Read vault bridge context to restore linkedVault for metrics widget
+      let linkedVault: {
+        appId: string;
+        vaultId: string;
+        vaultNumber?: number | null;
+        vaultName?: string | null;
+        source?: string;
+      } | undefined;
+      try {
+        const bridgeResult = await readVaultBridgeContext();
+        if (bridgeResult.ok && bridgeResult.context?.vault_id) {
+          linkedVault = {
+            appId: EIDOLON_CONNECT_APP_ID,
+            vaultId: bridgeResult.context.vault_id,
+            vaultNumber: bridgeResult.context.vault_number,
+            vaultName: bridgeResult.context.vault_name,
+            source: bridgeResult.context.source,
+          };
+        }
+      } catch { /* non-blocking */ }
+
       setSession({
         user: {
           id: verifyData.user.id,
           username: verifyData.user.username,
           securityTier: verifyData.user.securityTier,
+          linkedVault,
         },
         accessToken: verifyData.accessToken,
         refreshToken: verifyData.refreshToken,
       });
+
+      pingVaultActivity(linkedVault?.vaultId);
 
       try {
         await initializeE2EE(verifyData.user.username);

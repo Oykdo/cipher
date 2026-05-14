@@ -53,12 +53,12 @@ function normalizeBaseUrl(baseUrl: string): string {
 
 function buildCandidateBaseUrls(preferredBaseUrl: string): string[] {
   const normalizedPreferred = normalizeBaseUrl(preferredBaseUrl);
-  const candidates = [
-    normalizedPreferred,
-    // Local fallbacks for development only
-    'http://127.0.0.1:8000',
-    'http://localhost:8000',
-  ];
+  const candidates = [normalizedPreferred];
+
+  // Local fallbacks only in development mode
+  if (import.meta.env.DEV) {
+    candidates.push('http://127.0.0.1:8000', 'http://localhost:8000');
+  }
 
   return Array.from(new Set(candidates));
 }
@@ -82,18 +82,39 @@ async function probeConnectAtBaseUrl(
 ): Promise<EidolonConnectProbeResult> {
   try {
     const capabilities = await fetchConnectJson<EidolonConnectCapabilities>(baseUrl, '/connect/capabilities');
-    const registration = await fetchConnectJson<EidolonConnectRegistration>(baseUrl, '/connect/apps/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        app_id: appId,
-        app_name: 'Cipher Desktop',
-        scopes: DEFAULT_CONNECT_SCOPES,
-        display_origin: API_BASE_URL,
-        redirect_uri: 'cipher://callback',
-      }),
-    });
 
+    // Check if the app is already registered/approved (GET doesn't require HMAC)
+    let registration: EidolonConnectRegistration | undefined;
+    try {
+      const existing = await fetchConnectJson<{ success: boolean; data?: EidolonConnectRegistration }>(baseUrl, `/connect/apps/${appId}`);
+      if (existing?.data?.status === 'approved') {
+        registration = existing.data;
+      }
+    } catch {
+      // App not yet registered — fall through to POST registration
+    }
+
+    // Only attempt POST registration if not already approved
+    if (!registration) {
+      try {
+        registration = await fetchConnectJson<EidolonConnectRegistration>(baseUrl, '/connect/apps/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            app_id: appId,
+            app_name: 'Cipher Desktop',
+            scopes: DEFAULT_CONNECT_SCOPES,
+            display_origin: API_BASE_URL,
+            redirect_uri: 'cipher://callback',
+          }),
+        });
+      } catch {
+        // POST registration requires HMAC signature which the client doesn't have.
+        // The app must be pre-registered on the server. Continue without registration.
+      }
+    }
+
+    // Capabilities endpoint is enough to confirm the server is reachable
     return {
       ok: true,
       baseUrl,
@@ -102,15 +123,11 @@ async function probeConnectAtBaseUrl(
     };
   } catch (error: any) {
     const message = error?.message || String(error);
-    const serverHint =
-      baseUrl.includes(':8080')
-        ? 'Le serveur detecte sur 8080 ressemble au serveur de registration. Eidolon Connect attend l API locale sur le port 8000.'
-        : message;
 
     return {
       ok: false,
       baseUrl,
-      error: serverHint,
+      error: message,
     };
   }
 }
@@ -140,16 +157,12 @@ export async function ensureEidolonConnectRegistration(
       };
     }
 
-    console.error('[EidolonConnect] Registration probe failed', {
+    // IPC probe failed — fall through to HTTP candidates instead of returning early
+    console.warn('[EidolonConnect] IPC probe failed, falling through to HTTP', {
       baseUrl: result.baseUrl || EIDOLON_CONNECT_BASE_URL,
       appId,
       error: result.error || 'Unknown IPC probe error',
     });
-    return {
-      ok: false,
-      baseUrl: result.baseUrl || EIDOLON_CONNECT_BASE_URL,
-      error: result.error || 'Unable to reach Eidolon Connect.',
-    };
   }
 
   const candidates = buildCandidateBaseUrls(EIDOLON_CONNECT_BASE_URL);

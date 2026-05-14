@@ -34,6 +34,15 @@ const TIER_BASE_YIELD: Record<string, number> = {
   standard: 1,     // Standard (#10001+)
 };
 
+function tierFromVaultNumber(vaultNumber: number | null | undefined): string {
+  if (!vaultNumber) return 'standard';
+  if (vaultNumber <= 33) return 'supreme';
+  if (vaultNumber <= 100) return 'elite';
+  if (vaultNumber <= 1000) return 'veteran';
+  if (vaultNumber <= 10000) return 'pioneer';
+  return 'standard';
+}
+
 function computeDailyYield(resonance: number, entropy: number, tier: string, rosetta: boolean): number {
   const base = TIER_BASE_YIELD[tier] ?? 1;
   const resonanceFactor = 0.85 + (resonance / 100) * 0.30; // 0.85 - 1.15
@@ -55,36 +64,7 @@ export function useVaultMetrics(pollIntervalMs = 30_000): VaultMetrics | null {
     let cancelled = false;
 
     const fetchMetrics = async () => {
-      // Desktop: use Electron IPC to read local vault registry
-      if (window.electron?.getEidolonVaultMetrics) {
-        try {
-          const result = await window.electron.getEidolonVaultMetrics({
-            vaultId: linkedVault.vaultId,
-            vaultNumber: linkedVault.vaultNumber,
-          });
-          if (!cancelled && result?.ok && result.metrics) {
-            const m = result.metrics;
-            const tier = m.pioneerTier || 'standard';
-            const resonance = m.resonanceScore ?? 50;
-            const entropy = m.operationalEntropy ?? 0;
-            const rosetta = false; // TODO: check Rosetta Stone ownership
-            setMetrics({
-              resonance,
-              entropy,
-              eidolonBalance: m.eidolonBalance ?? 0,
-              holographicDepth: m.holographicDepthLevel ?? 0,
-              pioneerTier: tier,
-              rosettaBonus: rosetta,
-              dailyYield: computeDailyYield(resonance, entropy, tier, rosetta),
-            });
-          }
-        } catch {
-          // Eidolon not available — keep last known or default
-        }
-        return;
-      }
-
-      // Browser/Mobile: fetch from VPS API
+      // Production: fetch from VPS API (Eidolon Connect)
       try {
         const connectUrl = import.meta.env.VITE_EIDOLON_CONNECT_URL || 'https://eidolon-connect.xyz';
         const connectSecret = import.meta.env.VITE_EIDOLON_CONNECT_SESSION_SECRET || '';
@@ -94,7 +74,9 @@ export function useVaultMetrics(pollIntervalMs = 30_000): VaultMetrics | null {
         const resp = await fetch(`${connectUrl}/connect/vault/economy/${linkedVault.vaultId}`, { headers });
         if (resp.ok && !cancelled) {
           const data = await resp.json();
-          const tier = data.pioneer_tier || 'standard';
+          const tier = linkedVault.vaultNumber
+            ? tierFromVaultNumber(linkedVault.vaultNumber)
+            : (data.pioneer_tier || 'standard');
           const resonance = data.resonance_score ?? 50;
           const entropy = data.operational_entropy ?? 0;
           const rosetta = false;

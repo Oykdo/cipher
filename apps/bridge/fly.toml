@@ -17,7 +17,7 @@ kill_timeout = '30s'
   BRIDGE_MESSAGE_TTL_DAYS = '7'
   BRIDGE_PURGE_INTERVAL_MINUTES = '60'
   BRIDGE_SECURITY_EVENT_BUFFER_SIZE = '10000'
-  EIDOLON_CONNECT_ENABLED = 'false'
+  EIDOLON_CONNECT_ENABLED = 'true'
   NODE_ENV = 'production'
   PORT = '4000'
   # TIMELOCK_ENABLED retired in v1.2.4 — drand/tlock ships unconditionally.
