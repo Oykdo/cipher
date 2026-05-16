@@ -12,14 +12,10 @@
   <a href="https://github.com/Oykdo/cipher/releases/latest">
     <img src="https://img.shields.io/github/v/release/Oykdo/cipher?include_prereleases&label=%E2%AC%87%20Download%20for%20Linux&style=for-the-badge&color=f57900" alt="Download Cipher for Linux" height="44" />
   </a>
-  &nbsp;
-  <a href="https://github.com/Oykdo/cipher/releases/latest">
-    <img src="https://img.shields.io/github/v/release/Oykdo/cipher?include_prereleases&label=%E2%AC%87%20Download%20for%20macOS&style=for-the-badge&color=555555" alt="Download Cipher for macOS" height="44" />
-  </a>
 </p>
 
 <p align="center">
-  <sub>Windows .exe · Linux AppImage + .deb · macOS .dmg + .zip · <a href="#install">install instructions</a> · <a href="CIPHER_PRIVACY_GUARANTEES.md">privacy contract</a></sub>
+  <sub>Windows .exe · Linux AppImage + .deb · <a href="#install">install instructions</a> · <a href="CIPHER_PRIVACY_GUARANTEES.md">privacy contract</a> · macOS: <a href="#macos">coming soon</a></sub>
 </p>
 
 <p align="center">
@@ -129,14 +125,9 @@ cipher                    # launch from anywhere
 
 Both artifacts live on the [latest release](../../releases/latest) page next to the Windows installer.
 
-### macOS (available now, unsigned)
+### macOS
 
-Download `Cipher-1.3.1-arm64.dmg` or `.zip` from the [latest release](../../releases/latest). The binary is **unsigned** — macOS Gatekeeper will block it on first launch. To open it:
-
-1. Right-click the `.app` → **Open** → confirm in the dialog.
-2. Or: `xattr -cr /Applications/Cipher.app` in Terminal.
-
-Code-signing requires an Apple Developer Program subscription (99 $/year), planned alongside the CipherMobile iOS release.
+Not yet shipped as a packaged binary. Code-signing macOS apps requires an Apple Developer Program subscription (99 $/year), planned alongside the CipherMobile iOS release. Mac users can [build from source](#build-from-source) — the `npm run build:mac` target produces a working (unsigned) `.dmg` and `.zip` when run on macOS.
 
 ---
 
@@ -242,7 +233,7 @@ WHERE table_schema = 'public'
 
 Cipher is **alpha**. It works end-to-end (we shipped the privacy-l1 milestone on 2026-04-27 with all invariants passing in production), but you're early. Specifically:
 
-- **Windows and Linux pre-built downloads are available now.** macOS builds are produced by CI but unsigned (Gatekeeper requires a right-click → Open on first launch).
+- **Windows and Linux pre-built downloads are available now.** macOS is not yet shipped as a packaged binary.
 - **Eidolon vault identity is live.** Users can import an Eidolon keybundle to authenticate instead of using a BIP-39 mnemonic. The bridge stores only a PSNX SHA-256 hash — never the vault file itself.
 - **Mobile is in design.** See [`CipherMobile/ARCHITECTURE.md`](../CipherMobile/ARCHITECTURE.md) for the target architecture (React Native + Expo, same crypto core as desktop).
 - **No code signing yet.** The `.exe` is unsigned during alpha; SmartScreen will scream. Mac signing requires an Apple developer account, Windows signing a code-signing cert — both planned for the 1.0 release.
