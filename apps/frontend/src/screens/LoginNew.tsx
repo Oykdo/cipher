@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
-import { API_BASE_URL, EIDOLON_CONNECT_APP_ID, EIDOLON_CONNECT_ENABLED } from '../config';
+import { API_BASE_URL, API_SUPPORTS_LOCAL_PSNX, EIDOLON_CONNECT_APP_ID, EIDOLON_CONNECT_ENABLED } from '../config';
 import { saveKnownAccount, clearPasswordCache } from '../lib/localStorage';
 import { createEidolonConnectSession, ensureEidolonConnectRegistration } from '../lib/eidolonConnect';
 import { readVaultBridgeContext, type VaultBridgeContext } from '../lib/vaultBridge';
@@ -163,15 +163,18 @@ export default function LoginNew() {
         throw new Error(t('auth.vault_bridge_no_context_error'));
       }
 
-      // Desktop path: direct vault bridge without Connect session
-      // The vault files are already local — no need to round-trip through the VPS
+      // Desktop Electron: send PSNX proof directly (no Eidolon Connect needed).
+      // The bridge verifies against a stored hash on return visits.
+      // On first registration with a remote bridge, the .psnx file is uploaded
+      // so the bridge can compute the hash itself (no blind trust).
       const isDesktop = !!window.electron;
       let connectSessionId: string | undefined;
       let psnxPath = vaultContext.psnx_path;
       let psnxHash = vaultContext.psnx_hash;
+      let psnxFileBase64: string | undefined;
 
       if (isDesktop) {
-        // If the .psnx file wasn't found at its original path, ask the user to locate it
+        // If the .psnx hash wasn't found in the bridge context, ask the user
         if (!psnxHash && window.electron?.selectPsnxFile) {
           const selected = await window.electron.selectPsnxFile();
           if (!selected?.ok) {
@@ -180,8 +183,17 @@ export default function LoginNew() {
           psnxPath = selected.psnxPath;
           psnxHash = selected.psnxHash;
         }
+        // For remote bridges, read the .psnx file content so the bridge can
+        // verify it on first registration (proof of possession, not TOFU).
+        if (!API_SUPPORTS_LOCAL_PSNX && psnxPath && window.electron?.readPsnxFile) {
+          const readResult = await window.electron.readPsnxFile(psnxPath);
+          if (readResult.ok) {
+            psnxFileBase64 = readResult.base64;
+            if (!psnxHash) psnxHash = readResult.hash;
+          }
+        }
       } else {
-        // Mobile/browser: use Connect session via VPS
+        // Browser/mobile: use Connect session via VPS
         const connectSession = await createEidolonConnectSession({
           appId: EIDOLON_CONNECT_APP_ID,
           vaultId: vaultContext.vault_id,
@@ -205,8 +217,9 @@ export default function LoginNew() {
           vaultId: vaultContext.vault_id,
           vaultNumber: vaultContext.vault_number,
           vaultName: vaultContext.vault_name,
-          psnxPath,
-          psnxHash,
+          psnxPath: isDesktop ? psnxPath : undefined,
+          psnxHash: isDesktop ? psnxHash : undefined,
+          psnxFileBase64: isDesktop ? psnxFileBase64 : undefined,
         }),
       });
 

@@ -4,7 +4,13 @@
  * Export produces a binary `.eidolon_keybundle` download. Import uploads one
  * via multipart and returns the freshly-registered vault info (used to
  * auto-login post-import).
+ *
+ * Packaged Electron must not use relative `/api/...` URLs — they resolve to
+ * `file:///C:/api/...`. When the bridge is remote (Fly), import/export run
+ * locally via `window.electron` IPC + Eidolon's keybundle_cli.py.
  */
+
+import { API_BASE_URL, API_SUPPORTS_LOCAL_PSNX } from '../config';
 
 export type ExportResult = {
   ok: true;
@@ -29,23 +35,17 @@ export type ImportResult = {
 
 export type KeybundleError = { ok: false; error: string; detail?: unknown };
 
-/**
- * Fetch the bundle, trigger a browser download, return metadata. The browser
- * save dialog is spawned synchronously in the click handler's event loop so
- * popup blockers don't kick in.
- */
-export async function exportVaultKeybundle(vaultId: string): Promise<ExportResult | KeybundleError> {
-  const url = `/api/v2/vault/keybundle/export?vaultId=${encodeURIComponent(vaultId)}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    let detail: unknown;
-    try { detail = await res.json(); } catch { /* non-JSON error */ }
-    return { ok: false, error: `export failed: HTTP ${res.status}`, detail };
-  }
-  const disposition = res.headers.get('content-disposition') ?? '';
-  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `${vaultId}.eidolon_keybundle`;
-  const blob = await res.blob();
+function apiV2Url(pathSuffix: string): string {
+  const base = API_BASE_URL.replace(/\/$/, '');
+  const suffix = pathSuffix.startsWith('/') ? pathSuffix : `/${pathSuffix}`;
+  return `${base}${suffix}`;
+}
 
+async function blobToUint8Array(file: File | Blob): Promise<Uint8Array> {
+  return new Uint8Array(await file.arrayBuffer());
+}
+
+function triggerBrowserDownload(blob: Blob, filename: string): void {
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = objectUrl;
@@ -53,9 +53,81 @@ export async function exportVaultKeybundle(vaultId: string): Promise<ExportResul
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  // Slight delay before revoking so browsers that start the download async
-  // don't truncate. 5 s is plenty even on slow disks.
   setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
+}
+
+type ElectronKeybundleImportResult =
+  | ImportResult
+  | KeybundleError
+  | {
+      ok: true;
+      reusedExisting?: boolean;
+      vaultId: string;
+      vaultNumber: number;
+      vaultName: string;
+      psnxPath: string;
+      blendPath: string;
+      bridgePath: string;
+      message?: string;
+    };
+
+type ElectronKeybundleExportResult =
+  | KeybundleError
+  | {
+      ok: true;
+      bytes: Uint8Array;
+      filename: string;
+      vaultId: string;
+      vaultName: string;
+      sha256: string;
+      size: number;
+    };
+
+/**
+ * Fetch the bundle, trigger a browser download, return metadata. The browser
+ * save dialog is spawned synchronously in the click handler's event loop so
+ * popup blockers don't kick in.
+ */
+export async function exportVaultKeybundle(vaultId: string): Promise<ExportResult | KeybundleError> {
+  if (window.electron?.exportVaultKeybundle && !API_SUPPORTS_LOCAL_PSNX) {
+    const result = (await window.electron.exportVaultKeybundle(
+      vaultId,
+    )) as ElectronKeybundleExportResult;
+    if (!result.ok) {
+      return { ok: false, error: result.error, detail: result };
+    }
+    const blob = new Blob([result.bytes as BlobPart], {
+      type: 'application/octet-stream',
+    });
+    triggerBrowserDownload(blob, result.filename);
+    return {
+      ok: true,
+      filename: result.filename,
+      size: result.size,
+      vaultId: result.vaultId,
+      vaultName: result.vaultName,
+      sha256: result.sha256,
+    };
+  }
+
+  const url = apiV2Url(
+    `/api/v2/vault/keybundle/export?vaultId=${encodeURIComponent(vaultId)}`,
+  );
+  const res = await fetch(url);
+  if (!res.ok) {
+    let detail: unknown;
+    try {
+      detail = await res.json();
+    } catch {
+      /* non-JSON error */
+    }
+    return { ok: false, error: `export failed: HTTP ${res.status}`, detail };
+  }
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const filename =
+    /filename="([^"]+)"/.exec(disposition)?.[1] ?? `${vaultId}.eidolon_keybundle`;
+  const blob = await res.blob();
+  triggerBrowserDownload(blob, filename);
 
   return {
     ok: true,
@@ -67,10 +139,40 @@ export async function exportVaultKeybundle(vaultId: string): Promise<ExportResul
   };
 }
 
-export async function importVaultKeybundle(file: File | Blob): Promise<ImportResult | KeybundleError> {
+export async function importVaultKeybundle(
+  file: File | Blob,
+): Promise<ImportResult | KeybundleError> {
+  if (window.electron?.importVaultKeybundle && !API_SUPPORTS_LOCAL_PSNX) {
+    const bytes = await blobToUint8Array(file);
+    const result = (await window.electron.importVaultKeybundle(
+      bytes,
+    )) as ElectronKeybundleImportResult;
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: 'error' in result ? result.error : 'import failed',
+        detail: result,
+      };
+    }
+    return {
+      ok: true,
+      reusedExisting: result.reusedExisting,
+      vaultId: result.vaultId,
+      vaultNumber: result.vaultNumber,
+      vaultName: result.vaultName,
+      psnxPath: result.psnxPath,
+      blendPath: result.blendPath,
+      bridgePath: result.bridgePath,
+      message: result.message,
+    };
+  }
+
   const form = new FormData();
   form.append('file', file, 'bundle.eidolon_keybundle');
-  const res = await fetch('/api/v2/vault/keybundle/import', { method: 'POST', body: form });
+  const res = await fetch(apiV2Url('/api/v2/vault/keybundle/import'), {
+    method: 'POST',
+    body: form,
+  });
   let payload: Record<string, unknown>;
   try {
     payload = await res.json();

@@ -88,6 +88,7 @@ interface EidolonBridgeSessionBody {
   vaultName?: string;
   psnxPath?: string;
   psnxHash?: string;
+  psnxFileBase64?: string;
 }
 
 const DEFAULT_EIDOLON_CONNECT_APP_ID = process.env.EIDOLON_CONNECT_APP_ID || 'cipher.desktop';
@@ -473,28 +474,72 @@ export async function authRoutes(fastify: FastifyInstance) {
           return { error: 'The authenticated PSNX vault does not match the Eidolon Connect session.' };
         }
       } else if (hintedVaultId) {
-        // --- Path B: Direct desktop vault bridge (local .psnx trust) ---
-        // Security: verify the caller can prove possession of the .psnx file
+        // --- Path B: Direct desktop vault bridge (PSNX hash proof) ---
+        // Three verification modes:
+        //   1. Return visit  → verify client hash against stored hash
+        //   2. Local bridge  → read the .psnx file from disk, compute and store hash
+        //   3. Remote bridge, first registration → client uploads the .psnx file,
+        //      bridge computes the hash itself (no TOFU — proof of possession)
         const clientPsnxHash = typeof request.body.psnxHash === 'string' ? request.body.psnxHash.trim() : '';
         const localPsnxPath = typeof psnxPath === 'string' ? psnxPath.trim() : '';
+        const psnxFileB64 = typeof request.body.psnxFileBase64 === 'string' ? request.body.psnxFileBase64 : '';
 
-        if (!clientPsnxHash || !localPsnxPath) {
-          reply.code(400);
-          return { error: 'Desktop bridge requires psnxHash and psnxPath for vault proof' };
-        }
+        const bridgeIdentityHint = buildEidolonBridgeIdentity(hintedVaultId);
+        const existingUser = await db.getUserById(bridgeIdentityHint.userId);
+        const existingSettings = existingUser ? await db.getUserSettings(existingUser.id) : {};
+        const storedPsnxHash: string | undefined = existingSettings?.eidolonBridge?.psnxHash;
 
-        try {
-          const { readFileSync } = await import('node:fs');
-          const fileBuffer = readFileSync(localPsnxPath);
-          const serverPsnxHash = createHash('sha256').update(fileBuffer).digest('hex');
-          if (serverPsnxHash !== clientPsnxHash) {
+        if (storedPsnxHash) {
+          // Return visit: verify against the stored hash
+          if (!clientPsnxHash || clientPsnxHash !== storedPsnxHash) {
             reply.code(401);
-            return { error: 'PSNX file hash mismatch — vault proof failed' };
+            return { error: 'PSNX hash mismatch — vault proof failed' };
           }
-        } catch (fsError: any) {
-          request.log.warn({ error: fsError, psnxPath: localPsnxPath }, 'Cannot read PSNX file for desktop bridge');
+        } else if (psnxFileB64) {
+          // First registration: client uploaded the .psnx file.
+          // The bridge computes the hash itself — proof of possession.
+          // This works for both local and remote bridges; prefer it when available.
+          try {
+            const fileBuffer = Buffer.from(psnxFileB64, 'base64');
+            if (fileBuffer.length === 0 || fileBuffer.length > 2 * 1024 * 1024) {
+              reply.code(400);
+              return { error: 'Invalid PSNX file upload (empty or exceeds 2 MB)' };
+            }
+            const serverPsnxHash = createHash('sha256').update(fileBuffer).digest('hex');
+            if (clientPsnxHash && serverPsnxHash !== clientPsnxHash) {
+              reply.code(401);
+              return { error: 'PSNX file hash does not match uploaded content' };
+            }
+            // Store the server-computed hash; the file bytes are NOT persisted.
+            request.log.info({ vaultId: hintedVaultId }, 'PSNX hash derived from uploaded file (remote bridge)');
+            // Override clientPsnxHash with the server-computed one for storage below
+            (request.body as any).__serverPsnxHash = serverPsnxHash;
+          } catch (b64Error: any) {
+            reply.code(400);
+            return { error: 'Invalid PSNX file upload: base64 decode failed' };
+          }
+        } else if (localPsnxPath) {
+          // Local bridge fallback: read the file from disk
+          if (!clientPsnxHash) {
+            reply.code(400);
+            return { error: 'Desktop bridge requires psnxHash for vault proof' };
+          }
+          try {
+            const { readFileSync } = await import('node:fs');
+            const fileBuffer = readFileSync(localPsnxPath);
+            const serverPsnxHash = createHash('sha256').update(fileBuffer).digest('hex');
+            if (serverPsnxHash !== clientPsnxHash) {
+              reply.code(401);
+              return { error: 'PSNX file hash mismatch — vault proof failed' };
+            }
+          } catch (fsError: any) {
+            request.log.warn({ error: fsError, psnxPath: localPsnxPath }, 'Cannot read PSNX file for desktop bridge');
+            reply.code(401);
+            return { error: 'Cannot verify PSNX file — ensure the vault files are accessible' };
+          }
+        } else {
           reply.code(401);
-          return { error: 'Cannot verify PSNX file — ensure the vault files are accessible' };
+          return { error: 'Cannot verify PSNX proof — provide psnxHash + psnxPath (local) or psnxFileBase64 (remote)' };
         }
 
         resolvedVaultId = hintedVaultId;
@@ -502,7 +547,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         resolvedVaultName = typeof request.body.vaultName === 'string' ? request.body.vaultName : undefined;
         resolvedSource = 'desktop_bridge';
         resolvedCreatedAt = new Date().toISOString();
-        resolvedAuthStrength = 'psnx_file_proof';
+        resolvedAuthStrength = storedPsnxHash ? 'psnx_hash_proof' : (localPsnxPath ? 'psnx_file_proof' : 'psnx_upload_proof');
       } else {
         reply.code(400);
         return { error: 'vaultId or connectSessionId is required' };
@@ -554,6 +599,12 @@ export async function authRoutes(fastify: FastifyInstance) {
       }
 
       try {
+        // Include the PSNX hash in bridge settings so return visits can verify
+        // against it even when the bridge cannot read the local .psnx file.
+        // Prefer the server-computed hash (from uploaded file) over the client-provided one.
+        const psnxHashToStore =
+          (request.body as any).__serverPsnxHash ||
+          (typeof request.body.psnxHash === 'string' ? request.body.psnxHash.trim() : '');
         await db.updateUserSettings(user.id, {
           eidolonBridge: {
             appId: normalizedAppId,
@@ -564,6 +615,7 @@ export async function authRoutes(fastify: FastifyInstance) {
             lastLinkedAt: new Date().toISOString(),
             bridgeCreatedAt: resolvedCreatedAt || null,
             authStrength: resolvedAuthStrength || 'eidolon_connect_session',
+            ...(psnxHashToStore ? { psnxHash: psnxHashToStore } : {}),
           },
         });
       } catch (settingsError) {

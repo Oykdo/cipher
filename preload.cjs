@@ -11,6 +11,12 @@ contextBridge.exposeInMainWorld('electron', {
   createEidolonConnectSession: (payload) => ipcRenderer.invoke('eidolon:connect-session', payload),
   getVaultBridgeContext: () => ipcRenderer.invoke('vault-bridge:get-context'),
   selectPsnxFile: () => ipcRenderer.invoke('vault-bridge:select-psnx'),
+  readPsnxFile: (psnxPath) => ipcRenderer.invoke('vault-bridge:read-psnx', psnxPath),
+  // Local keybundle import/export (Python CLI). Required in packaged builds
+  // where relative /api/... URLs resolve to file:// and the hosted bridge
+  // cannot access the user's Eidolon vault files.
+  importVaultKeybundle: (bytes) => ipcRenderer.invoke('keybundle:import', bytes),
+  exportVaultKeybundle: (vaultId) => ipcRenderer.invoke('keybundle:export', vaultId),
   openStripeCheckout: (url) => ipcRenderer.invoke('stripe:open-checkout', url),
 
   // System power-resume signal. Fires after the OS wakes from sleep so

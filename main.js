@@ -2,10 +2,11 @@ import electron from 'electron';
 const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, powerMonitor, safeStorage, shell } = electron;
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fork, spawn } from 'node:child_process';
+import { fork, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import os from 'node:os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -142,17 +143,49 @@ async function resolveEidolonInstaller() {
   return findFirstAccessiblePath(getEidolonInstallerCandidates());
 }
 
+const KEYBUNDLE_CLI_REL = path.join('scripts', 'public', 'keybundle_cli.py');
+
 function getEidolonRootCandidates() {
-  return [
-    path.join(__dirname, '..', 'Eidolon'),
-    path.join(process.cwd(), '..', 'Eidolon'),
-    path.join(process.cwd(), 'Eidolon'),
-    path.join(process.resourcesPath, 'Eidolon'),
-  ];
+  const seen = new Set();
+  const add = (candidate) => {
+    if (!candidate || typeof candidate !== 'string') return;
+    const resolved = path.resolve(candidate);
+    if (!seen.has(resolved)) seen.add(resolved);
+  };
+
+  if (process.env.EIDOLON_ROOT) add(process.env.EIDOLON_ROOT);
+
+  // electron-builder extraResources → resources/Eidolon (see bundle-eidolon-runtime.mjs)
+  if (process.resourcesPath) add(path.join(process.resourcesPath, 'Eidolon'));
+
+  add(path.join(__dirname, 'assets', 'eidolon-runtime'));
+  add(path.join(__dirname, '..', 'Eidolon'));
+  add(path.join(process.cwd(), '..', 'Eidolon'));
+  add(path.join(process.cwd(), 'Eidolon'));
+
+  let dir = app.isPackaged ? path.dirname(process.execPath) : __dirname;
+  for (let depth = 0; depth < 10; depth++) {
+    add(path.join(dir, 'Eidolon'));
+    add(path.join(dir, '..', 'Eidolon'));
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  return [...seen];
 }
 
 async function resolveEidolonRoot() {
-  return findFirstAccessiblePath(getEidolonRootCandidates());
+  for (const root of getEidolonRootCandidates()) {
+    const cli = path.join(root, KEYBUNDLE_CLI_REL);
+    try {
+      await fs.access(cli);
+      return root;
+    } catch {
+      // try next candidate
+    }
+  }
+  return null;
 }
 
 function parseNumberString(value) {
@@ -321,31 +354,50 @@ async function probeEidolonConnect(payload = {}) {
       };
     }
 
-    const registrationResponse = await fetch(`${baseUrl}/connect/apps/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        app_id: appId,
-        app_name: 'Cipher Desktop',
-        scopes: ['auth', 'read_public_identity'],
-        display_origin: 'cipher-desktop',
-        redirect_uri: 'cipher://callback',
-      }),
-    });
-    const registration = await registrationResponse.json().catch(() => ({}));
-    if (!registrationResponse.ok) {
-      return {
-        ok: false,
-        baseUrl,
-        error: registration?.detail || registration?.error || `Registration HTTP ${registrationResponse.status}`,
-      };
+    // Registration POST requires HMAC signature which the desktop client
+    // doesn't hold. Try it as best-effort; if it fails (e.g. "invalid
+    // signature" on a remote server), check if the app is already approved
+    // via GET. The probe succeeds as long as capabilities are reachable.
+    let registration;
+    try {
+      const registrationResponse = await fetch(`${baseUrl}/connect/apps/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          app_id: appId,
+          app_name: 'Cipher Desktop',
+          scopes: ['auth', 'read_public_identity'],
+          display_origin: 'cipher-desktop',
+          redirect_uri: 'cipher://callback',
+        }),
+      });
+      if (registrationResponse.ok) {
+        registration = await registrationResponse.json().catch(() => undefined);
+      }
+    } catch {
+      // POST registration failed — not fatal
+    }
+
+    // If POST registration didn't yield an approved status, check GET
+    if (!registration || registration.status !== 'approved') {
+      try {
+        const existing = await fetch(`${baseUrl}/connect/apps/${encodeURIComponent(appId)}`);
+        if (existing.ok) {
+          const existingData = await existing.json().catch(() => ({}));
+          if (existingData?.data?.status === 'approved') {
+            registration = existingData.data;
+          }
+        }
+      } catch {
+        // GET check failed — not fatal
+      }
     }
 
     return {
       ok: true,
       baseUrl,
       capabilities,
-      registration,
+      registration: registration || undefined,
     };
   } catch (error) {
     return {
@@ -888,10 +940,226 @@ ipcMain.handle('tray.quitNow', () => {
 
 function getVaultBridgeCandidates() {
   return [
+    path.join(app.getPath('userData'), VAULT_BRIDGE_FILE),
     path.join(__dirname, '..', VAULT_BRIDGE_FILE),
     path.join(process.cwd(), '..', VAULT_BRIDGE_FILE),
     path.join(process.cwd(), VAULT_BRIDGE_FILE),
   ];
+}
+
+// --- Keybundle import/export (local Eidolon Python CLI) -----------------------
+// Packaged Cipher loads the UI from file:// and talks to the hosted bridge for
+// auth/messaging. Keybundle routes must run on the user's machine (extract .psnx
+// + .blend_data into %LOCALAPPDATA%\Eidolon, write eidolon_cipher_bridge.json).
+
+function resolveEidolonPython() {
+  if (process.env.EIDOLON_PYTHON && existsSync(process.env.EIDOLON_PYTHON)) {
+    return process.env.EIDOLON_PYTHON;
+  }
+
+  // Prefer the bundled venv Python (ships with numpy + cryptography so the
+  // keybundle CLI doesn't depend on the user having them installed globally).
+  for (const root of getEidolonRootCandidates()) {
+    const venvPython = process.platform === 'win32'
+      ? path.join(root, 'venv', 'Scripts', 'python.exe')
+      : path.join(root, 'venv', 'bin', 'python');
+    if (existsSync(venvPython)) {
+      return venvPython;
+    }
+  }
+
+  if (process.platform !== 'win32') {
+    for (const abs of ['/usr/bin/python3', '/usr/local/bin/python3']) {
+      if (existsSync(abs)) return abs;
+    }
+    const r = spawnSync('which', ['python3'], { encoding: 'utf8' });
+    if (r.status === 0 && r.stdout.trim()) return r.stdout.trim().split('\n')[0];
+    return 'python3';
+  }
+  const isStub = (p) => /WindowsApps/i.test(p) || /AppInstaller/i.test(p);
+  for (const cand of ['python.exe', 'py.exe']) {
+    const r = spawnSync('where', [cand], { encoding: 'utf8' });
+    if (r.status === 0 && r.stdout) {
+      const found = r.stdout
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .filter((p) => !isStub(p));
+      if (found[0] && existsSync(found[0])) return found[0];
+    }
+  }
+  const userHome = process.env.USERPROFILE || process.env.HOME || '';
+  const known = [
+    path.join(userHome, 'AppData', 'Local', 'Programs', 'Python', 'Python312', 'python.exe'),
+    path.join(userHome, 'AppData', 'Local', 'Programs', 'Python', 'Python311', 'python.exe'),
+    path.join(userHome, 'AppData', 'Local', 'Programs', 'Python', 'Python310', 'python.exe'),
+    'C:\\Program Files\\Python312\\python.exe',
+    'C:\\Program Files\\Python311\\python.exe',
+    'C:\\Windows\\py.exe',
+  ];
+  for (const p of known) if (existsSync(p)) return p;
+  return 'python.exe';
+}
+
+async function resolveKeybundleCliScript() {
+  const eidolonRoot = await resolveEidolonRoot();
+  if (!eidolonRoot) return null;
+  const script = path.join(eidolonRoot, KEYBUNDLE_CLI_REL);
+  return existsSync(script) ? script : null;
+}
+
+function getEidolonDataDir() {
+  if (process.env.EIDOLON_DATA_DIR) return process.env.EIDOLON_DATA_DIR;
+  const localApp = process.env.LOCALAPPDATA;
+  if (localApp) return path.join(localApp, 'Eidolon');
+  return null;
+}
+
+function parseKeybundleCliJson(stdout) {
+  const lines = stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      return JSON.parse(lines[i]);
+    } catch {
+      // skip non-JSON lines
+    }
+  }
+  return null;
+}
+
+function runKeybundleCli(args) {
+  return new Promise((resolve, reject) => {
+    resolveKeybundleCliScript()
+      .then(async (script) => {
+        if (!script) {
+          reject(
+            new Error(
+              'Eidolon introuvable (keybundle_cli.py). ' +
+                'Rebuild Cipher depuis Chimera (Eidolon à côté de Cipher), ou définissez EIDOLON_ROOT ' +
+                'vers un checkout Eidolon complet, avec Python 3 et eidolon_crypto installés.',
+            ),
+          );
+          return;
+        }
+        const eidolonRoot = await resolveEidolonRoot();
+        const python = resolveEidolonPython();
+        const dataDir = getEidolonDataDir();
+        const child = spawn(python, [script, ...args], {
+          cwd: eidolonRoot,
+          env: {
+            ...process.env,
+            PYTHONUNBUFFERED: '1',
+            EIDOLON_ROOT: eidolonRoot,
+            ...(dataDir ? { EIDOLON_DATA_DIR: dataDir } : {}),
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        let stdout = '';
+        let stderr = '';
+        child.stdout.setEncoding('utf8');
+        child.stderr.setEncoding('utf8');
+        child.stdout.on('data', (d) => { stdout += d; });
+        child.stderr.on('data', (d) => { stderr += d; });
+        child.on('error', (err) => reject(err));
+        child.on('close', (code) => resolve({ stdout, stderr, code: code ?? -1 }));
+      })
+      .catch(reject);
+  });
+}
+
+async function mirrorBridgeContextToUserData(bridgePath) {
+  if (!bridgePath || !existsSync(bridgePath)) return;
+  const dest = path.join(app.getPath('userData'), VAULT_BRIDGE_FILE);
+  try {
+    const raw = await fs.readFile(bridgePath, 'utf8');
+    await fs.writeFile(dest, raw, 'utf8');
+  } catch (err) {
+    console.warn('[keybundle] Failed to mirror bridge context to userData:', err);
+  }
+}
+
+function mapKeybundleImportPayload(payload) {
+  return {
+    ok: true,
+    reusedExisting: payload.reused_existing === true,
+    vaultId: String(payload.vault_id ?? ''),
+    vaultNumber: Number(payload.vault_number ?? 0),
+    vaultName: String(payload.vault_name ?? ''),
+    psnxPath: String(payload.psnx_path ?? ''),
+    blendPath: String(payload.blend_path ?? ''),
+    bridgePath: String(payload.bridge_path ?? ''),
+    message: typeof payload.message === 'string' ? payload.message : undefined,
+  };
+}
+
+async function importVaultKeybundleLocal(bundleBytes) {
+  const buf = Buffer.isBuffer(bundleBytes) ? bundleBytes : Buffer.from(bundleBytes);
+  if (!buf.length || buf.length > 5 * 1024 * 1024) {
+    return { ok: false, error: `bundle size out of range (${buf.length} bytes)` };
+  }
+
+  const tmpDir = path.join(os.tmpdir(), `cipher-keybundle-${randomBytes(6).toString('hex')}`);
+  mkdirSync(tmpDir, { recursive: true });
+  const tmpPath = path.join(tmpDir, 'incoming.eidolon_keybundle');
+  writeFileSync(tmpPath, buf);
+
+  try {
+    const result = await runKeybundleCli(['import', '--bundle', tmpPath]);
+    const payload = parseKeybundleCliJson(result.stdout);
+    if (result.code !== 0 || !payload || payload.ok !== true) {
+      const detail = payload?.error || result.stderr.slice(-500) || `exit ${result.code}`;
+      return { ok: false, error: `keybundle import failed: ${detail}` };
+    }
+    await mirrorBridgeContextToUserData(String(payload.bridge_path ?? ''));
+    return mapKeybundleImportPayload(payload);
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'keybundle import failed',
+    };
+  } finally {
+    try { unlinkSync(tmpPath); } catch { /* ignore */ }
+  }
+}
+
+async function exportVaultKeybundleLocal(vaultId) {
+  const id = String(vaultId ?? '').trim().toLowerCase();
+  if (!/^[a-f0-9]{4,64}$/i.test(id)) {
+    return { ok: false, error: 'invalid vaultId' };
+  }
+
+  const tmpDir = path.join(os.tmpdir(), `cipher-keybundle-${randomBytes(6).toString('hex')}`);
+  mkdirSync(tmpDir, { recursive: true });
+  const outPath = path.join(tmpDir, `${id}.eidolon_keybundle`);
+
+  try {
+    const result = await runKeybundleCli(['export', '--vault-id', id, '--output', outPath]);
+    const payload = parseKeybundleCliJson(result.stdout);
+    if (result.code !== 0 || !payload || payload.ok !== true) {
+      const detail = payload?.error || result.stderr.slice(-500) || `exit ${result.code}`;
+      return { ok: false, error: `keybundle export failed: ${detail}` };
+    }
+    const bundlePath = String(payload.bundle_path ?? outPath);
+    if (!existsSync(bundlePath)) {
+      return { ok: false, error: 'bundle file missing after export' };
+    }
+    const bytes = await fs.readFile(bundlePath);
+    try { unlinkSync(bundlePath); } catch { /* ignore */ }
+    return {
+      ok: true,
+      bytes: new Uint8Array(bytes),
+      filename: `vault_${String(payload.vault_name ?? id).replace(/[^A-Za-z0-9_-]/g, '_')}.eidolon_keybundle`,
+      vaultId: String(payload.vault_id ?? id),
+      vaultName: String(payload.vault_name ?? ''),
+      sha256: String(payload.sha256 ?? ''),
+      size: bytes.length,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'keybundle export failed',
+    };
+  }
 }
 
 async function readVaultBridgeContext() {
@@ -950,6 +1218,10 @@ async function readVaultBridgeContext() {
 
 ipcMain.handle('vault-bridge:get-context', async () => readVaultBridgeContext());
 
+ipcMain.handle('keybundle:import', async (_event, bundleBytes) => importVaultKeybundleLocal(bundleBytes));
+
+ipcMain.handle('keybundle:export', async (_event, vaultId) => exportVaultKeybundleLocal(vaultId));
+
 ipcMain.handle('vault-bridge:select-psnx', async () => {
   const { dialog } = electron;
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -967,6 +1239,18 @@ ipcMain.handle('vault-bridge:select-psnx', async () => {
     return { ok: true, psnxPath: selectedPath, psnxHash };
   } catch (err) {
     return { ok: false, error: 'Cannot read the selected file' };
+  }
+});
+
+ipcMain.handle('vault-bridge:read-psnx', async (_event, psnxPath) => {
+  if (typeof psnxPath !== 'string' || !psnxPath.trim()) {
+    return { ok: false, error: 'psnxPath is required' };
+  }
+  try {
+    const buf = readFileSync(psnxPath.trim());
+    return { ok: true, base64: buf.toString('base64'), hash: createHash('sha256').update(buf).digest('hex') };
+  } catch (err) {
+    return { ok: false, error: 'Cannot read PSNX file at the specified path' };
   }
 });
 

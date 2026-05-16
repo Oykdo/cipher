@@ -47,6 +47,10 @@ type SelectPsnxResult =
   | { ok: true; psnxPath: string; psnxHash: string }
   | { ok: false; error: string };
 
+type ReadPsnxResult =
+  | { ok: true; base64: string; hash: string }
+  | { ok: false; error: string };
+
 declare global {
   interface Window {
     electron?: {
@@ -57,6 +61,7 @@ declare global {
         vaultRef: { vaultId?: string; vaultNumber?: number | null }
       ) => Promise<EidolonVaultMetricsResult>;
       selectPsnxFile?: () => Promise<SelectPsnxResult>;
+      readPsnxFile?: (psnxPath: string) => Promise<ReadPsnxResult>;
       probeEidolonConnect?: (payload: {
         baseUrl?: string;
         appId?: string;
@@ -82,6 +87,32 @@ declare global {
         error?: string;
       }>;
       getVaultBridgeContext?: () => Promise<{ ok: boolean; path?: string; context?: Record<string, unknown>; error?: string }>;
+      importVaultKeybundle?: (bytes: Uint8Array) => Promise<
+        | {
+            ok: true;
+            reusedExisting?: boolean;
+            vaultId: string;
+            vaultNumber: number;
+            vaultName: string;
+            psnxPath: string;
+            blendPath: string;
+            bridgePath: string;
+            message?: string;
+          }
+        | { ok: false; error: string }
+      >;
+      exportVaultKeybundle?: (vaultId: string) => Promise<
+        | {
+            ok: true;
+            bytes: Uint8Array;
+            filename: string;
+            vaultId: string;
+            vaultName: string;
+            sha256: string;
+            size: number;
+          }
+        | { ok: false; error: string }
+      >;
       backupPassword?: {
         has: (username: string) => Promise<boolean>;
         get: (username: string) => Promise<{ exists: boolean; password?: string; error?: string }>;

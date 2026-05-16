@@ -1,5 +1,39 @@
 # Changelog
 
+## v1.3.1 — Eidolon keybundle import fixes + bundled Python venv
+
+### Fixed
+
+- **Keybundle import from Eidolon vault now works with remote bridges.**
+  The Electron client uploads the `.psnx` file content to the bridge
+  on first registration, so the bridge can compute the SHA-256 hash
+  itself (proof of possession, no blind trust). Return visits verify
+  against the stored hash. Previously the bridge tried to read the
+  file from its own disk (only works for local bridges), causing
+  "Cannot verify PSNX file — ensure the vault files are accessible"
+  on every Fly.io-based authentication.
+- **Eidolon Connect IPC probe no longer treats registration failure
+  as fatal.** `probeEidolonConnect` in `main.js` now catches the
+  `POST /connect/apps/register` HMAC error gracefully and falls
+  through to the `GET /connect/apps/{app_id}` check, matching the
+  frontend `eidolonConnect.ts` behaviour.
+- **Bundled Python venv ships with the Electron build.**
+  `scripts/bundle-eidolon-runtime.mjs` now creates a minimal venv
+  with `numpy` and `cryptography` so the packaged `keybundle_cli.py`
+  works without requiring the user to have these installed globally.
+  `resolveEidolonPython()` in `main.js` prefers the venv Python
+  when available.
+
+### Changed
+
+- **`LoginNew.tsx` no longer requires Eidolon Connect for Electron
+  clients.** Desktop clients authenticate directly via PSNX hash
+  proof (`psnxHash` + `psnxFileBase64`), bypassing the broken
+  Eidolon Connect session flow entirely.
+- **Bridge `auth.ts` Path B priority reordered.** `psnxFileBase64`
+  (upload) is checked before `psnxPath` (local file read), so
+  remote bridges never accidentally try to read a Windows path.
+
 ## v1.3.0 — Eidolon Connect goes live: vault resonance sphere
 
 ### Added

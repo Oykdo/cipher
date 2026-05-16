@@ -17,10 +17,21 @@ const pickProdUrl = (envValue: string | undefined, fallback: string) => {
   return envValue;
 };
 
-// In production, default to same-origin to avoid CSP/mixed-content issues on hosted deployments.
-const DEFAULT_API_BASE_URL = import.meta.env.PROD ? RUNTIME_ORIGIN : 'http://localhost:4000';
+const isFileProtocolOrigin =
+  RUNTIME_ORIGIN === 'null' || RUNTIME_ORIGIN === '' || RUNTIME_ORIGIN.startsWith('file:');
+
+// In production, default to same-origin for hosted web builds. Packaged Electron
+// loads from file:// — same-origin would resolve API calls to file:///C:/api/...
+const HOSTED_BRIDGE_FALLBACK = 'https://cipher-bridge.fly.dev';
+const DEFAULT_API_BASE_URL = import.meta.env.PROD
+  ? isFileProtocolOrigin
+    ? import.meta.env.VITE_API_BASE_URL || HOSTED_BRIDGE_FALLBACK
+    : RUNTIME_ORIGIN
+  : 'http://localhost:4000';
 const DEFAULT_WS_BASE_URL = import.meta.env.PROD
-  ? RUNTIME_ORIGIN.replace(/^http/, 'ws')
+  ? isFileProtocolOrigin
+    ? (import.meta.env.VITE_WS_BASE_URL || 'wss://cipher-bridge.fly.dev')
+    : RUNTIME_ORIGIN.replace(/^http/, 'ws')
   : 'ws://localhost:4000';
 
 export const API_BASE_URL = import.meta.env.PROD
