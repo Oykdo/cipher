@@ -33,13 +33,6 @@ jobs:
             artifact_glob: |
               release/*.exe
               release/SHA256SUMS.txt
-          - os: macos-latest
-            builder_flag: --mac
-            artifact_name: cipher-macos
-            artifact_glob: |
-              release/*.dmg
-              release/*.zip
-              release/SHA256SUMS.txt
 
     runs-on: ${{ matrix.os }}
 
@@ -163,7 +156,6 @@ jobs:
           case "${RUNNER_OS}" in
             Linux)   sha256sum *.AppImage *.deb > SHA256SUMS.txt ;;
             Windows) sha256sum *.exe > SHA256SUMS.txt ;;
-            macOS)   sha256sum *.dmg *.zip > SHA256SUMS.txt ;;
             *) echo "::error::Unsupported runner OS: ${RUNNER_OS}"; exit 1 ;;
           esac
           echo "::group::SHA256SUMS.txt"
