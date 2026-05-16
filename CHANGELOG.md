@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.3.2 — Eidolon ecosystem integration, macOS CI revert, README refresh
+
+### Added
+
+- **Eidolon vault identity is now documented as a first-class Cipher
+  auth method.** The README reflects the full integration: keybundle
+  login, PSNX hash proof flow, and the relationship between Cipher
+  and Eidolon as the post-quantum identity layer.
+
+### Changed
+
+- **macOS removed from CI release matrix.** The build was added but
+  cannot be tested without a macOS machine. It will be re-added
+  alongside Apple Developer signing when testable.
+- **README updated for v1.3.2.** macOS download badge removed
+  ("coming soon"), Eidolon row added to comparison table, vault
+  resonance sphere and group conversations listed in working features,
+  download versions bumped to 1.3.2.
+
 ## v1.3.1 — Eidolon keybundle import fixes + bundled Python venv
 
 ### Fixed

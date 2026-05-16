@@ -1,7 +1,7 @@
 
 {
   "name": "cipher",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "Cipher - Secure E2E encrypted messenger with Time-Lock and DiceKey",
   "main": "main.js",
   "type": "module",
