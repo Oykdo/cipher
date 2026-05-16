@@ -12,10 +12,14 @@
   <a href="https://github.com/Oykdo/cipher/releases/latest">
     <img src="https://img.shields.io/github/v/release/Oykdo/cipher?include_prereleases&label=%E2%AC%87%20Download%20for%20Linux&style=for-the-badge&color=f57900" alt="Download Cipher for Linux" height="44" />
   </a>
+  &nbsp;
+  <a href="https://github.com/Oykdo/cipher/releases/latest">
+    <img src="https://img.shields.io/github/v/release/Oykdo/cipher?include_prereleases&label=%E2%AC%87%20Download%20for%20macOS&style=for-the-badge&color=555555" alt="Download Cipher for macOS" height="44" />
+  </a>
 </p>
 
 <p align="center">
-  <sub>Windows .exe · Linux AppImage + .deb · <a href="#install">install instructions</a> · <a href="CIPHER_PRIVACY_GUARANTEES.md">privacy contract</a> · macOS: <a href="#macos">coming with mobile release</a></sub>
+  <sub>Windows .exe · Linux AppImage + .deb · macOS .dmg + .zip · <a href="#install">install instructions</a> · <a href="CIPHER_PRIVACY_GUARANTEES.md">privacy contract</a></sub>
 </p>
 
 <p align="center">
@@ -25,6 +29,8 @@
 </p>
 
 Cipher is a desktop messenger built around a privacy contract — a public document that says, line by line, what the server stores, what it does NOT store, and how anyone can verify the promise. Every claim is enforced by code and checked by automated tests in CI.
+
+Cipher is also the first consumer-facing client for the **Eidolon** post-quantum vault identity system. Users can authenticate via an Eidolon keybundle (`.eidolon_keybundle`) instead of a traditional mnemonic — their vault file IS their key material, and Cipher never sees the raw secret.
 
 If you've ever wondered *"how do I know my messenger isn't lying about end-to-end encryption?"*, this repository is the answer for Cipher: read [`CIPHER_PRIVACY_GUARANTEES.md`](CIPHER_PRIVACY_GUARANTEES.md), then check the schema, then run the invariants.
 
@@ -41,6 +47,7 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 | Server retains zero auth log | ✗ | partial | ✓ | ✓ |
 | Server-side message history | indefinite | ~30 days | none | **7 days max post-pickup** |
 | User owns and exports their data | partial | partial | ✓ | ✓ |
+| Eidolon vault identity integration | ✗ | ✗ | ✗ | ✓ |
 | Federated / self-hostable | ✗ | ✗ | ✓ | planned (post-1.0) |
 
 ---
@@ -49,7 +56,7 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 
 ### Windows (available now)
 
-1. Download `Cipher-Setup-1.2.7.exe` from the [latest release](../../releases/latest).
+1. Download `Cipher-Setup-1.3.1.exe` from the [latest release](../../releases/latest).
 2. Windows SmartScreen will show **"Windows protected your PC — Unrecognized app"**. This is **expected during alpha** — see the box below. Click **"More info"** → **"Run anyway"**.
 3. Pick an install directory and finish.
 
@@ -89,7 +96,7 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 >
 >    ```powershell
 >    # Windows — print the local hash, eyeball-match the line in SHA256SUMS.txt
->    Get-FileHash .\Cipher-Setup-1.2.7.exe -Algorithm SHA256
+>    Get-FileHash .\Cipher-Setup-1.3.1.exe -Algorithm SHA256
 >    ```
 >
 >    `SHA256SUMS.txt` is generated inside the GitHub Actions runner from
@@ -108,25 +115,28 @@ Two formats are produced from the same CI build, both unsigned during alpha. Pic
 **AppImage** (works on most distros, no install required):
 
 ```bash
-chmod +x Cipher-1.2.7-x86_64.AppImage
-./Cipher-1.2.7-x86_64.AppImage
+chmod +x Cipher-1.3.1-x86_64.AppImage
+./Cipher-1.3.1-x86_64.AppImage
 ```
 
 **Debian / Ubuntu** (`.deb`):
 
 ```bash
-sudo dpkg -i Cipher-1.2.7-amd64.deb
+sudo dpkg -i Cipher-1.3.1-amd64.deb
 sudo apt-get install -f   # only if dpkg reports missing dependencies
 cipher                    # launch from anywhere
 ```
 
 Both artifacts live on the [latest release](../../releases/latest) page next to the Windows installer.
 
-### macOS
+### macOS (available now, unsigned)
 
-Not yet shipped as a packaged binary. Code-signing macOS apps requires an Apple Developer Program subscription (99 $/year), which we'll subscribe to alongside the iOS App Store release of CipherMobile. One subscription, two platforms.
+Download `Cipher-1.3.1-arm64.dmg` or `.zip` from the [latest release](../../releases/latest). The binary is **unsigned** — macOS Gatekeeper will block it on first launch. To open it:
 
-Until then, Mac users can [build from source](#build-from-source) — the `npm run build:mac` target produces a working (unsigned) `.dmg` and `.zip` when run on macOS.
+1. Right-click the `.app` → **Open** → confirm in the dialog.
+2. Or: `xattr -cr /Applications/Cipher.app` in Terminal.
+
+Code-signing requires an Apple Developer Program subscription (99 $/year), planned alongside the CipherMobile iOS release.
 
 ---
 
@@ -232,20 +242,23 @@ WHERE table_schema = 'public'
 
 Cipher is **alpha**. It works end-to-end (we shipped the privacy-l1 milestone on 2026-04-27 with all invariants passing in production), but you're early. Specifically:
 
-- **Windows is the only pre-built download today.** macOS and Linux are blocked on a CI runner setup (electron-builder needs native Linux tools to package `.AppImage` and macOS to sign `.dmg`); both can be built locally from source on the matching OS — see [Build from source](#build-from-source).
-- **Mobile is in design.** See [`CipherMobile/ARCHITECTURE.md`](../CipherMobile/ARCHITECTURE.md) for the target architecture (React Native + Expo, same crypto core as desktop). Implementation starts after the desktop alpha gets feedback.
-- **Group chats are not yet wired.** 1-to-1 conversations work; group plumbing exists in the schema but the per-recipient delivery acks are deferred until groups are a real product surface.
+- **Windows and Linux pre-built downloads are available now.** macOS builds are produced by CI but unsigned (Gatekeeper requires a right-click → Open on first launch).
+- **Eidolon vault identity is live.** Users can import an Eidolon keybundle to authenticate instead of using a BIP-39 mnemonic. The bridge stores only a PSNX SHA-256 hash — never the vault file itself.
+- **Mobile is in design.** See [`CipherMobile/ARCHITECTURE.md`](../CipherMobile/ARCHITECTURE.md) for the target architecture (React Native + Expo, same crypto core as desktop).
 - **No code signing yet.** The `.exe` is unsigned during alpha; SmartScreen will scream. Mac signing requires an Apple developer account, Windows signing a code-signing cert — both planned for the 1.0 release.
 - **No mobile push.** That's blocked on the mobile companion app being built first.
 
 What works today:
 - Mnemonic-based account creation, locally generated, never sent to the server
+- Eidolon keybundle login — import a `.eidolon_keybundle` from your Eidolon vault and authenticate via PSNX hash proof (no mnemonic needed)
 - Quick-unlock via password (PBKDF2 600k, byte-compatible across devices)
 - 1-to-1 E2E encrypted text messages (Double Ratchet + sender re-read via self-encrypting envelope)
+- Group conversations (2–10 members, e2ee-v2 only, deterministic keypair per user)
 - Attachment encryption + upload + download
 - Burn-after-reading (server-side scheduler, true DELETE)
 - Time-lock via drand (cryptographic, no server enforcement)
 - Local export of full history to a password-encrypted file
+- Vault resonance sphere — real-time PSNX tokenomics from Eidolon Connect
 
 **Research in progress.** A third temporal primitive is being studied as a complement to time-lock and burn. Where time-lock controls *when a message becomes readable* and burn controls *when it stops existing*, this third axis would target *how a message reveals itself across time*. No release timeline yet — the design is being prototyped against the privacy contract before any implementation work begins.
 
@@ -267,7 +280,7 @@ Cipher/
 ├── apps/
 │   ├── frontend/           — React + Vite (the UI + crypto)
 │   └── bridge/             — Fastify + Postgres (the relay)
-├── scripts/                — Build + ops scripts
+├── scripts/                — Build + ops scripts (+ Eidolon venv bundler)
 ├── Documentation/internal/ — Design docs (workflow, audits)
 ├── CIPHER_PRIVACY_GUARANTEES.md  — The contract (read this first)
 ├── INFRA_NOTES.md                — Operational follow-ups
@@ -276,7 +289,7 @@ Cipher/
 
 Sister projects in the same Chimera ecosystem (separate repos):
 - **CipherMobile** — React Native + Expo companion (in design).
-- **Eidolon** — Post-quantum vault identity system (used as Cipher's auth root in the long term).
+- **Eidolon** — Post-quantum vault identity system. Cipher is the first client to ship Eidolon keybundle authentication; the bridge verifies PSNX hash proofs and derives vault identities without ever seeing the raw key material.
 
 ---
 
@@ -294,7 +307,7 @@ Bug reports are very welcome at this stage. Be specific: which OS, which build, 
 
 ---
 
-*This README describes Cipher as of the privacy-l1 ship (2026-04-27). The French version
+*This README describes Cipher as of v1.3.1 (2026-05-16). The French version
 ([`README.fr.md`](README.fr.md)) is the historical dev-focused doc and predates this
 rewrite — it is being kept while it remains useful but the canonical product description
 is here.*
