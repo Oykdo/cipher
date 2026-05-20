@@ -585,6 +585,14 @@ try {
     purgeWorker.start();
     app.log.info('✅ Privacy purge worker started');
 
+    // Cipher Activity Reporter (push messages/conversations to Eidolon every 4h).
+    // Env-gated: set EIDOLON_ACTIVITY_REPORT_ENABLED=true to enable.
+    const { CipherActivityReporter } = await import('./services/cipherActivityReporter.js');
+    const cipherActivityReporter = new CipherActivityReporter();
+    cipherActivityReporter.initialize(app);
+    cipherActivityReporter.start();
+    app.log.info('✅ Cipher Activity Reporter wired');
+
     // P2P Signaling
     new SignalingServer({
         httpServer,

@@ -9,6 +9,10 @@ export interface VaultMetrics {
   pioneerTier: string;
   rosettaBonus: boolean;
   dailyYield: number;
+  evolvingSpheres: number;
+  mythicalOrHigherSpheres: number;
+  consecutiveActiveEpochs: number;
+  rosettaSource: 'streak' | 'spheres' | 'server' | null;
 }
 
 const DEFAULT_METRICS: VaultMetrics = {
@@ -19,6 +23,10 @@ const DEFAULT_METRICS: VaultMetrics = {
   pioneerTier: 'standard',
   rosettaBonus: false,
   dailyYield: 0,
+  evolvingSpheres: 0,
+  mythicalOrHigherSpheres: 0,
+  consecutiveActiveEpochs: 0,
+  rosettaSource: null,
 };
 
 // Base yield per tier (EIDOLON tokens/tick)
@@ -45,8 +53,10 @@ function tierFromVaultNumber(vaultNumber: number | null | undefined): string {
 
 function computeDailyYield(resonance: number, entropy: number, tier: string, rosetta: boolean): number {
   const base = TIER_BASE_YIELD[tier] ?? 1;
-  const resonanceFactor = 0.85 + (resonance / 100) * 0.30; // 0.85 - 1.15
-  const entropyPenalty = 1 - (entropy / 100) * 0.30; // 1.0 - 0.70
+  // P2: wider activity influence (0.50 - 1.50 instead of 0.85 - 1.15)
+  const resonanceFactor = 0.50 + (resonance / 100) * 1.00;
+  // Entropy penalty (unchanged): 1.0 - 0.70
+  const entropyPenalty = 1 - (entropy / 100) * 0.30;
   const rosettaMultiplier = rosetta ? 1.2 : 1.0;
   return base * resonanceFactor * entropyPenalty * rosettaMultiplier;
 }
@@ -79,7 +89,25 @@ export function useVaultMetrics(pollIntervalMs = 30_000): VaultMetrics | null {
             : (data.pioneer_tier || 'standard');
           const resonance = data.resonance_score ?? 50;
           const entropy = data.operational_entropy ?? 0;
-          const rosetta = false;
+          // Rosetta (+20% yield) eligibility — comes from the VPS:
+          //  - explicit `rosetta_active` flag
+          //  - or streak >= 42 active 4h-epochs (7 days)
+          //  - or holding >= 10 mythical-or-higher unique spheres
+          const streak = data.consecutive_active_epochs ?? 0;
+          const mythicalCount = data.mythical_or_higher_spheres ?? 0;
+          const evolvingSpheres = data.evolving_spheres ?? 0;
+          let rosetta = false;
+          let rosettaSource: VaultMetrics['rosettaSource'] = null;
+          if (data.rosetta_active === true) {
+            rosetta = true;
+            rosettaSource = 'server';
+          } else if (streak >= 42) {
+            rosetta = true;
+            rosettaSource = 'streak';
+          } else if (mythicalCount >= 10) {
+            rosetta = true;
+            rosettaSource = 'spheres';
+          }
           setMetrics({
             resonance,
             entropy,
@@ -88,6 +116,10 @@ export function useVaultMetrics(pollIntervalMs = 30_000): VaultMetrics | null {
             pioneerTier: tier,
             rosettaBonus: rosetta,
             dailyYield: computeDailyYield(resonance, entropy, tier, rosetta),
+            evolvingSpheres,
+            mythicalOrHigherSpheres: mythicalCount,
+            consecutiveActiveEpochs: streak,
+            rosettaSource,
           });
           return;
         }
