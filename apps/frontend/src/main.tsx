@@ -26,29 +26,35 @@ const queryClient = new QueryClient({
 });
 
 /**
- * Initialize app with security migrations
+ * masterKey → IndexedDB migration. Runs in the background so the first React
+ * paint is never blocked: on packaged Electron, IndexedDB open can stall long
+ * enough that users see an empty #root ("white screen") if we awaited here.
  */
-async function initApp() {
-  logger.info('🔐 Running security migrations...');
-  
-  try {
-    // Run masterKey migration
-    const migrationResult = await migrateMasterKeyToSecureStorage();
-    
-    if (migrationResult.status === 'success') {
-      logger.info('✅ Security migration completed successfully');
-    } else if (migrationResult.status === 'not_needed') {
-      logger.info('ℹ️ Security migration not needed (already up to date)');
-    } else {
-      logger.error('❌ Security migration failed', undefined, { message: migrationResult.message });
-      // Continue anyway - app will use IndexedDB if available, fallback to existing storage
+function runSecurityMigrationsInBackground() {
+  void (async () => {
+    logger.info('🔐 Running security migrations...');
+
+    try {
+      const migrationResult = await migrateMasterKeyToSecureStorage();
+
+      if (migrationResult.status === 'success') {
+        logger.info('✅ Security migration completed successfully');
+      } else if (migrationResult.status === 'not_needed') {
+        logger.info('ℹ️ Security migration not needed (already up to date)');
+      } else {
+        logger.error('❌ Security migration failed', undefined, {
+          message: migrationResult.message,
+        });
+      }
+    } catch (error) {
+      logger.error('❌ Migration error', error);
     }
-  } catch (error) {
-    logger.error('❌ Migration error', error);
-    // Continue anyway to not block app launch
-  }
-  
-  // Render app
+  })();
+}
+
+function initApp() {
+  runSecurityMigrationsInBackground();
+
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <HashRouter>
@@ -60,5 +66,4 @@ async function initApp() {
   );
 }
 
-// Start app with migrations
 initApp();

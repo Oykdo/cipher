@@ -20,6 +20,8 @@ pnpm-lock.yaml
 dist/
 build/
 release/
+# Staged by scripts/bundle-eidolon-runtime.mjs before electron-builder (not source)
+assets/eidolon-runtime/
 out/
 *.tsbuildinfo
 .vite/
