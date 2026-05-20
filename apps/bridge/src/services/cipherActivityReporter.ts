@@ -18,6 +18,7 @@
  */
 
 import type { FastifyInstance } from 'fastify';
+import { createHmac } from 'node:crypto';
 import { getDatabase } from '../db/database.js';
 
 const ENABLED = process.env.EIDOLON_ACTIVITY_REPORT_ENABLED === 'true';
@@ -28,6 +29,8 @@ const EIDOLON_BASE_URL = (
   process.env.EIDOLON_CONNECT_URL || 'http://localhost:8000'
 ).replace(/\/$/, '');
 const EIDOLON_SECRET = process.env.EIDOLON_CONNECT_SESSION_SECRET || '';
+const CIPHER_WEBHOOK_SECRET =
+  process.env.CIPHER_WEBHOOK_SECRET || process.env.EIDOLON_CONNECT_SESSION_SECRET || '';
 
 type AggregatedMetrics = {
   vault_id: string;
@@ -198,15 +201,28 @@ export class CipherActivityReporter {
     );
   }
 
+  private canonicalWebhookPayload(metrics: AggregatedMetrics): string {
+    return `{${Object.keys(metrics)
+      .sort()
+      .map((key) => `"${key}": ${JSON.stringify(metrics[key as keyof AggregatedMetrics])}`)
+      .join(', ')}}`;
+  }
+
   private async postToEidolon(metrics: AggregatedMetrics): Promise<void> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const body = JSON.stringify(metrics);
+    if (CIPHER_WEBHOOK_SECRET) {
+      headers['X-Cipher-Signature'] = `sha256=${createHmac('sha256', CIPHER_WEBHOOK_SECRET)
+        .update(this.canonicalWebhookPayload(metrics))
+        .digest('hex')}`;
+    }
     if (EIDOLON_SECRET) {
       headers['X-Eidolon-Connect-Secret'] = EIDOLON_SECRET;
     }
     const response = await fetch(`${EIDOLON_BASE_URL}/api/v1/cipher/activity`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(metrics),
+      body,
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
