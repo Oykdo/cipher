@@ -1,5 +1,50 @@
 # Changelog
 
+## v1.3.3 — Security hardening, zero-retention burn, signaling auth
+
+### Added
+
+- **HMAC verification for vault tokens.** Vault token redemption now
+  requires a valid HMAC signature (`EIDOLON_VAULT_TOKEN_SECRET` or
+  fallback to `EIDOLON_CONNECT_SESSION_SECRET`). Tokens without a
+  valid signature are rejected with 401.
+- **`issued_at` is now mandatory on vault tokens.** Missing or
+  non-finite `issued_at` returns 400; clock-skew tolerance of ±60s
+  prevents false rejections.
+- **Signaling WebSocket authentication.** The P2P signaling server
+  now requires JWT authentication on connection. Unauthenticated
+  sockets are rejected; `userId/token` mismatch is also blocked.
+- **Per-conversation and per-user post-pickup retention days (0/1/7/30).**
+  `postPickupRetentionDays` is stored in `conversations` and
+  `user_settings`, normalized to the allowed set. The effective
+  retention for a conversation is `min(conversation, user)` across
+  all members.
+- **Zero-retention auto-burn.** When `postPickupRetentionDays === 0`,
+  messages are burned immediately after all recipients have picked
+  them up (delivery confirmation). No server-side plaintext persists.
+- **Conversation access revocation for removed members.** When a
+  member is removed from a group, their sockets are evicted from the
+  conversation room and their verified-conversations entry is cleared.
+- **Keybundle export is now gated to the authenticated user's linked
+  vaultId.** `GET /api/v2/vault/keybundle/export` requires
+  authentication and checks that the requested `vaultId` matches the
+  user's `eidolonBridge.vaultId` in settings.
+- **HTTP keybundle import disabled in production.**
+  `POST /api/v2/vault/keybundle/import` returns 404 in production
+  unless `ENABLE_HTTP_KEYBUNDLE_IMPORT=true`.
+- **Legacy DiceKey avatar route gated behind feature flag.** The
+  `/api/v2/avatars` route is only registered when
+  `ENABLE_LEGACY_DICEKEY_AVATAR=true`.
+- **Privacy invariants tests expanded** for retention and zero-burn
+  behaviour.
+- **All 8 locales updated** with retention settings i18n keys.
+
+### Changed
+
+- **`INFRA_NOTES.md` removed** (internal, not for public repo).
+- **`schema_postgresql.sql` updated** with
+  `post_pickup_retention_days` column.
+
 ## v1.3.2 — Eidolon ecosystem integration, macOS CI revert, README refresh
 
 ### Added
