@@ -1,6 +1,6 @@
 {
   "name": "@pulse/bridge",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -14,7 +14,8 @@
     "db:clear": "node scripts/clear-database.cjs",
     "db:migrate": "node scripts/migrate-conversation-requests.js",
     "db:migrate:groups": "node scripts/run-migration-007.js",
-    "db:migrate:fix-group-type": "node scripts/run-migration-008.js"
+    "db:migrate:fix-group-type": "node scripts/run-migration-008.js",
+    "db:migrate:retention-policy": "node scripts/run-migration-009.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

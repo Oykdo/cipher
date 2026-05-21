@@ -255,6 +255,7 @@ export async function groupRoutes(fastify: FastifyInstance) {
       }
 
       const updatedMemberIds = await db.getConversationMembers(conversationId);
+      fastify.io.revokeConversationAccess(conversationId, [targetUserId]);
 
       // Notify the rest, plus the user being removed (so their list updates).
       fastify.broadcast([...updatedMemberIds, targetUserId], {
@@ -303,6 +304,7 @@ export async function groupRoutes(fastify: FastifyInstance) {
 
       await db.removeConversationMember(conversationId, callerId);
       const updatedMemberIds = await db.getConversationMembers(conversationId);
+      fastify.io.revokeConversationAccess(conversationId, [callerId]);
 
       fastify.broadcast([...updatedMemberIds, callerId], {
         type: 'group_member_removed',
@@ -387,6 +389,7 @@ export async function groupRoutes(fastify: FastifyInstance) {
       // Capture members BEFORE delete so we can broadcast to them.
       const previousMembers = [...memberIds];
       await db.deleteConversation(conversationId);
+      fastify.io.revokeConversationAccess(conversationId, previousMembers);
 
       fastify.broadcast(previousMembers, {
         type: 'conversation_deleted',

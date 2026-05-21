@@ -10,6 +10,7 @@ export interface UserSettings {
     privacy?: {
         discoverable?: boolean;
         readReceipts?: boolean;
+        postPickupRetentionDays?: 0 | 1 | 7 | 30;
     };
     notifications?: {
         email?: boolean;

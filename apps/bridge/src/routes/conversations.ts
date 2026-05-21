@@ -5,6 +5,10 @@ import {
   buildConversationSummary,
   type ConversationSummary,
 } from '../utils/conversationSummary.js';
+import {
+  ConversationIdSchema,
+  PostPickupRetentionDaysSchema,
+} from '../validation/securitySchemas.js';
 
 const db = getDatabase();
 
@@ -71,6 +75,69 @@ export async function conversationRoutes(fastify: FastifyInstance) {
 
       const memberIds = summary.members.map((m) => m.id);
       fastify.broadcast(memberIds, {
+        type: 'conversation',
+        conversation: summary,
+      });
+
+      return summary;
+    },
+  );
+
+  // Conversation-level post-pickup retention cap. Any member can reduce
+  // retention; extension to 30 days only takes effect when every member's
+  // user privacy setting also opts in.
+  fastify.patch(
+    '/api/v2/conversations/:id/retention',
+    {
+      preHandler: fastify.authenticate as any,
+    },
+    async (request, reply) => {
+      const userId = (request.user as any).sub as string;
+      const id = (request.params as { id: string }).id;
+      const body = (request.body as { postPickupRetentionDays?: unknown } | undefined) ?? {};
+
+      const idResult = ConversationIdSchema.safeParse(id);
+      if (!idResult.success) {
+        reply.code(400);
+        return { error: 'Format conversationId invalide', details: idResult.error.issues };
+      }
+
+      const retentionResult = PostPickupRetentionDaysSchema.safeParse(body.postPickupRetentionDays);
+      if (!retentionResult.success) {
+        reply.code(400);
+        return {
+          error: 'postPickupRetentionDays doit valoir 0, 1, 7, 30 ou null',
+          details: retentionResult.error.issues,
+        };
+      }
+
+      const convo = await db.getConversationById(id);
+      if (!convo) {
+        reply.code(404);
+        return { error: 'Conversation introuvable' };
+      }
+
+      const members = await db.getConversationMembers(id);
+      if (!members.includes(userId)) {
+        reply.code(404);
+        return { error: 'Conversation introuvable' };
+      }
+
+      const updated = await db.updateConversationPostPickupRetentionDays(
+        id,
+        retentionResult.data,
+      );
+      if (retentionResult.data === 0) {
+        await db.purgeZeroRetentionDeliveredMessagesForConversation(id);
+      }
+
+      const summary = await buildConversationSummary(updated, userId);
+      if (!summary) {
+        reply.code(500);
+        return { error: 'Conversation mise à jour mais introuvable' };
+      }
+
+      fastify.broadcast(members, {
         type: 'conversation',
         conversation: summary,
       });

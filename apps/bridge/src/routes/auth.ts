@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { randomUUID, createHash } from 'crypto';
+import { randomUUID, createHash, createHmac, timingSafeEqual } from 'crypto';
 import * as srp from 'secure-remote-password/server.js';
 import { getDatabase } from '../db/database.js';
 import { createRefreshToken, validateRefreshToken, revokeRefreshToken, revokeAllUserTokens } from '../utils/refreshToken.js';
@@ -95,6 +95,48 @@ const DEFAULT_EIDOLON_CONNECT_APP_ID = process.env.EIDOLON_CONNECT_APP_ID || 'ci
 const DEFAULT_EIDOLON_CONNECT_BASE_URL =
   (process.env.EIDOLON_CONNECT_URL || 'http://localhost:8000').replace(/\/$/, '');
 const EIDOLON_CONNECT_SESSION_SECRET = process.env.EIDOLON_CONNECT_SESSION_SECRET || '';
+const EIDOLON_VAULT_TOKEN_SECRET =
+  process.env.EIDOLON_VAULT_TOKEN_SECRET || EIDOLON_CONNECT_SESSION_SECRET;
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(',')}]`;
+  }
+  const objectValue = value as Record<string, unknown>;
+  return `{${Object.keys(objectValue)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableJson(objectValue[key])}`)
+    .join(',')}}`;
+}
+
+function verifyVaultTokenHmac(tokenData: Record<string, unknown>): boolean {
+  if (!EIDOLON_VAULT_TOKEN_SECRET) {
+    return false;
+  }
+  const providedHmac = typeof tokenData.hmac === 'string' ? tokenData.hmac.trim() : '';
+  if (!providedHmac) {
+    return false;
+  }
+
+  const { hmac: _hmac, ...signedPayload } = tokenData;
+  const expected = createHmac('sha256', EIDOLON_VAULT_TOKEN_SECRET)
+    .update(stableJson(signedPayload))
+    .digest('hex');
+
+  const providedHex = /^[a-f0-9]{64}$/i.test(providedHmac)
+    ? providedHmac.toLowerCase()
+    : Buffer.from(providedHmac.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('hex');
+
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  const providedBuffer = Buffer.from(providedHex, 'hex');
+  return (
+    providedBuffer.length === expectedBuffer.length &&
+    timingSafeEqual(providedBuffer, expectedBuffer)
+  );
+}
 
 function buildEidolonBridgeIdentity(vaultId: string) {
   const normalizedVaultId = vaultId.trim().toLowerCase();
@@ -669,14 +711,26 @@ export async function authRoutes(fastify: FastifyInstance) {
         reply.code(400);
         return { error: 'Vault token missing vault_id' };
       }
+      if (!EIDOLON_VAULT_TOKEN_SECRET) {
+        request.log.error('Vault token redeem refused: EIDOLON_VAULT_TOKEN_SECRET/EIDOLON_CONNECT_SESSION_SECRET is not configured');
+        reply.code(503);
+        return { error: 'Vault token login is not configured' };
+      }
+      if (!verifyVaultTokenHmac(tokenData as unknown as Record<string, unknown>)) {
+        reply.code(401);
+        return { error: 'Invalid vault token signature' };
+      }
 
       // Check token age (max 5 minutes)
-      if (tokenData.issued_at) {
-        const age = Date.now() - new Date(tokenData.issued_at).getTime();
-        if (age > 5 * 60 * 1000) {
-          reply.code(410);
-          return { error: 'Vault token expired — generate a new QR code from Eidolon' };
-        }
+      if (!tokenData.issued_at) {
+        reply.code(400);
+        return { error: 'Vault token missing issued_at' };
+      }
+      const issuedAt = new Date(tokenData.issued_at).getTime();
+      const age = Date.now() - issuedAt;
+      if (!Number.isFinite(issuedAt) || age < -60 * 1000 || age > 5 * 60 * 1000) {
+        reply.code(410);
+        return { error: 'Vault token expired — generate a new QR code from Eidolon' };
       }
 
       const resolvedVaultId = tokenData.vault_id.trim().toLowerCase();

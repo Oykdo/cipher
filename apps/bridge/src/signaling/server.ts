@@ -23,6 +23,7 @@ import type { Server as HTTPServer } from 'http';
 
 export interface SignalingServerOptions {
   httpServer: HTTPServer;
+  authenticateToken: (token: string) => Promise<{ sub?: string }>;
   cors?: {
     origin: string | string[];
     credentials?: boolean;
@@ -45,6 +46,32 @@ export class SignalingServer {
       path: '/signaling',
     });
 
+    this.io.use(async (socket, next) => {
+      try {
+        const token = typeof socket.handshake.auth?.token === 'string'
+          ? socket.handshake.auth.token
+          : '';
+        if (!token) {
+          next(new Error('authentication required'));
+          return;
+        }
+        const payload = await options.authenticateToken(token);
+        if (!payload.sub) {
+          next(new Error('invalid token'));
+          return;
+        }
+        const requestedUserId = socket.handshake.auth?.userId;
+        if (requestedUserId && requestedUserId !== payload.sub) {
+          next(new Error('userId/token mismatch'));
+          return;
+        }
+        socket.data.userId = payload.sub;
+        next();
+      } catch {
+        next(new Error('authentication failed'));
+      }
+    });
+
     this.setupEventHandlers();
   }
 
@@ -53,7 +80,7 @@ export class SignalingServer {
    */
   private setupEventHandlers(): void {
     this.io.on('connection', (socket) => {
-      const userId = socket.handshake.auth.userId as string;
+      const userId = socket.data.userId as string;
 
       if (!userId) {
         console.error('❌ [SIGNALING] Connection rejected: No userId');

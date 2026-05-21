@@ -31,6 +31,7 @@ export interface ConversationSummary {
   memberCount: number;
   createdBy: string | null;
   encryptedTitle: string | null;
+  postPickupRetentionDays: 0 | 1 | 7 | 30 | null;
   /** Convenience field for direct conversations only. */
   otherParticipant?: ConversationMember;
 }
@@ -91,6 +92,23 @@ export async function buildConversationSummary(
     memberCount: members.length,
     createdBy: convo.created_by ?? null,
     encryptedTitle: convo.encrypted_title ?? null,
+    postPickupRetentionDays: normalizePostPickupRetentionDays(
+      convo.post_pickup_retention_days,
+      null,
+    ),
     otherParticipant,
   };
+}
+
+function normalizePostPickupRetentionDays(
+  value: unknown,
+  fallback: 0 | 1 | 7 | 30 | null,
+): 0 | 1 | 7 | 30 | null {
+  if (value === null || value === undefined || value === '') {
+    return fallback;
+  }
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return parsed === 0 || parsed === 1 || parsed === 7 || parsed === 30
+    ? parsed
+    : fallback;
 }

@@ -5,7 +5,8 @@
  * for the `messages` table (and the attachments referenced by them):
  *
  *   1. Post-pickup grace : delete messages where `delivered_at` is older
- *      than BRIDGE_MESSAGE_TTL_DAYS (default 7).
+ *      than the effective conversation/member cap (default 7, opt-in max 30,
+ *      0 for high-confidentiality immediate purge).
  *   2. Max-pending safety net : delete messages where `delivered_at` is
  *      still NULL but `created_at` is older than BRIDGE_MESSAGE_MAX_PENDING_DAYS
  *      (default 30). Covers recipients who never came back online.
@@ -117,9 +118,15 @@ class PurgeWorker {
 
             // Step 2 — delete messages past the post-pickup grace window.
             const deliveredResult = await db.pool.query(
-                `DELETE FROM messages
-                 WHERE delivered_at IS NOT NULL
-                   AND delivered_at < NOW() - ($1::int * INTERVAL '1 day')`,
+                `${effectiveRetentionCte()}
+                 DELETE FROM messages m
+                 USING effective_retention er
+                 WHERE m.conversation_id = er.conversation_id
+                   AND m.delivered_at IS NOT NULL
+                   AND (
+                     er.retention_days = 0
+                     OR m.delivered_at < NOW() - (er.retention_days * INTERVAL '1 day')
+                   )`,
                 [ttlDays]
             );
             stats.deliveredPurged = deliveredResult.rowCount ?? 0;
@@ -182,11 +189,16 @@ class PurgeWorker {
             // the attachments that belong to conversations entirely
             // covered by the purge window.
             const result = await db.pool.query(
-                `SELECT a.path
+                `${effectiveRetentionCte()}
+                 SELECT a.path
                  FROM attachments a
                  JOIN messages m ON m.conversation_id = a.conversation_id
+                 JOIN effective_retention er ON er.conversation_id = m.conversation_id
                  WHERE (m.delivered_at IS NOT NULL
-                        AND m.delivered_at < NOW() - ($1::int * INTERVAL '1 day'))
+                        AND (
+                          er.retention_days = 0
+                          OR m.delivered_at < NOW() - (er.retention_days * INTERVAL '1 day')
+                        ))
                     OR (m.delivered_at IS NULL
                         AND m.created_at < NOW() - ($2::int * INTERVAL '1 day'))`,
                 [ttlDays, maxPendingDays]
@@ -205,6 +217,34 @@ function clampInt(envValue: string | undefined, fallback: number, min: number, m
     const parsed = envValue ? Number.parseInt(envValue, 10) : NaN;
     if (!Number.isFinite(parsed)) return fallback;
     return Math.min(max, Math.max(min, parsed));
+}
+
+function effectiveRetentionCte(): string {
+    return `
+        WITH member_retention AS (
+            SELECT
+                cm.conversation_id,
+                MIN(
+                    CASE
+                        WHEN (us.settings #>> '{privacy,postPickupRetentionDays}') ~ '^(0|1|7|30)$'
+                            THEN (us.settings #>> '{privacy,postPickupRetentionDays}')::int
+                        ELSE $1::int
+                    END
+                ) AS member_retention_days
+            FROM conversation_members cm
+            LEFT JOIN user_settings us ON us.user_id = cm.user_id
+            GROUP BY cm.conversation_id
+        ),
+        effective_retention AS (
+            SELECT
+                c.id AS conversation_id,
+                LEAST(
+                    COALESCE(c.post_pickup_retention_days, mr.member_retention_days, $1::int),
+                    COALESCE(mr.member_retention_days, $1::int)
+                ) AS retention_days
+            FROM conversations c
+            LEFT JOIN member_retention mr ON mr.conversation_id = c.id
+        )`;
 }
 
 export const purgeWorker = new PurgeWorker();

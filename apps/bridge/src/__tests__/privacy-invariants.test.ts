@@ -306,5 +306,110 @@ describeDb('Privacy invariants (CIPHER_PRIVACY_GUARANTEES.md)', () => {
             expect(remainingIds.has(survivorDelivered)).toBe(true);
             expect(remainingIds.has(survivorPending)).toBe(true);
         });
+
+        it('allows 30-day post-pickup retention only when all members opt in', async () => {
+            const aliceId = `alice_${randomUUID()}`.slice(0, 32);
+            const bobId = `bob_${randomUUID()}`.slice(0, 32);
+            const convId = randomUUID();
+
+            await db.createUser({
+                id: aliceId,
+                username: `alice_${randomUUID().slice(0, 8)}`,
+                security_tier: 'standard',
+                srp_salt: 'salt',
+                srp_verifier: 'verifier',
+            });
+            await db.createUser({
+                id: bobId,
+                username: `bob_${randomUUID().slice(0, 8)}`,
+                security_tier: 'standard',
+                srp_salt: 'salt',
+                srp_verifier: 'verifier',
+            });
+            await db.updateUserSettings(aliceId, {
+                privacy: { postPickupRetentionDays: 30 },
+            });
+            await db.updateUserSettings(bobId, {
+                privacy: { postPickupRetentionDays: 30 },
+            });
+            await db.createConversation(convId, [aliceId, bobId], {
+                postPickupRetentionDays: 30,
+            });
+
+            const survivorDelivered = randomUUID();
+            const purgedDelivered = randomUUID();
+            await db.createMessage({
+                id: survivorDelivered,
+                conversation_id: convId,
+                sender_id: aliceId,
+                body: '{"version":"test","data":"x"}',
+            });
+            await db.createMessage({
+                id: purgedDelivered,
+                conversation_id: convId,
+                sender_id: aliceId,
+                body: '{"version":"test","data":"x"}',
+            });
+
+            await db.pool.query(
+                `UPDATE messages SET delivered_at = NOW() - INTERVAL '8 days' WHERE id = $1`,
+                [survivorDelivered]
+            );
+            await db.pool.query(
+                `UPDATE messages SET delivered_at = NOW() - INTERVAL '31 days' WHERE id = $1`,
+                [purgedDelivered]
+            );
+
+            const { purgeWorker } = await import('../services/purge-worker.js');
+            const logShim = {
+                log: {
+                    info: () => {},
+                    warn: () => {},
+                    error: () => {},
+                    debug: () => {},
+                },
+            } as any;
+            purgeWorker.initialize(logShim);
+            await purgeWorker.runOnce(7, 30);
+
+            expect(await db.getMessageById(survivorDelivered)).toBeTruthy();
+            expect(await db.getMessageById(purgedDelivered)).toBeFalsy();
+        });
+
+        it('deletes delivered messages after pickup when any member selects immediate retention', async () => {
+            const aliceId = `alice_${randomUUID()}`.slice(0, 32);
+            const bobId = `bob_${randomUUID()}`.slice(0, 32);
+            const convId = randomUUID();
+            const messageId = randomUUID();
+
+            await db.createUser({
+                id: aliceId,
+                username: `alice_${randomUUID().slice(0, 8)}`,
+                security_tier: 'standard',
+                srp_salt: 'salt',
+                srp_verifier: 'verifier',
+            });
+            await db.createUser({
+                id: bobId,
+                username: `bob_${randomUUID().slice(0, 8)}`,
+                security_tier: 'standard',
+                srp_salt: 'salt',
+                srp_verifier: 'verifier',
+            });
+            await db.updateUserSettings(bobId, {
+                privacy: { postPickupRetentionDays: 0 },
+            });
+            await db.createConversation(convId, [aliceId, bobId]);
+            await db.createMessage({
+                id: messageId,
+                conversation_id: convId,
+                sender_id: aliceId,
+                body: '{"version":"test","data":"x"}',
+            });
+
+            await db.markMessagesDeliveredFor(convId, bobId);
+
+            expect(await db.getMessageById(messageId)).toBeFalsy();
+        });
     });
 });

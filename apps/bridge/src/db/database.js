@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { Pool } = pg;
+const ALLOWED_POST_PICKUP_RETENTION_DAYS = new Set([0, 1, 7, 30]);
 
 // Promisified helpers adapted for pg
 async function run(pool, sql, params = []) {
@@ -23,6 +24,16 @@ async function all(pool, sql, params = []) {
 
 async function exec(pool, sql) {
     return await pool.query(sql);
+}
+
+function parsePostPickupRetentionDays(value, fallback) {
+    if (value === null || value === undefined || value === '') {
+        return fallback;
+    }
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && ALLOWED_POST_PICKUP_RETENTION_DAYS.has(parsed)
+        ? parsed
+        : fallback;
 }
 
 // NOTE: encryptMnemonic / decryptMnemonic removed in privacy-l1 (2026-04-27).
@@ -307,13 +318,17 @@ class DatabaseService {
      *
      * @param {string} id
      * @param {string[]} memberIds
-     * @param {{ type?: 'direct' | 'group', createdBy?: string | null, encryptedTitle?: string | null }} [opts]
+     * @param {{ type?: 'direct' | 'group', createdBy?: string | null, encryptedTitle?: string | null, postPickupRetentionDays?: 0 | 1 | 7 | 30 | null }} [opts]
      * @returns {Promise<object>} the created conversation row
      */
     async createConversation(id, memberIds, opts = {}) {
         const type = opts.type ?? 'direct';
         const createdBy = opts.createdBy ?? null;
         const encryptedTitle = opts.encryptedTitle ?? null;
+        const postPickupRetentionDays = parsePostPickupRetentionDays(
+            opts.postPickupRetentionDays,
+            null,
+        );
 
         if (type === 'direct') {
             if (memberIds.length !== 2) {
@@ -340,10 +355,10 @@ class DatabaseService {
             await client.query('BEGIN');
             await run(
                 client,
-                `INSERT INTO conversations (id, type, created_by, encrypted_title)
-                 VALUES ($1, $2, $3, $4)
+                `INSERT INTO conversations (id, type, created_by, encrypted_title, post_pickup_retention_days)
+                 VALUES ($1, $2, $3, $4, $5)
                  ON CONFLICT DO NOTHING`,
-                [id, type, createdBy, encryptedTitle],
+                [id, type, createdBy, encryptedTitle, postPickupRetentionDays],
             );
             for (const memberId of dedupedMembers) {
                 await run(
@@ -366,6 +381,52 @@ class DatabaseService {
 
     async getConversationById(id) {
         return await get(this.pool, 'SELECT * FROM conversations WHERE id = $1', [id]);
+    }
+
+    async getConversationPostPickupRetentionDays(conversationId, fallback = 7) {
+        const fallbackDays = parsePostPickupRetentionDays(fallback, 7);
+        const rows = await all(this.pool, `
+            SELECT
+                c.post_pickup_retention_days AS conversation_retention_days,
+                us.settings #>> '{privacy,postPickupRetentionDays}' AS user_retention_days
+            FROM conversations c
+            LEFT JOIN conversation_members cm ON cm.conversation_id = c.id
+            LEFT JOIN user_settings us ON us.user_id = cm.user_id
+            WHERE c.id = $1
+        `, [conversationId]);
+
+        if (rows.length === 0) {
+            return fallbackDays;
+        }
+
+        let memberCap = Number.POSITIVE_INFINITY;
+        for (const row of rows) {
+            memberCap = Math.min(
+                memberCap,
+                parsePostPickupRetentionDays(row.user_retention_days, fallbackDays),
+            );
+        }
+        if (!Number.isFinite(memberCap)) {
+            memberCap = fallbackDays;
+        }
+
+        const conversationCap = parsePostPickupRetentionDays(
+            rows[0]?.conversation_retention_days,
+            memberCap,
+        );
+        return Math.min(conversationCap, memberCap);
+    }
+
+    async updateConversationPostPickupRetentionDays(conversationId, days) {
+        const normalized = days === null
+            ? null
+            : parsePostPickupRetentionDays(days, 7);
+        await run(this.pool, `
+            UPDATE conversations
+            SET post_pickup_retention_days = $1
+            WHERE id = $2
+        `, [normalized, conversationId]);
+        return this.getConversationById(conversationId);
     }
 
     async getConversationMembers(conversationId) {
@@ -574,7 +635,11 @@ class DatabaseService {
                       AND sender_id <> $2
                       AND delivered_at IS NULL
                 `, [conversationId, recipientUserId]);
-                return result?.rowCount ?? 0;
+                const promoted = result?.rowCount ?? 0;
+                if (promoted > 0) {
+                    await this.purgeZeroRetentionDeliveredMessagesForConversation(conversationId);
+                }
+                return promoted;
             }
 
             // Groups: per-recipient delivery tracking.
@@ -617,7 +682,11 @@ class DatabaseService {
                   )
             `, [conversationId]);
 
-            return promoted?.rowCount ?? 0;
+            const promotedCount = promoted?.rowCount ?? 0;
+            if (promotedCount > 0) {
+                await this.purgeZeroRetentionDeliveredMessagesForConversation(conversationId);
+            }
+            return promotedCount;
         } catch (error) {
             console.warn(
                 '[Database] markMessagesDeliveredFor failed:',
@@ -625,6 +694,26 @@ class DatabaseService {
             );
             return 0;
         }
+    }
+
+    async purgeZeroRetentionDeliveredMessagesForConversation(conversationId) {
+        const retentionDays = await this.getConversationPostPickupRetentionDays(conversationId, 7);
+        if (retentionDays !== 0) {
+            return 0;
+        }
+
+        const rows = await all(this.pool, `
+            SELECT id
+            FROM messages
+            WHERE conversation_id = $1
+              AND delivered_at IS NOT NULL
+        `, [conversationId]);
+
+        for (const row of rows) {
+            await this.burnMessage(row.id);
+        }
+
+        return rows.length;
     }
 
     async getConversationMessages(conversationId, limit = 100) {

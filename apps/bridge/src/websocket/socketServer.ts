@@ -590,6 +590,25 @@ export function setupSocketServer(httpServer: HTTPServer, fastify: FastifyInstan
     }, 'Message unlocked emitted to room');
   };
 
+  io.revokeConversationAccess = (conversationId: string, userIds: string[]) => {
+    const roomName = `conversation:${conversationId}`;
+    const revoked = new Set(userIds);
+    let socketCount = 0;
+
+    for (const socket of io.sockets.sockets.values() as Iterable<AuthenticatedSocket>) {
+      if (!socket.userId || !revoked.has(socket.userId)) continue;
+      socket.leave(roomName);
+      socket.verifiedConversations?.delete(conversationId);
+      socketCount += 1;
+    }
+
+    fastify.log.info({
+      conversationId,
+      userCount: revoked.size,
+      socketCount,
+    }, 'Conversation access revoked for sockets');
+  };
+
   return io;
 }
 
@@ -602,5 +621,6 @@ declare module 'socket.io' {
     emitNewMessage: (payload: NewMessagePayload) => void;
     emitMessageBurned: (payload: MessageBurnedPayload) => void;
     emitMessageUnlocked: (payload: MessageUnlockedPayload) => void;
+    revokeConversationAccess: (conversationId: string, userIds: string[]) => void;
   }
 }

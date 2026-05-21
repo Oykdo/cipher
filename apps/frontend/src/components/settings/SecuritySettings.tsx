@@ -23,6 +23,7 @@ export function SecuritySettings() {
 
     const linkedVault = user?.linkedVault;
     const discoverable = settings?.privacy?.discoverable ?? true;
+    const postPickupRetentionDays = settings?.privacy?.postPickupRetentionDays ?? 7;
 
     const identityBadge = linkedVault
         ? {
@@ -47,6 +48,15 @@ export function SecuritySettings() {
             privacy: {
                 ...settings?.privacy,
                 discoverable: checked,
+            },
+        });
+    };
+
+    const handleRetentionChange = (days: 0 | 1 | 7 | 30) => {
+        updateSettings({
+            privacy: {
+                ...settings?.privacy,
+                postPickupRetentionDays: days,
             },
         });
     };
@@ -149,6 +159,35 @@ export function SecuritySettings() {
                                 <div className="h-6 w-12 rounded-full bg-slate-700 transition peer-checked:bg-brand-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-400 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-6" />
                             </label>
                         )}
+                    </div>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/55 p-4 backdrop-blur-sm">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex-1">
+                            <label htmlFor="retention-select" className="text-white font-medium">
+                                {t("settings.security_settings.retention_label")}
+                            </label>
+                            <p className="mt-2 text-xs text-slate-400">
+                                {t("settings.security_settings.retention_desc")}
+                            </p>
+                            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                                {t("settings.security_settings.retention_note")}
+                            </p>
+                        </div>
+
+                        <select
+                            id="retention-select"
+                            value={postPickupRetentionDays}
+                            onChange={(e) => handleRetentionChange(Number(e.target.value) as 0 | 1 | 7 | 30)}
+                            disabled={isUpdating}
+                            className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none transition focus:border-brand-400 disabled:opacity-60"
+                        >
+                            <option value={0}>{t("settings.security_settings.retention_immediate")}</option>
+                            <option value={1}>{t("settings.security_settings.retention_1_day")}</option>
+                            <option value={7}>{t("settings.security_settings.retention_7_days")}</option>
+                            <option value={30}>{t("settings.security_settings.retention_30_days")}</option>
+                        </select>
                     </div>
                 </div>
             </div>

@@ -2,13 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import { avatarService } from '../services/avatarService.js';
 
 export async function avatarRoutes(fastify: FastifyInstance) {
-    fastify.post<{ Body: { checksums: string[]; userId?: string } }>(
+    fastify.post<{ Body: { checksums: string[] } }>(
         '/api/generate-dicekey-avatar',
         {
             config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+            preHandler: fastify.authenticate,
         },
         async (request, reply) => {
-            const { checksums, userId } = request.body;
+            const { checksums } = request.body;
 
             // This endpoint is part of the signup flow and may include user-specific data.
             // Explicitly prevent caching to avoid stale or shared responses.
@@ -20,19 +21,7 @@ export async function avatarRoutes(fastify: FastifyInstance) {
             }
 
             try {
-                // If user is authenticated, use their ID automatically to store the hash
-                let effectiveUserId = userId;
-                try {
-                    await request.jwtVerify();
-                    const authenticatedUserId = (request.user as any)?.sub;
-                    if (authenticatedUserId) {
-                        effectiveUserId = authenticatedUserId;
-                        request.log.info({ userId: effectiveUserId }, 'Generating avatar for authenticated user');
-                    }
-                } catch {
-                    // Not authenticated - that's fine, might be signup flow
-                    request.log.info('Generating avatar for unauthenticated request');
-                }
+                const effectiveUserId = request.user.sub;
 
                 const result = await avatarService.generateAvatar(checksums, effectiveUserId);
                 return { success: true, avatarUrl: result.url, avatarHash: result.hash };

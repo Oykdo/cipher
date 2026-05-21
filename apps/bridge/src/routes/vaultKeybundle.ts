@@ -5,6 +5,8 @@ import { existsSync, createReadStream, readFileSync, unlinkSync, writeFileSync, 
 import path from 'path';
 import { randomBytes } from 'crypto';
 import os from 'os';
+import { getDatabase } from '../db/database.js';
+import { config } from '../config.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // routes/ -> src/ -> bridge/ -> apps/ -> Cipher/ -> Chimera/ (5 levels up)
@@ -53,6 +55,7 @@ const EIDOLON_PYTHON = resolvePython();
 
 const CLI_SCRIPT = path.join(EIDOLON_ROOT, 'scripts', 'public', 'keybundle_cli.py');
 const VAULT_ID_REGEX = /^[a-f0-9]{4,64}$/i;
+const db = getDatabase();
 
 type CliResult = { stdout: string; stderr: string; code: number };
 
@@ -93,11 +96,20 @@ export async function vaultKeybundleRoutes(fastify: FastifyInstance) {
    *   400 → invalid vault_id
    *   500 → CLI failure
    */
-  fastify.get('/api/v2/vault/keybundle/export', async (request, reply) => {
+  fastify.get('/api/v2/vault/keybundle/export', { preHandler: fastify.authenticate }, async (request, reply) => {
     const vaultId = String((request.query as { vaultId?: string }).vaultId ?? '').trim().toLowerCase();
     if (!VAULT_ID_REGEX.test(vaultId)) {
       reply.code(400);
       return { error: 'invalid vaultId' };
+    }
+
+    const settings = await db.getUserSettings(request.user.sub);
+    const linkedVaultId = typeof settings?.eidolonBridge?.vaultId === 'string'
+      ? settings.eidolonBridge.vaultId.trim().toLowerCase()
+      : '';
+    if (linkedVaultId !== vaultId) {
+      reply.code(403);
+      return { error: 'vaultId does not match authenticated user' };
     }
 
     const tmpDir = path.join(os.tmpdir(), `cipher-keybundle-${randomBytes(6).toString('hex')}`);
@@ -151,6 +163,11 @@ export async function vaultKeybundleRoutes(fastify: FastifyInstance) {
    *   500 → CLI failure
    */
   fastify.post('/api/v2/vault/keybundle/import', async (request, reply) => {
+    if (config.isProd && process.env.ENABLE_HTTP_KEYBUNDLE_IMPORT !== 'true') {
+      reply.code(404);
+      return { error: 'keybundle import is not available over HTTP in production' };
+    }
+
     const data = await request.file();
     if (!data) {
       reply.code(400);

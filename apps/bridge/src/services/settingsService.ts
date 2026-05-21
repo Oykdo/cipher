@@ -8,6 +8,7 @@ export interface UserSettings {
     privacy?: {
         discoverable?: boolean;
         readReceipts?: boolean;
+        postPickupRetentionDays?: 0 | 1 | 7 | 30;
     };
     notifications?: {
         email?: boolean;
@@ -34,7 +35,11 @@ export class SettingsService {
             ...settings,
             privacy: {
                 ...(settings.privacy || {}),
-                discoverable: user.discoverable !== false // Default to true
+                discoverable: user.discoverable !== false, // Default to true
+                postPickupRetentionDays: normalizePostPickupRetentionDays(
+                    settings.privacy?.postPickupRetentionDays,
+                    7
+                ),
             }
         };
     }
@@ -59,4 +64,14 @@ export class SettingsService {
         // Return merged result
         return this.getSettings(userId);
     }
+}
+
+function normalizePostPickupRetentionDays(value: unknown, fallback: 0 | 1 | 7 | 30): 0 | 1 | 7 | 30 {
+    if (value === null || value === undefined || value === '') {
+        return fallback;
+    }
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return parsed === 0 || parsed === 1 || parsed === 7 || parsed === 30
+        ? parsed
+        : fallback;
 }

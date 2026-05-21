@@ -102,6 +102,7 @@ export interface ConversationSummaryV3 {
   memberCount: number;
   createdBy: string | null;
   encryptedTitle?: string | null;
+  postPickupRetentionDays?: 0 | 1 | 7 | 30 | null;
   /** Set only when type === 'direct'. */
   otherParticipant?: ConversationMemberV3;
 }
@@ -141,6 +142,8 @@ export interface AddGroupMemberResponseV2 {
 export interface UpdateGroupTitleRequestV2 {
   encryptedTitle: string;
 }
+
+export type PostPickupRetentionDays = 0 | 1 | 7 | 30 | null;
 
 export interface MessageV2 {
   id: string;
@@ -309,6 +312,16 @@ export const apiv2 = {
     return authFetchV2WithRefresh("/conversations", {
       method: "POST",
       body: JSON.stringify({ targetUsername }),
+    });
+  },
+
+  updateConversationRetention: async (
+    conversationId: string,
+    postPickupRetentionDays: PostPickupRetentionDays,
+  ): Promise<ConversationSummaryV3> => {
+    return authFetchV2WithRefresh(`/conversations/${conversationId}/retention`, {
+      method: "PATCH",
+      body: JSON.stringify({ postPickupRetentionDays }),
     });
   },
 

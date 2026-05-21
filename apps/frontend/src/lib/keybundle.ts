@@ -11,6 +11,7 @@
  */
 
 import { API_BASE_URL, API_SUPPORTS_LOCAL_PSNX } from '../config';
+import { useAuthStore } from '../store/auth';
 
 export type ExportResult = {
   ok: true;
@@ -113,7 +114,10 @@ export async function exportVaultKeybundle(vaultId: string): Promise<ExportResul
   const url = apiV2Url(
     `/api/v2/vault/keybundle/export?vaultId=${encodeURIComponent(vaultId)}`,
   );
-  const res = await fetch(url);
+  const accessToken = useAuthStore.getState().session?.accessToken;
+  const res = await fetch(url, {
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+  });
   if (!res.ok) {
     let detail: unknown;
     try {

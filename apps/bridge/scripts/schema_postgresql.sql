@@ -1,5 +1,5 @@
 -- Cipher - Database Schema (PostgreSQL)
--- Version: 2.5.0
+-- Version: 2.5.2
 --
 -- Conforms to CIPHER_PRIVACY_GUARANTEES.md (root). Any column added here
 -- must be justified against the contract: secrets and PII have no place
@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS conversations (
   type VARCHAR(16) NOT NULL DEFAULT 'direct' CHECK (type IN ('direct', 'group')),
   created_by VARCHAR(255),                -- Group owner; NULL for direct conversations
   encrypted_title TEXT,                   -- Group title (e2ee-v2 envelope); NULL for direct
+  post_pickup_retention_days INTEGER CHECK (
+    post_pickup_retention_days IS NULL OR post_pickup_retention_days IN (0, 1, 7, 30)
+  ),                                      -- NULL=user defaults, 0=delete after pickup, max 30d opt-in
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   last_message_id VARCHAR(255),           -- ID du dernier message (FK vers messages)
   last_message_at TIMESTAMP WITH TIME ZONE, -- Timestamp dernier message (pour tri)
@@ -91,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_conversation_members_user ON conversation_members
 -- server cannot distinguish it from a regular message.
 --
 -- Retention policy (enforced by purge-worker.ts):
---   * delivered_at IS NOT NULL AND > 7 days old  → DELETE (post-pickup grace)
+--   * delivered_at IS NOT NULL AND effective grace elapsed → DELETE
 --   * delivered_at IS NULL AND created_at > 30 days old → DELETE (max pending)
 -- Time-lock (drand) does NOT extend retention — locks are enforced
 -- client-side, so the recipient must pick the blob up within 30 days
@@ -297,4 +300,4 @@ CREATE TABLE IF NOT EXISTS metadata (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-INSERT INTO metadata (key, value) VALUES ('schema_version', '2.5.0') ON CONFLICT DO NOTHING;
+INSERT INTO metadata (key, value) VALUES ('schema_version', '2.5.2') ON CONFLICT DO NOTHING;

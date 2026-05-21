@@ -69,9 +69,7 @@ function getTrayStrings() {
 //
 // Priority (first match wins — already-set env vars always take precedence):
 //   1. Shell / process env already set
-//   2. apps/bridge/.env.production   (baked into the release by CI — holds
-//      the production lock-server URL + HMAC secret. Gitignored.)
-//   3. apps/bridge/.env              (developer local overrides)
+//   2. apps/bridge/.env              (developer local overrides)
 function loadBridgeEnvFile(filename) {
   try {
     const envPath = path.join(__dirname, 'apps', 'bridge', filename);
@@ -91,7 +89,6 @@ function loadBridgeEnvFile(filename) {
     // file not found or unreadable — non-fatal
   }
 }
-loadBridgeEnvFile('.env.production');
 loadBridgeEnvFile('.env');
 const DEFAULT_EIDOLON_DOWNLOAD_URL =
   process.env.EIDOLON_DOWNLOAD_URL || 'https://github.com/Oykdo/Project_Logos/releases';
@@ -911,8 +908,31 @@ app.on('activate', () => {
   }
 });
 
+function isTrustedRendererEvent(event) {
+  const frameUrl = event?.senderFrame?.url || event?.sender?.getURL?.() || '';
+  try {
+    const parsed = new URL(frameUrl);
+    if (parsed.protocol === 'file:') return true;
+    if ((parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') && parsed.port === '5173') {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function requireTrustedRenderer(event) {
+  if (!isTrustedRendererEvent(event)) {
+    throw new Error('Untrusted renderer origin');
+  }
+}
+
 // Handle IPC if needed
-ipcMain.handle('get-app-path', () => app.getPath('userData'));
+ipcMain.handle('get-app-path', (event) => {
+  requireTrustedRenderer(event);
+  return app.getPath('userData');
+});
 
 // Tray prefs IPC — owned by main process, persisted to userData/tray-prefs.json.
 // Renderer reads on Settings panel mount and writes on toggle change.
@@ -946,6 +966,7 @@ function getVaultBridgeCandidates() {
     path.join(process.cwd(), VAULT_BRIDGE_FILE),
   ];
 }
+let lastSelectedPsnxPath = null;
 
 // --- Keybundle import/export (local Eidolon Python CLI) -----------------------
 // Packaged Cipher loads the UI from file:// and talks to the hosted bridge for
@@ -1216,13 +1237,39 @@ async function readVaultBridgeContext() {
   return { ok: false, error: 'Vault bridge context not found.' };
 }
 
-ipcMain.handle('vault-bridge:get-context', async () => readVaultBridgeContext());
+function getAllowedPsnxPaths() {
+  const allowed = new Set();
+  if (lastSelectedPsnxPath) allowed.add(path.resolve(lastSelectedPsnxPath));
+  for (const candidate of getVaultBridgeCandidates()) {
+    try {
+      const context = JSON.parse(readFileSync(candidate, 'utf8'));
+      if (typeof context.psnx_path === 'string') {
+        allowed.add(path.resolve(context.psnx_path));
+      }
+    } catch {
+      // ignore missing or malformed context
+    }
+  }
+  return allowed;
+}
 
-ipcMain.handle('keybundle:import', async (_event, bundleBytes) => importVaultKeybundleLocal(bundleBytes));
+ipcMain.handle('vault-bridge:get-context', async (event) => {
+  requireTrustedRenderer(event);
+  return readVaultBridgeContext();
+});
 
-ipcMain.handle('keybundle:export', async (_event, vaultId) => exportVaultKeybundleLocal(vaultId));
+ipcMain.handle('keybundle:import', async (event, bundleBytes) => {
+  requireTrustedRenderer(event);
+  return importVaultKeybundleLocal(bundleBytes);
+});
 
-ipcMain.handle('vault-bridge:select-psnx', async () => {
+ipcMain.handle('keybundle:export', async (event, vaultId) => {
+  requireTrustedRenderer(event);
+  return exportVaultKeybundleLocal(vaultId);
+});
+
+ipcMain.handle('vault-bridge:select-psnx', async (event) => {
+  requireTrustedRenderer(event);
   const { dialog } = electron;
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Select your .psnx vault file',
@@ -1234,6 +1281,7 @@ ipcMain.handle('vault-bridge:select-psnx', async () => {
   }
   const selectedPath = result.filePaths[0];
   try {
+    lastSelectedPsnxPath = path.resolve(selectedPath);
     const psnxBuffer = readFileSync(selectedPath);
     const psnxHash = createHash('sha256').update(psnxBuffer).digest('hex');
     return { ok: true, psnxPath: selectedPath, psnxHash };
@@ -1242,12 +1290,20 @@ ipcMain.handle('vault-bridge:select-psnx', async () => {
   }
 });
 
-ipcMain.handle('vault-bridge:read-psnx', async (_event, psnxPath) => {
+ipcMain.handle('vault-bridge:read-psnx', async (event, psnxPath) => {
+  requireTrustedRenderer(event);
   if (typeof psnxPath !== 'string' || !psnxPath.trim()) {
     return { ok: false, error: 'psnxPath is required' };
   }
   try {
-    const buf = readFileSync(psnxPath.trim());
+    const resolvedPath = path.resolve(psnxPath.trim());
+    if (path.extname(resolvedPath).toLowerCase() !== '.psnx') {
+      return { ok: false, error: 'Only .psnx files can be read' };
+    }
+    if (!getAllowedPsnxPaths().has(resolvedPath)) {
+      return { ok: false, error: 'PSNX path is not allowed' };
+    }
+    const buf = readFileSync(resolvedPath);
     return { ok: true, base64: buf.toString('base64'), hash: createHash('sha256').update(buf).digest('hex') };
   } catch (err) {
     return { ok: false, error: 'Cannot read PSNX file at the specified path' };

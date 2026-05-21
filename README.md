@@ -52,7 +52,7 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 
 ### Windows (available now)
 
-1. Download `Cipher-Setup-1.3.1.exe` from the [latest release](../../releases/latest).
+1. Download `Cipher-Setup-1.1.1.exe` from the [latest release](../../releases/latest).
 2. Windows SmartScreen will show **"Windows protected your PC — Unrecognized app"**. This is **expected during alpha** — see the box below. Click **"More info"** → **"Run anyway"**.
 3. Pick an install directory and finish.
 

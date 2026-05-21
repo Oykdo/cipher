@@ -32,9 +32,12 @@ export interface DbInstance {
       type?: 'direct' | 'group';
       createdBy?: string | null;
       encryptedTitle?: string | null;
+      postPickupRetentionDays?: 0 | 1 | 7 | 30 | null;
     },
   ): Promise<any>;
   getConversationById(id: string): Promise<any | null>;
+  getConversationPostPickupRetentionDays(conversationId: string, fallback?: 0 | 1 | 7 | 30): Promise<0 | 1 | 7 | 30>;
+  updateConversationPostPickupRetentionDays(conversationId: string, days: 0 | 1 | 7 | 30 | null): Promise<any>;
   getConversationMembers(conversationId: string): Promise<string[]>;
   getUserConversations(userId: string): Promise<any[]>;
   conversationExists(id: string): Promise<boolean>;
@@ -71,6 +74,7 @@ export interface DbInstance {
   // Privacy-l1: mark messages as delivered when the recipient fetches them.
   // Returns the number of rows newly marked (1-to-1 only for now; groups deferred).
   markMessagesDeliveredFor(conversationId: string, recipientUserId: string): Promise<number>;
+  purgeZeroRetentionDeliveredMessagesForConversation(conversationId: string): Promise<number>;
 
   // Metadata
   getMetadata(key: string): Promise<string | null>;

@@ -347,7 +347,10 @@ await app.register(settingsRoutes);
 await app.register(trustStarRoutes);
 await app.register(recoveryRoutes);
 await app.register(acknowledgeRoutes);
-await app.register(avatarRoutes);
+if (process.env.ENABLE_LEGACY_DICEKEY_AVATAR === 'true') {
+    await app.register(avatarRoutes);
+    app.log.warn('Legacy DiceKey avatar route enabled by ENABLE_LEGACY_DICEKEY_AVATAR=true');
+}
 await app.register(e2eeRoutes);
 await app.register(conversationRequestRoutes);
 await app.register(publicKeysRoutes);
@@ -596,6 +599,7 @@ try {
     // P2P Signaling
     new SignalingServer({
         httpServer,
+        authenticateToken: async (token: string) => app.jwt.verify(token) as Promise<{ sub?: string }>,
         cors: { origin: config.security.allowedOrigins, credentials: true },
     });
     app.log.info('✅ P2P Signaling server configured');

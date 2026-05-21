@@ -59,24 +59,6 @@ jobs:
         run: npm ci
         working-directory: apps/frontend
 
-      # apps/bridge/.env.production is gitignored and listed in the
-      # electron-builder `files` array. If the BRIDGE_ENV_PRODUCTION secret
-      # is set we materialize it; otherwise we drop an empty file so the
-      # packager doesn't choke on the missing entry. The bridge env loader
-      # in main.js silently ignores empty/missing files.
-      - name: Materialize apps/bridge/.env.production
-        shell: bash
-        env:
-          BRIDGE_ENV_PRODUCTION: ${{ secrets.BRIDGE_ENV_PRODUCTION }}
-        run: |
-          if [ -n "${BRIDGE_ENV_PRODUCTION:-}" ]; then
-            printf '%s\n' "$BRIDGE_ENV_PRODUCTION" > apps/bridge/.env.production
-            echo "✓ .env.production materialized from secret"
-          else
-            : > apps/bridge/.env.production
-            echo "⚠ BRIDGE_ENV_PRODUCTION secret not set — shipping with empty .env.production"
-          fi
-
       - name: Build frontend + bridge
         run: npm run build:all
 

@@ -13,12 +13,26 @@ export const UpdateSettingsSchema = z.object({
     privacy: z.object({
         discoverable: z.boolean().optional(),
         readReceipts: z.boolean().optional(),
+        postPickupRetentionDays: z.union([
+            z.literal(0),
+            z.literal(1),
+            z.literal(7),
+            z.literal(30),
+        ]).optional(),
     }).optional(),
     notifications: z.object({
         email: z.boolean().optional(),
         push: z.boolean().optional(),
     }).optional(),
 }).strict(); // Reject unknown properties
+
+export const PostPickupRetentionDaysSchema = z.union([
+    z.literal(0),
+    z.literal(1),
+    z.literal(7),
+    z.literal(30),
+    z.null(),
+]);
 
 export const UsernameSchema = z.string()
     .min(3, 'Username must be at least 3 characters')

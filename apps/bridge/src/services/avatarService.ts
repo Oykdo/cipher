@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 interface AvatarParams {
     geometry: {
@@ -133,19 +133,19 @@ export class AvatarService {
 
         // Use deterministic filename based on userId to prevent wrong file downloads
         // If no userId (testing/preview), use temp- prefix with random UUID
-        const filename = userId ? `${userId}.blend` : `temp-${randomUUID()}.blend`;
+        const safeUserId = userId ? userId.replace(/[^a-zA-Z0-9_-]/g, '_') : '';
+        const filename = safeUserId ? `${safeUserId}.blend` : `temp-${randomUUID()}.blend`;
         const outputPath = path.join(this.outputDir, filename);
 
         // JSON stringify params to pass to Python script
         const paramsJson = JSON.stringify(params);
 
-        // Construct command
-        const command = `blender --background --python "${this.scriptPath}" -- --output "${outputPath}" --params '${paramsJson}'`;
-
         try {
-            console.log('Executing Blender command:', command);
-            // In a real environment with Blender installed:
-            await execAsync(command);
+            await execFileAsync(
+                'blender',
+                ['--background', '--python', this.scriptPath, '--', '--output', outputPath, '--params', paramsJson],
+                { windowsHide: true }
+            );
         } catch (e: any) {
             // Check if it's a "command not found" type error
             if (e.message && (e.message.includes('not recognized') || e.message.includes('not found') || e.code === 127 || e.code === 1)) {
