@@ -41,7 +41,7 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 | Server retains zero plaintext | ✓ | ✓ | ✓ | ✓ |
 | Server retains zero IP / user-agent | ✗ | partial | ✓ | ✓ |
 | Server retains zero auth log | ✗ | partial | ✓ | ✓ |
-| Server-side message history | indefinite | ~30 days | none | **7 days max post-pickup** |
+| Server-side message history | indefinite | ~30 days | none | **0–30 days, user-configurable** |
 | User owns and exports their data | partial | partial | ✓ | ✓ |
 | Eidolon vault identity integration | ✗ | ✗ | ✗ | ✓ |
 | Federated / self-hostable | ✗ | ✗ | ✓ | planned (post-1.0) |
