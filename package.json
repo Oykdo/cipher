@@ -35,7 +35,10 @@
     "p2p",
     "privacy"
   ],
-  "author": "Project Logos",
+  "author": {
+    "name": "Project Logos",
+    "email": "dev@cipher.app"
+  },
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/Oykdo/Project_Chimera/issues"
