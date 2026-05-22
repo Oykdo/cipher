@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.3.4 — System tray icon fix for packaged Windows build
+
+### Fixed
+
+- **System tray icon now appears correctly on Windows.** The `assets/icon.ico`
+  and `assets/icon.png` files were missing from the electron-builder `files`
+  list, so `nativeImage.createFromPath()` resolved to an empty image inside
+  the packaged asar. The tray slot was clickable but displayed no glyph.
+  Both icon files are now explicitly included in the build.
+
 ## v1.3.3 — Security hardening, zero-retention burn, signaling auth
 
 ### Added
