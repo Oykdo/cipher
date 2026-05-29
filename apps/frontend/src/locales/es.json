@@ -1474,6 +1474,13 @@
     "stream_closed_early": "El flujo se cerró antes de completarse.",
     "stream_generic_error": "Conexión perdida. Inténtalo de nuevo.",
     "generation_failed": "Error en la generación.",
-    "retry": "Reintentar"
+    "retry": "Reintentar",
+    "stage_awakening": "Despertar",
+    "status_awakening": "El entramado te ha elegido…",
+    "awakening_title": "Despertar de la Génesis",
+    "awakening_seat": "Asiento {{seat}} del Consejo de la Octava",
+    "awakening_sequence": "Bóveda nº {{n}} del ecosistema",
+    "awakening_demo": "Demo · esperando ancla",
+    "claim_seat": "Reclamar tu asiento"
   }
 }

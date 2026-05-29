@@ -1469,6 +1469,13 @@
     "stream_closed_early": "Stream closed before completion.",
     "stream_generic_error": "Connection lost. Please try again.",
     "generation_failed": "Generation failed.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "stage_awakening": "Awakening",
+    "status_awakening": "The lattice has chosen you…",
+    "awakening_title": "Genesis Awakening",
+    "awakening_seat": "Seat {{seat}} of the Council of the Octave",
+    "awakening_sequence": "Vault #{{n}} of the ecosystem",
+    "awakening_demo": "Demo · awaiting anchor",
+    "claim_seat": "Claim your seat"
   }
 }

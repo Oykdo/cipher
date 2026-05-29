@@ -6,6 +6,11 @@ type Props = {
   phase: number;
   ratio: number;
   finalPayload?: Record<string, unknown> | null;
+  awakeningPayload?: {
+    color_hue?: number;
+    archetype_id?: number;
+    archetype_glyph?: string;
+  } | null;
 };
 
 /**
@@ -17,16 +22,23 @@ type Props = {
  * canonical Python-generated viewer which the user opens via a separate
  * "Voir mon hologramme" link from the done screen.
  */
-export default function GenesisScene({ phase, ratio, finalPayload }: Props) {
+export default function GenesisScene({ phase, ratio, finalPayload, awakeningPayload }: Props) {
   const revealed = Boolean(finalPayload);
+  const awakening = Boolean(awakeningPayload);
   const progress = revealed ? 1 : Math.min(1, ((Math.max(1, phase) - 1) + ratio) / 9);
+  // When the Genesis Awakening fires, the radial vignette warms toward the
+  // archetype's color_hue so the canvas behind the banner feels "lit by"
+  // the user's archetype. Falls back to the default cool palette otherwise.
+  const bgGradient = awakening && awakeningPayload?.color_hue !== undefined
+    ? `radial-gradient(circle at 50% 55%, hsl(${awakeningPayload.color_hue}, 50%, 8%) 0%, #04050c 70%)`
+    : 'radial-gradient(circle at 50% 55%, #0a0c18 0%, #04050c 70%)';
 
   return (
     <Canvas
       camera={{ position: [0, 0, 6], fov: 50 }}
       gl={{ antialias: true, alpha: true, powerPreference: 'low-power' }}
       dpr={[1, 1.5]}
-      style={{ background: 'radial-gradient(circle at 50% 55%, #0a0c18 0%, #04050c 70%)' }}
+      style={{ background: bgGradient }}
       onCreated={({ gl }) => {
         // Swallow context-loss into a no-op log; without preventDefault the
         // browser treats the loss as permanent and the whole ceremony goes
@@ -45,7 +57,11 @@ export default function GenesisScene({ phase, ratio, finalPayload }: Props) {
       <pointLight position={[4, 4, 4]} intensity={0.55} color="#9fb7ff" />
       <pointLight position={[-4, -2, 3]} intensity={0.35} color="#c88aff" />
 
-      <ZenField progress={progress} converging={revealed} />
+      <ZenField
+        progress={progress}
+        converging={revealed}
+        awakeningHue={awakening ? (awakeningPayload?.color_hue ?? null) : null}
+      />
     </Canvas>
   );
 }
@@ -56,7 +72,11 @@ export default function GenesisScene({ phase, ratio, finalPayload }: Props) {
 
 const FIELD_COUNT = 380;
 
-function ZenField({ progress, converging }: { progress: number; converging: boolean }) {
+function ZenField({ progress, converging, awakeningHue }: {
+  progress: number;
+  converging: boolean;
+  awakeningHue: number | null;
+}) {
   const pointsRef = useRef<THREE.Points>(null);
   const convergeRef = useRef(1);
   const origins = useMemo(() => {
@@ -125,9 +145,15 @@ function ZenField({ progress, converging }: { progress: number; converging: bool
       );
     }
     attr.needsUpdate = true;
-    const hue = 0.62 - progress * 0.12;
+    // Awakening overrides the cool default hue with the archetype's hue,
+    // so the field visibly "answers" to the council seat the user just
+    // received. Three.js' setHSL expects hue in 0..1 — degrees → ratio.
+    const hue = awakeningHue !== null
+      ? (awakeningHue / 360)
+      : 0.62 - progress * 0.12;
+    const saturation = awakeningHue !== null ? 0.7 : 0.55;
     const light = converging ? 0.78 : 0.68;
-    material.color.setHSL(hue, 0.55, light);
+    material.color.setHSL(hue, saturation, light);
     material.opacity = 0.6 + progress * 0.35;
   });
 

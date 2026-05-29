@@ -1474,6 +1474,13 @@
     "stream_closed_early": "流在完成前关闭。",
     "stream_generic_error": "连接断开，请重试。",
     "generation_failed": "生成失败。",
-    "retry": "重试"
+    "retry": "重试",
+    "stage_awakening": "觉醒",
+    "status_awakening": "晶格选择了你…",
+    "awakening_title": "创世觉醒",
+    "awakening_seat": "八度议会第 {{seat}} 席位",
+    "awakening_sequence": "生态系统第 {{n}} 号金库",
+    "awakening_demo": "演示 · 等待锚定",
+    "claim_seat": "认领您的席位"
   }
 }

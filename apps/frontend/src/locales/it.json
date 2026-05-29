@@ -1474,6 +1474,13 @@
     "stream_closed_early": "Flusso chiuso prima del completamento.",
     "stream_generic_error": "Connessione persa. Riprova.",
     "generation_failed": "Generazione fallita.",
-    "retry": "Riprova"
+    "retry": "Riprova",
+    "stage_awakening": "Risveglio",
+    "status_awakening": "Il reticolo ti ha scelto…",
+    "awakening_title": "Risveglio della Genesi",
+    "awakening_seat": "Seggio {{seat}} del Consiglio dell'Ottava",
+    "awakening_sequence": "Volta n°{{n}} dell'ecosistema",
+    "awakening_demo": "Demo · in attesa dell'ancora",
+    "claim_seat": "Reclama il tuo seggio"
   }
 }

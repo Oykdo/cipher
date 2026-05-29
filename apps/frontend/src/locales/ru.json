@@ -1469,6 +1469,13 @@
     "stream_closed_early": "Stream closed before completion.",
     "stream_generic_error": "Connection lost. Please try again.",
     "generation_failed": "Generation failed.",
-    "retry": "Retry"
+    "retry": "Повторить",
+    "stage_awakening": "Пробуждение",
+    "status_awakening": "Решётка выбрала тебя…",
+    "awakening_title": "Пробуждение Генезиса",
+    "awakening_seat": "Место {{seat}} в Совете Октавы",
+    "awakening_sequence": "Хранилище №{{n}} экосистемы",
+    "awakening_demo": "Демо · ожидание якоря",
+    "claim_seat": "Занять место"
   }
 }

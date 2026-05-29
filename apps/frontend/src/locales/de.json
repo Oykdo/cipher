@@ -1474,6 +1474,13 @@
     "stream_closed_early": "Stream wurde vor Abschluss beendet.",
     "stream_generic_error": "Verbindung unterbrochen. Bitte erneut versuchen.",
     "generation_failed": "Generierung fehlgeschlagen.",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "stage_awakening": "Erwachen",
+    "status_awakening": "Das Gitter hat dich gewählt…",
+    "awakening_title": "Genesis-Erwachen",
+    "awakening_seat": "Sitz {{seat}} im Rat der Oktave",
+    "awakening_sequence": "Vault Nr. {{n}} des Ökosystems",
+    "awakening_demo": "Demo · Anker ausstehend",
+    "claim_seat": "Sitz beanspruchen"
   }
 }

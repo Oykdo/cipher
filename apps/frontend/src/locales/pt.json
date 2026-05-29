@@ -1469,6 +1469,13 @@
     "stream_closed_early": "Stream closed before completion.",
     "stream_generic_error": "Connection lost. Please try again.",
     "generation_failed": "Generation failed.",
-    "retry": "Retry"
+    "retry": "Tentar novamente",
+    "stage_awakening": "Despertar",
+    "status_awakening": "A rede te escolheu…",
+    "awakening_title": "Despertar da Gênesis",
+    "awakening_seat": "Assento {{seat}} do Conselho da Oitava",
+    "awakening_sequence": "Cofre n°{{n}} do ecossistema",
+    "awakening_demo": "Demo · aguardando âncora",
+    "claim_seat": "Reivindicar seu assento"
   }
 }

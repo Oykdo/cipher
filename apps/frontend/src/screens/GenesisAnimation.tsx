@@ -11,6 +11,26 @@ type PhaseEvent = {
   metadata: Record<string, unknown>;
 };
 
+/**
+ * Genesis Awakening payload, emitted by Eidolon's vault_auto_provision when
+ * the freshly-minted vault lands on one of the 88 Genesis positions in the
+ * ecosystem sequence. The keys come straight from the Python emitter — keep
+ * them in sync with src/crypto/vault_auto_provision.py::_build_demo_awakening
+ * and the future anchor API contract.
+ */
+type AwakeningPayload = {
+  sequence?: number;
+  archetype_id?: number;
+  archetype_name?: string;
+  archetype_glyph?: string;
+  color_hue?: number;
+  council_seat?: string;
+  vault_id?: string;
+  vault_fp_hex?: string;
+  demo_mode?: boolean;
+  anchor_url?: string | null;
+};
+
 type CeremonyState =
   | { kind: 'idle' }
   | { kind: 'running'; startedAt: number }
@@ -27,7 +47,8 @@ function stageKey(phase: number): string {
   if (phase <= 2) return 'genesis.stage_invocation';
   if (phase <= 5) return 'genesis.stage_crystallization';
   if (phase <= 8) return 'genesis.stage_sealing';
-  return 'genesis.stage_emergence';
+  if (phase === 9) return 'genesis.stage_emergence';
+  return 'genesis.stage_awakening';
 }
 
 function statusKey(phase: number): string {
@@ -35,7 +56,8 @@ function statusKey(phase: number): string {
   if (phase <= 2) return 'genesis.status_invocation';
   if (phase <= 5) return 'genesis.status_crystallization';
   if (phase <= 8) return 'genesis.status_sealing';
-  return 'genesis.status_emergence';
+  if (phase === 9) return 'genesis.status_emergence';
+  return 'genesis.status_awakening';
 }
 
 export default function GenesisAnimation() {
@@ -56,6 +78,7 @@ export default function GenesisAnimation() {
   const [state, setState] = useState<CeremonyState>({ kind: 'idle' });
   const [currentPhase, setCurrentPhase] = useState<PhaseEvent | null>(null);
   const [finalPayload, setFinalPayload] = useState<Record<string, unknown> | null>(null);
+  const [awakeningPayload, setAwakeningPayload] = useState<AwakeningPayload | null>(null);
   const [exportState, setExportState] = useState<'idle' | 'downloading' | 'ok' | 'error'>('idle');
   const [exportMessage, setExportMessage] = useState('');
   const sourceRef = useRef<EventSource | null>(null);
@@ -69,6 +92,7 @@ export default function GenesisAnimation() {
     setState({ kind: 'running', startedAt: Date.now() });
     setCurrentPhase(null);
     setFinalPayload(null);
+    setAwakeningPayload(null);
 
     const url = `/api/v2/auth/genesis-stream?name=${encodeURIComponent(name)}`;
     let src: EventSource;
@@ -91,6 +115,9 @@ export default function GenesisAnimation() {
         setCurrentPhase(data);
         if (data.phase === 9 && data.label === 'HOLOGRAPHIC_CERTIFICATE') {
           setFinalPayload(data.metadata);
+        }
+        if (data.phase === 10 && data.label === 'GENESIS_AWAKENING') {
+          setAwakeningPayload(data.metadata as AwakeningPayload);
         }
       } catch {
         // ignore malformed events
@@ -135,6 +162,7 @@ export default function GenesisAnimation() {
           phase={phase}
           ratio={currentPhase?.ratio ?? 0}
           finalPayload={finalPayload}
+          awakeningPayload={awakeningPayload}
         />
       </div>
 
@@ -171,7 +199,11 @@ export default function GenesisAnimation() {
 
         {done && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18, alignItems: 'center' }}>
-            <div style={welcome}>{t('genesis.welcome')}</div>
+            {awakeningPayload ? (
+              <AwakeningBanner payload={awakeningPayload} />
+            ) : (
+              <div style={welcome}>{t('genesis.welcome')}</div>
+            )}
             <div style={backupNotice}>{t('genesis.backup_notice')}</div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
               <button
@@ -203,6 +235,30 @@ export default function GenesisAnimation() {
                 >
                   {t('genesis.view_hologram')}
                 </a>
+              )}
+              {awakeningPayload && (
+                <button
+                  onClick={() => {
+                    // The claim flow lives in Esoptron — open the council
+                    // page with the seal as query parameter. The anchor URL
+                    // is published by the Eidolon emitter when the production
+                    // anchor service answers; otherwise (demo mode) fall back
+                    // to the default Esoptron host.
+                    const base = awakeningPayload.anchor_url
+                      ?? 'https://esoptron.eidolon-connect.xyz';
+                    const seq = awakeningPayload.sequence ?? '';
+                    const arch = awakeningPayload.archetype_id ?? '';
+                    const fp = awakeningPayload.vault_fp_hex ?? '';
+                    window.open(
+                      `${base}/genesis/claim?sequence=${seq}&archetype_id=${arch}&vault_fp=${fp}`,
+                      '_blank',
+                      'noopener',
+                    );
+                  }}
+                  style={buttonClaim(awakeningPayload.color_hue ?? 45)}
+                >
+                  {t('genesis.claim_seat')}
+                </button>
               )}
               {fromSignup ? (
                 <button
@@ -352,3 +408,94 @@ const backupNotice: React.CSSProperties = {
 };
 const exportOk: React.CSSProperties = { fontSize: 12, color: '#a0e0a0', opacity: 0.8 };
 const exportErr: React.CSSProperties = { fontSize: 12, color: '#f0a0a0', opacity: 0.85, maxWidth: 420 };
+
+/* -------------------------------------------------------------------------- */
+/*  Genesis Awakening — banner shown for the 88 vaults of the Council         */
+/* -------------------------------------------------------------------------- */
+
+function AwakeningBanner({ payload }: { payload: AwakeningPayload }) {
+  const { t } = useTranslation();
+  const hue = payload.color_hue ?? 45;
+  const archetypeKey = payload.archetype_id !== undefined
+    ? `genesis.archetype_${payload.archetype_id}`
+    : '';
+  // Prefer the i18n key when present, otherwise fall back to the raw name
+  // emitted by the Python side. Lets us ship phase-10 immediately even
+  // before the 88 localized names are translated.
+  const archetypeLabel = archetypeKey
+    ? t(archetypeKey, { defaultValue: payload.archetype_name ?? '' })
+    : payload.archetype_name ?? '';
+  const glyphColor = `hsl(${hue}, 70%, 70%)`;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+      <div style={awakeningTitle}>{t('genesis.awakening_title')}</div>
+      <div style={{ ...awakeningGlyph, color: glyphColor, textShadow: `0 0 24px ${glyphColor}` }}>
+        {payload.archetype_glyph}
+      </div>
+      <div style={awakeningArchetype}>{archetypeLabel}</div>
+      {payload.council_seat && (
+        <div style={awakeningSeat}>
+          {t('genesis.awakening_seat', { seat: payload.council_seat })}
+        </div>
+      )}
+      {payload.sequence !== undefined && (
+        <div style={awakeningSequence}>
+          {t('genesis.awakening_sequence', { n: payload.sequence })}
+        </div>
+      )}
+      {payload.demo_mode && (
+        <div style={awakeningDemo}>{t('genesis.awakening_demo')}</div>
+      )}
+    </div>
+  );
+}
+
+const awakeningTitle: React.CSSProperties = {
+  fontSize: 12,
+  letterSpacing: 6,
+  textTransform: 'uppercase',
+  color: '#f6ecd0',
+  opacity: 0.9,
+};
+const awakeningGlyph: React.CSSProperties = {
+  fontSize: 56,
+  fontWeight: 200,
+  letterSpacing: 6,
+  lineHeight: 1.1,
+  fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Mono", monospace',
+};
+const awakeningArchetype: React.CSSProperties = {
+  fontSize: 28,
+  fontWeight: 200,
+  letterSpacing: 2,
+  color: '#f6ecd0',
+};
+const awakeningSeat: React.CSSProperties = {
+  fontSize: 13,
+  letterSpacing: 2,
+  opacity: 0.75,
+};
+const awakeningSequence: React.CSSProperties = {
+  fontSize: 11,
+  letterSpacing: 1,
+  opacity: 0.55,
+};
+const awakeningDemo: React.CSSProperties = {
+  fontSize: 10,
+  letterSpacing: 2,
+  textTransform: 'uppercase',
+  color: '#f0c070',
+  opacity: 0.65,
+  marginTop: 4,
+};
+
+function buttonClaim(hue: number): React.CSSProperties {
+  const accent = `hsl(${hue}, 70%, 65%)`;
+  return {
+    ...button,
+    background: `linear-gradient(180deg, ${accent}aa, ${accent}33)`,
+    borderColor: accent,
+    color: '#fff',
+    boxShadow: `0 0 18px ${accent}66`,
+  };
+}

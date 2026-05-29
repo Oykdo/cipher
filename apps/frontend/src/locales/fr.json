@@ -1470,6 +1470,13 @@
     "stream_closed_early": "Le flux a été interrompu avant la fin.",
     "stream_generic_error": "Connexion perdue. Veuillez réessayer.",
     "generation_failed": "Échec de la génération.",
-    "retry": "Réessayer"
+    "retry": "Réessayer",
+    "stage_awakening": "Éveil",
+    "status_awakening": "Le treillis t'a choisi…",
+    "awakening_title": "Éveil de la Genèse",
+    "awakening_seat": "Siège {{seat}} du Conseil de l'Octave",
+    "awakening_sequence": "Vault n°{{n}} de l'écosystème",
+    "awakening_demo": "Démo · en attente de l'ancre",
+    "claim_seat": "Réclamer votre siège"
   }
 }
