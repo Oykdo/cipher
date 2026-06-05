@@ -38,7 +38,14 @@ export function useP2P(options: UseP2POptions = {}) {
   // Initialize P2P manager
   useEffect(() => {
     const userId = session?.user?.id;
-    if (!userId || initializingRef.current) {
+    const authToken = session?.accessToken;
+    // Gate on a live token, not just user id. The auth store never persists
+    // accessToken (VUL-007), so after a reload session.user exists while
+    // accessToken === ''. Connecting with an empty token makes the signaling
+    // server reject the handshake and the client loops forever. Waiting for a
+    // real token also self-heals: re-auth repopulates accessToken and, since
+    // it's now a dependency, this effect re-runs and connects.
+    if (!userId || !authToken || initializingRef.current) {
       return;
     }
 
@@ -94,7 +101,7 @@ export function useP2P(options: UseP2POptions = {}) {
       manager?.destroy();
       initializingRef.current = false;
     };
-  }, [session?.user?.id, options.signalingUrl]);
+  }, [session?.user?.id, session?.accessToken, options.signalingUrl]);
 
   /**
    * Send message to peer
