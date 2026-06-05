@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.3.5 — Genesis Awakening UI + signaling reconnect fix
+
+### Added
+
+- **Genesis Awakening UI for ceremony phase 10.** Front-end surface for the
+  final phase of the vault genesis ceremony.
+
+### Fixed
+
+- **Signaling no longer loops on an empty access token.** After a reload the
+  auth store rehydrates `session.user` while forcing `accessToken` to `''`
+  (tokens are never persisted, by design). `useP2P` initialized the signaling
+  client as soon as `user.id` existed, so it connected with an empty token; the
+  signaling server's JWT middleware then rejected the handshake and the client
+  reconnected forever ("WebSocket is closed before the connection is
+  established"). Initialization is now gated on a non-empty `accessToken`, and
+  the token is a dependency of the effect — so it connects once re-auth
+  repopulates the token instead of looping.
+
 ## v1.3.4 — System tray icon fix for packaged Windows build
 
 ### Fixed
