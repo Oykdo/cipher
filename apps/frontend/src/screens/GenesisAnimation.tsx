@@ -245,7 +245,7 @@ export default function GenesisAnimation() {
                     // anchor service answers; otherwise (demo mode) fall back
                     // to the default Esoptron host.
                     const base = awakeningPayload.anchor_url
-                      ?? 'https://esoptron.eidolon-connect.xyz';
+                      ?? 'https://esoptron.logos-project.xyz';
                     const seq = awakeningPayload.sequence ?? '';
                     const arch = awakeningPayload.archetype_id ?? '';
                     const fp = awakeningPayload.vault_fp_hex ?? '';

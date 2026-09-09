@@ -43,9 +43,52 @@ export const API_SUPPORTS_LOCAL_PSNX = isLocalhostUrl(API_BASE_URL);
 export const EIDOLON_CONNECT_APP_ID =
   import.meta.env.VITE_EIDOLON_CONNECT_APP_ID || 'cipher.desktop';
 // Always use production Eidolon Connect server (local dev server is deprecated)
-const DEFAULT_EIDOLON_CONNECT_URL = 'https://eidolon-connect.xyz';
-export const EIDOLON_CONNECT_BASE_URL =
+const DEFAULT_EIDOLON_CONNECT_URL = 'https://eidolon.logos-project.xyz';
+export const EIDOLON_CONNECT_DEFAULT_BASE_URL =
   import.meta.env.VITE_EIDOLON_CONNECT_URL || DEFAULT_EIDOLON_CONNECT_URL;
+
+// The Connect URL baked into the build can go stale when the server moves
+// (VPS/domain migration). A device-local override lets an existing install
+// point to the new host without waiting for a rebuilt installer.
+const EIDOLON_CONNECT_URL_OVERRIDE_KEY = 'cipher.eidolon_connect_url_override';
+
+export const sanitizeEidolonConnectUrl = (value: string): string | null => {
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return trimmed;
+  } catch {
+    return null;
+  }
+};
+
+export const getEidolonConnectUrlOverride = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = window.localStorage.getItem(EIDOLON_CONNECT_URL_OVERRIDE_KEY);
+    return stored ? sanitizeEidolonConnectUrl(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const setEidolonConnectUrlOverride = (value: string | null): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (value === null) {
+      window.localStorage.removeItem(EIDOLON_CONNECT_URL_OVERRIDE_KEY);
+    } else {
+      window.localStorage.setItem(EIDOLON_CONNECT_URL_OVERRIDE_KEY, value);
+    }
+  } catch {
+    // localStorage unavailable — the override is best-effort.
+  }
+};
+
+export const getEidolonConnectBaseUrl = (): string =>
+  getEidolonConnectUrlOverride() || EIDOLON_CONNECT_DEFAULT_BASE_URL;
 export const EIDOLON_CONNECT_SESSION_SECRET =
   import.meta.env.VITE_EIDOLON_CONNECT_SESSION_SECRET || '';
 

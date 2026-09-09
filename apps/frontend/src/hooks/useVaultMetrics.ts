@@ -76,7 +76,7 @@ export function useVaultMetrics(pollIntervalMs = 30_000): VaultMetrics | null {
     const fetchMetrics = async () => {
       // Production: fetch from VPS API (Eidolon Connect)
       try {
-        const connectUrl = import.meta.env.VITE_EIDOLON_CONNECT_URL || 'https://eidolon-connect.xyz';
+        const connectUrl = import.meta.env.VITE_EIDOLON_CONNECT_URL || 'https://eidolon.logos-project.xyz';
         const connectSecret = import.meta.env.VITE_EIDOLON_CONNECT_SESSION_SECRET || '';
         const headers: Record<string, string> = {};
         if (connectSecret) headers['X-Eidolon-Connect-Secret'] = connectSecret;

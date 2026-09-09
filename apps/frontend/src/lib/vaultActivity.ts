@@ -31,7 +31,7 @@ export function pingVaultActivity(vaultId: string | undefined | null): void {
   if (now - last < ACTIVITY_THROTTLE_MS) return;
   setLastPing(vaultId, now);
 
-  const connectUrl = import.meta.env.VITE_EIDOLON_CONNECT_URL || 'https://eidolon-connect.xyz';
+  const connectUrl = import.meta.env.VITE_EIDOLON_CONNECT_URL || 'https://eidolon.logos-project.xyz';
   const url = `${connectUrl}/connect/vault/economy/${vaultId}/activity`;
 
   // no-cors: opaque response, no console errors on 429

@@ -1,8 +1,8 @@
 import {
   API_BASE_URL,
   EIDOLON_CONNECT_APP_ID,
-  EIDOLON_CONNECT_BASE_URL,
   EIDOLON_CONNECT_ENABLED,
+  getEidolonConnectBaseUrl,
 } from '../config';
 
 const CONNECT_DISABLED_ERROR =
@@ -135,23 +135,25 @@ async function probeConnectAtBaseUrl(
 export async function ensureEidolonConnectRegistration(
   appId: string = EIDOLON_CONNECT_APP_ID
 ): Promise<EidolonConnectProbeResult> {
+  const connectBaseUrl = getEidolonConnectBaseUrl();
+
   if (!EIDOLON_CONNECT_ENABLED) {
     return {
       ok: false,
-      baseUrl: EIDOLON_CONNECT_BASE_URL,
+      baseUrl: connectBaseUrl,
       error: CONNECT_DISABLED_ERROR,
     };
   }
 
   if (window.electron?.probeEidolonConnect) {
     const result = await window.electron.probeEidolonConnect({
-      baseUrl: EIDOLON_CONNECT_BASE_URL,
+      baseUrl: connectBaseUrl,
       appId,
     });
     if (result.ok) {
       return {
         ok: true,
-        baseUrl: result.baseUrl || EIDOLON_CONNECT_BASE_URL,
+        baseUrl: result.baseUrl || connectBaseUrl,
         capabilities: result.capabilities as unknown as EidolonConnectCapabilities,
         registration: result.registration as unknown as EidolonConnectRegistration,
       };
@@ -159,13 +161,13 @@ export async function ensureEidolonConnectRegistration(
 
     // IPC probe failed — fall through to HTTP candidates instead of returning early
     console.warn('[EidolonConnect] IPC probe failed, falling through to HTTP', {
-      baseUrl: result.baseUrl || EIDOLON_CONNECT_BASE_URL,
+      baseUrl: result.baseUrl || connectBaseUrl,
       appId,
       error: result.error || 'Unknown IPC probe error',
     });
   }
 
-  const candidates = buildCandidateBaseUrls(EIDOLON_CONNECT_BASE_URL);
+  const candidates = buildCandidateBaseUrls(connectBaseUrl);
   let lastFailure: EidolonConnectProbeResult | null = null;
 
   for (const baseUrl of candidates) {
@@ -177,7 +179,7 @@ export async function ensureEidolonConnectRegistration(
   }
 
   console.error('[EidolonConnect] Registration probe failed', {
-    baseUrl: EIDOLON_CONNECT_BASE_URL,
+    baseUrl: connectBaseUrl,
     appId,
     candidates,
     error: lastFailure?.error || 'Unable to reach Eidolon Connect.',
@@ -185,7 +187,7 @@ export async function ensureEidolonConnectRegistration(
 
   return {
     ok: false,
-    baseUrl: lastFailure?.baseUrl || EIDOLON_CONNECT_BASE_URL,
+    baseUrl: lastFailure?.baseUrl || connectBaseUrl,
     error: lastFailure?.error || 'Unable to reach Eidolon Connect.',
   }
 }
@@ -198,10 +200,12 @@ export async function createEidolonConnectSession(input: {
   source?: string;
   createdAt?: string;
 }): Promise<{ ok: boolean; baseUrl: string; session?: EidolonConnectSession; error?: string }> {
+  const connectBaseUrl = getEidolonConnectBaseUrl();
+
   if (!EIDOLON_CONNECT_ENABLED) {
     return {
       ok: false,
-      baseUrl: EIDOLON_CONNECT_BASE_URL,
+      baseUrl: connectBaseUrl,
       error: CONNECT_DISABLED_ERROR,
     };
   }
@@ -210,7 +214,7 @@ export async function createEidolonConnectSession(input: {
 
   if (window.electron?.createEidolonConnectSession) {
     const result = await window.electron.createEidolonConnectSession({
-      baseUrl: EIDOLON_CONNECT_BASE_URL,
+      baseUrl: connectBaseUrl,
       appId,
       vaultId: input.vaultId,
       vaultNumber: input.vaultNumber,
@@ -222,14 +226,14 @@ export async function createEidolonConnectSession(input: {
     if (result.ok && result.session) {
       return {
         ok: true,
-        baseUrl: result.baseUrl || EIDOLON_CONNECT_BASE_URL,
+        baseUrl: result.baseUrl || connectBaseUrl,
         session: result.session as unknown as EidolonConnectSession,
       };
     }
 
     return {
       ok: false,
-      baseUrl: result.baseUrl || EIDOLON_CONNECT_BASE_URL,
+      baseUrl: result.baseUrl || connectBaseUrl,
       error: result.error || 'Unable to create an Eidolon Connect session.',
     };
   }
