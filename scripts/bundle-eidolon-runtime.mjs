@@ -118,6 +118,103 @@ const PBS_TARGETS = {
 };
 const PBS_CACHE_DIR = path.join(cipherRoot, 'assets', '.python-cache');
 
+// ---------------------------------------------------------------------------
+// Frozen ceremony runtime
+// ---------------------------------------------------------------------------
+//
+// One binary exposing `ceremony` and `keybundle`, published as a release
+// asset on this repository (Oykdo/Eidolon is private, so CI cannot fetch
+// from it without a token; the binary ships inside every installer
+// anyway). It is what Genesis actually runs, and it replaces the Python
+// tree: Cipher ships the ceremony without shipping the Eidolon crypto core.
+//
+// That matters twice over. CI only sees the PUBLIC Oykdo/Eidolon repo, which
+// holds src/__init__.py, src/daemon/ and src/protocols/ and nothing else — no
+// crypto core, so staging the tree there produced an installer that could not
+// create an account. And on a machine that DOES hold the private tree, copying
+// it into assets/eidolon-runtime meant shipping it inside the installer, to
+// everyone who downloads Cipher.
+//
+// Release and SHA-256 are pinned; the digest is re-verified on every build, so
+// a swapped asset fails the build instead of shipping.
+const RUNTIME_RELEASE = 'cipher-runtime-20260909';
+const RUNTIME_TARGETS = {
+  win32: {
+    asset: 'cipher-runtime.exe',
+    sha256: '9e40a039a0f73857fb568404e82eeff885f12d0f4fddde460933f2acb40b7f7e',
+    localDirs: ['dist-cipher-runtime'],
+  },
+  linux: {
+    asset: 'cipher-runtime',
+    sha256: 'a2a3529ece0fe5ebadf383ed9c51ba15ab161f4b8514ca5f1dd0a7aa0fd05146',
+    localDirs: ['dist-cipher-runtime-linux', 'dist-cipher-runtime'],
+  },
+};
+const RUNTIME_CACHE_DIR = path.join(cipherRoot, 'assets', '.runtime-cache');
+
+function runtimeTarget() {
+  return RUNTIME_TARGETS[process.platform === 'win32' ? 'win32' : 'linux'];
+}
+
+/**
+ * Put the frozen runtime in assets/eidolon-runtime, where electron-builder
+ * ships it as extraResources and main.js resolveCipherRuntime() finds it.
+ * A local build wins over the download: it is what the developer just
+ * produced, and it keeps packaging offline. Throws on failure — the caller
+ * must not package a ceremony-less installer.
+ */
+async function stageFrozenRuntime() {
+  const target = runtimeTarget();
+  const dest = path.join(destRoot, target.asset);
+
+  for (const dir of target.localDirs) {
+    const local = path.join(eidolonRoot, dir, target.asset);
+    if (!fs.existsSync(local)) continue;
+    const actual = sha256File(local);
+    if (actual !== target.sha256) {
+      console.warn(`[bundle-eidolon] ${dir}/${target.asset} does not match the pinned digest — ignored`);
+      console.warn(`[bundle-eidolon]   expected ${target.sha256}`);
+      console.warn(`[bundle-eidolon]   got      ${actual}`);
+      continue;
+    }
+    fs.copyFileSync(local, dest);
+    fs.chmodSync(dest, 0o755);
+    console.log('[bundle-eidolon] Frozen runtime from', path.join(dir, target.asset));
+    return dest;
+  }
+
+  fs.mkdirSync(RUNTIME_CACHE_DIR, { recursive: true });
+  const cached = path.join(RUNTIME_CACHE_DIR, `${RUNTIME_RELEASE}-${target.asset}`);
+
+  if (fs.existsSync(cached) && sha256File(cached) === target.sha256) {
+    console.log('[bundle-eidolon] Using cached frozen runtime');
+  } else {
+    const url =
+      `https://github.com/Oykdo/cipher/releases/download/` +
+      `${RUNTIME_RELEASE}/${target.asset}`;
+    console.log('[bundle-eidolon] Downloading frozen runtime', RUNTIME_RELEASE);
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`download failed: HTTP ${res.status} for ${url}`);
+    }
+    fs.writeFileSync(cached, Buffer.from(await res.arrayBuffer()));
+    const actual = sha256File(cached);
+    if (actual !== target.sha256) {
+      fs.rmSync(cached, { force: true });
+      throw new Error(
+        `SHA-256 mismatch for ${target.asset}
+  expected ${target.sha256}
+  got      ${actual}`,
+      );
+    }
+    console.log('[bundle-eidolon] SHA-256 verified');
+  }
+
+  fs.copyFileSync(cached, dest);
+  fs.chmodSync(dest, 0o755);
+  return dest;
+}
+
 function sha256File(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
@@ -275,25 +372,34 @@ async function createBundledPython() {
 }
 
 async function main() {
-  if (!fs.existsSync(cliMarker)) {
-    console.warn(
-      '[bundle-eidolon] Skipping: ../Eidolon not found (expected',
-      eidolonRoot,
-      ').',
-    );
-    console.warn(
-      '[bundle-eidolon] Packaged keybundle import needs Eidolon at build time,',
-    );
-    console.warn(
-      '[bundle-eidolon] or set EIDOLON_ROOT to a full Eidolon checkout at runtime.',
-    );
-    return;
-  }
-
   if (fs.existsSync(destRoot)) {
     fs.rmSync(destRoot, { recursive: true, force: true });
   }
   fs.mkdirSync(destRoot, { recursive: true });
+
+  // The frozen runtime IS the ceremony. stageFrozenRuntime throws on any
+  // failure, which fails the build rather than packaging an installer whose
+  // signup dies at the ceremony screen.
+  await stageFrozenRuntime();
+
+  // Legacy layout: the Eidolon Python tree plus a bundled CPython, staged into
+  // the very directory electron-builder ships. Off by default, because that
+  // puts the crypto core inside the installer, readable by anyone who installs
+  // Cipher. Development keeps its fallback anyway: main.js resolves a tree at
+  // runtime through EIDOLON_ROOT or ../Eidolon, without the installer carrying
+  // one.
+  if (process.env.BUNDLE_EIDOLON_PYTHON_TREE !== '1') {
+    console.log('[bundle-eidolon] Staged frozen runtime →', destRoot);
+    return;
+  }
+
+  if (!fs.existsSync(cliMarker)) {
+    console.error(
+      '[bundle-eidolon] BUNDLE_EIDOLON_PYTHON_TREE=1 but no Eidolon checkout at',
+      eidolonRoot,
+    );
+    process.exit(1);
+  }
 
   for (const rel of ['config', 'src', path.join('scripts', 'public')]) {
     const src = path.join(eidolonRoot, rel);
@@ -326,7 +432,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('[bundle-eidolon] Staged Eidolon runtime →', destRoot);
+  console.log('[bundle-eidolon] Staged frozen runtime + Python tree →', destRoot);
 }
 
 await main();

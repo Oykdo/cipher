@@ -39,15 +39,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The Genesis ceremony runs locally on the user's machine (it mints the
-      # master seed — it must never run server-side). bundle-eidolon-runtime
-      # stages Eidolon's Python tree + deps into assets/eidolon-runtime, which
-      # electron-builder ships as extraResources. Public repo, no token needed.
-      - name: Checkout Eidolon (ceremony runtime source)
-        uses: actions/checkout@v4
-        with:
-          repository: Oykdo/Eidolon
-          path: eidolon-src
+      # No Eidolon checkout: the Genesis ceremony ships as a frozen binary
+      # (cipher-runtime), downloaded from an Eidolon release and SHA-256
+      # verified by bundle-eidolon-runtime.mjs. The ceremony still runs on the
+      # user's machine — it mints the master seed and must never run
+      # server-side — but Cipher no longer needs the Eidolon source to build.
 
       - uses: actions/setup-python@v5
         with:
@@ -81,26 +77,27 @@ jobs:
         env:
           EIDOLON_ROOT: ${{ github.workspace }}/eidolon-src
 
-      # The bundler does NOT fail when the ceremony source is absent: main()
-      # looks for scripts/public/keybundle_cli.py and, not finding it, warns
-      # and returns 0. The public Oykdo/Eidolon repo holds only src/__init__.py,
-      # src/daemon/ and src/protocols/ — no crypto/, no scripts/public/ — so in
-      # CI that skip IS the normal path, and the step stays green while staging
-      # nothing at all.
+      # Until v1.4.0 this asserted on assets/eidolon-runtime/src/crypto/...py,
+      # the staged Python tree. In CI that file could never exist: the public
+      # Oykdo/Eidolon repo holds src/__init__.py, src/daemon/ and
+      # src/protocols/ and no crypto core, so the bundler warned, returned 0,
+      # and the step went red on every tag. The ceremony now ships as a frozen
+      # binary instead, so this asserts on the binary.
       #
-      # This assertion previously lived only in the Linux smoke test, AFTER
-      # packaging. With fail-fast: false that meant Linux went red while the
-      # Windows leg published a Cipher-Setup-*.exe whose Genesis signup cannot
-      # work. Running it here covers BOTH matrix legs and happens BEFORE
-      # electron-builder, so a ceremony-less installer is never packaged, let
-      # alone published.
+      # It runs BEFORE electron-builder and covers BOTH matrix legs: with
+      # fail-fast: false, checking after packaging let the Windows leg publish
+      # a Cipher-Setup-*.exe whose Genesis signup cannot work while Linux went
+      # red.
       - name: Assert ceremony runtime was actually staged
         shell: bash
         run: |
           set -euo pipefail
-          CEREMONY=assets/eidolon-runtime/src/crypto/vault_auto_provision.py
+          case "${RUNNER_OS}" in
+            Windows) CEREMONY=assets/eidolon-runtime/cipher-runtime.exe ;;
+            *)       CEREMONY=assets/eidolon-runtime/cipher-runtime ;;
+          esac
           if [ ! -f "$CEREMONY" ]; then
-            echo "::error::Ceremony runtime not staged ($CEREMONY). bundle:eidolon found no Eidolon crypto core, so this build would ship an installer that cannot create an account."
+            echo "::error::Frozen ceremony runtime not staged ($CEREMONY). bundle:eidolon did not produce it, so this build would ship an installer that cannot create an account."
             echo "--- assets/eidolon-runtime ---"
             ls -la assets/eidolon-runtime 2>/dev/null || echo "(absent)"
             exit 1
@@ -171,7 +168,7 @@ jobs:
           echo "✓ AppImage extracts cleanly and contains AppRun"
           # The ceremony entry point must be inside the bundle, or signup
           # dies at the Genesis screen on a machine with no Eidolon checkout.
-          CEREMONY=squashfs-root/resources/Eidolon/src/crypto/vault_auto_provision.py
+          CEREMONY=squashfs-root/resources/Eidolon/cipher-runtime
           if [ ! -f "$CEREMONY" ]; then
             echo "::error::Ceremony runtime missing from AppImage ($CEREMONY)"
             exit 1
