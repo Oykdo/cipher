@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.3.6 — Eidolon endpoints moved to logos-project.xyz
+
+### Changed
+
+- **Every Eidolon endpoint now points at `logos-project.xyz`.** The Netcup host
+  behind `eidolon-connect.xyz` is gone; Eidolon runs on a Scaleway instance with
+  Connect on `eidolon.logos-project.xyz`, the machine lock on
+  `lock.eidolon.logos-project.xyz` and the REST API on
+  `api.eidolon.logos-project.xyz`. Updated the frontend production env and
+  config default, the vault metrics and activity fallbacks, the Genesis anchor
+  host, and the bridge production template. An installer older than this release
+  cannot reach Eidolon at all.
+
+### Added
+
+- **Device-local Connect URL override.** The Connect URL baked into a build goes
+  stale whenever the server moves. Setting `cipher.eidolon_connect_url_override`
+  in `localStorage` repoints an existing install without a new installer.
+
+### Fixed
+
+- **Vault activity no longer always reports zero.** The bridge compared
+  `created_at`, a timestamp column, against a JavaScript epoch in milliseconds,
+  so the activity window never matched a row and every vault looked idle. The
+  bound parameter is now converted with `to_timestamp()`.
+
 ## v1.3.5 — Genesis Awakening UI + signaling reconnect fix
 
 ### Added
