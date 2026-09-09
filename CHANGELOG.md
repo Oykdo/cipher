@@ -22,6 +22,9 @@
 - **The username travels in the JWT**, so sockets stop relaying "Unknown".
 - **The genesis ceremony runs locally** instead of against the hosted bridge,
   and `pqcrypto` is pinned so post-quantum sealing actually runs.
+- **Stored bundles save on a fresh install.** `storedBundlesDir()` called
+  `require('fs')` inside an ESM module, which threw a `ReferenceError` that
+  `stored-bundle:save` swallowed into `{ ok: false }`.
 
 ### Changed
 

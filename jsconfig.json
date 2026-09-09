@@ -1,0 +1,15 @@
+{
+  "//": "Type-checks the JavaScript nothing else covers: the Electron main process, the preload bridge and the build scripts. eslint.config.js only matches **/*.ts and **/*.tsx, and no tsconfig at this level existed before. Catches the class of bug where code parses but cannot run, e.g. reading .catch off an async function that was declared and never invoked.",
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["main.js", "preload.cjs", "scripts/**/*"],
+  "exclude": ["node_modules", "dist", "release", "apps"]
+}

@@ -199,3 +199,6 @@ META_BURN_VALUE.md
 
 # Portable CPython archives cached by scripts/bundle-eidolon-runtime.mjs
 assets/.python-cache/
+
+# Cache du runtime de ceremonie telecharge par bundle-eidolon-runtime.mjs
+assets/.runtime-cache/

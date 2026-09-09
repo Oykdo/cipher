@@ -21,7 +21,8 @@
     "bundle:eidolon": "node scripts/bundle-eidolon-runtime.mjs",
     "build:win": "npm run bundle:eidolon && npm run build:all && electron-builder --win",
     "build:mac": "npm run bundle:eidolon && npm run build:all && electron-builder --mac",
-    "build:linux": "npm run bundle:eidolon && npm run build:all && electron-builder --linux"
+    "build:linux": "npm run bundle:eidolon && npm run build:all && electron-builder --linux",
+    "typecheck": "tsc -p jsconfig.json"
   },
   "repository": {
     "type": "git",
@@ -48,6 +49,7 @@
     "concurrently": "^8.2.2",
     "electron": "^35.7.5",
     "electron-builder": "^25.1.7",
+    "typescript": "^5.9.3",
     "wait-on": "^8.0.1"
   },
   "build": {

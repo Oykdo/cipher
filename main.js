@@ -680,6 +680,8 @@ async function startBackend() {
       ? path.join(process.resourcesPath, 'apps', 'bridge', 'dist', 'index.js')
       : path.join(__dirname, 'apps', 'bridge', 'src', 'index.ts');
 
+    /** @type {import('node:child_process').ForkOptions} */
+
     const options = {
       cwd: app.isPackaged 
         ? path.join(process.resourcesPath, 'apps', 'bridge')
@@ -1699,7 +1701,11 @@ const VAULT_ID_RE = /^[a-f0-9]{4,64}$/i;
 function storedBundlesDir() {
   const dir = path.join(app.getPath('userData'), STORED_BUNDLES_DIR);
   if (!existsSync(dir)) {
-    require('fs').mkdirSync(dir, { recursive: true });
+    // mkdirSync, not require('fs'): package.json declares "type": "module", so
+    // require is not defined here. This threw ReferenceError on the first
+    // stored-bundle save of every fresh install, and stored-bundle:save
+    // swallowed it into { ok: false }. Reproduced before fixing.
+    mkdirSync(dir, { recursive: true });
   }
   return dir;
 }
