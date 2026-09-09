@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.4.1 — the code is checked before it becomes a release
+
+No user-facing change. This release exists so the checks below are the ones
+that produced the installers, rather than being added after the fact.
+
+### Added
+
+- **A `checks` workflow that runs on every pull request and every push to
+  master.** `release.yml` was the only workflow and it fires only on a `v*`
+  tag: the first time CI read this code, it was already building the signed
+  installer. Every step in the new workflow exits 0 on the tree it landed on.
+- **`npm run typecheck` over `main.js`, `preload.cjs` and `scripts/`.** 6,545
+  lines that no checker matched: the root ESLint config only covered
+  `**/*.ts` and `**/*.tsx`, and no tsconfig reached that level. It catches
+  code that parses but cannot run, which is how an async function that was
+  declared and never invoked nearly shipped a keybundle export that hangs
+  forever.
+- **Type checking for the bridge's JavaScript.** The build already compiled
+  `src/db/*.js` and emitted it with checking explicitly disabled, so 1,500
+  lines of the database layer went through the compiler unread.
+
+### Fixed
+
+- Four type defects in the bridge database layer, by annotation, with no
+  behaviour change: a query parameter list that mixes a string pattern with a
+  numeric `LIMIT`, and three `catch` bindings read as `.message` while typed
+  `unknown`.
+
+### Removed
+
+- `eslint.config.js` and `.lintstagedrc.json`. Neither had ever run: the root
+  config cannot load, since it imports `@typescript-eslint/*` which exists
+  only under `apps/frontend` and ESLint is not a root dependency at all, and
+  lint-staged needs husky, which is not installed. A safety net that does not
+  exist is worse than none, because it stops you looking for a real one. The
+  gap they appeared to cover is now genuinely covered by `npm run typecheck`.
+
 ## v1.4.0 — Cipher <-> Eidolon link goes live
 
 ### Added
