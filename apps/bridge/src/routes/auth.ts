@@ -139,6 +139,26 @@ function verifyVaultTokenHmac(tokenData: Record<string, unknown>): boolean {
   );
 }
 
+/**
+ * True only when the TCP peer is the loopback interface.
+ *
+ * Deliberately reads request.socket.remoteAddress and NOT request.ip: the app
+ * is built with trustProxy: true (index.ts:59), so request.ip is derived from
+ * X-Forwarded-For and a remote caller can set it to 127.0.0.1 at will. The raw
+ * socket address cannot be forged by a header.
+ *
+ * Node reports IPv4 loopback as "::ffff:127.0.0.1" when the listener is dual
+ * stack, so the mapped form is accepted too. The whole 127.0.0.0/8 block is
+ * loopback, not just 127.0.0.1.
+ */
+function isLoopbackPeer(request: FastifyRequest): boolean {
+  const peer = request.socket?.remoteAddress;
+  if (!peer) return false;
+  const addr = peer.startsWith('::ffff:') ? peer.slice(7) : peer;
+  if (addr === '::1') return true;
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
+}
+
 function buildEidolonBridgeIdentity(vaultId: string) {
   const normalizedVaultId = vaultId.trim().toLowerCase();
   const hash = createHash('sha256').update(normalizedVaultId).digest('hex');
@@ -561,8 +581,25 @@ export async function authRoutes(fastify: FastifyInstance) {
             reply.code(400);
             return { error: 'Invalid PSNX file upload: base64 decode failed' };
           }
-        } else if (localPsnxPath) {
-          // Local bridge fallback: read the file from disk
+        } else if (localPsnxPath && isLoopbackPeer(request)) {
+          // Local bridge only: read the file from the SAME machine's disk.
+          //
+          // This route has no auth guard, only a rate limiter, so on a hosted
+          // bridge this branch was a remote account takeover: an attacker
+          // picks any unbound vaultId, points psnxPath at a file that exists
+          // on the SERVER (its own package.json, say), sends that file's
+          // SHA-256 — computable from the public repo — and the "proof of
+          // possession" passes. The account is created bound to them, and the
+          // real owner is locked out for good, since their genuine hash will
+          // then fail the storedPsnxHash comparison above. The two distinct
+          // 401s below also made it a file-existence oracle.
+          //
+          // Gating on the raw TCP peer keeps the localhost dev bridge working
+          // (the client only sends psnxPath when API_SUPPORTS_LOCAL_PSNX is
+          // true, i.e. the API base URL is localhost) while making the branch
+          // unreachable from anywhere else. request.ip is NOT usable here:
+          // trustProxy is on (index.ts:59), so it derives from
+          // X-Forwarded-For and a remote attacker can forge it.
           if (!clientPsnxHash) {
             reply.code(400);
             return { error: 'Desktop bridge requires psnxHash for vault proof' };
@@ -577,9 +614,19 @@ export async function authRoutes(fastify: FastifyInstance) {
             }
           } catch (fsError: any) {
             request.log.warn({ error: fsError, psnxPath: localPsnxPath }, 'Cannot read PSNX file for desktop bridge');
+            // Same message as the mismatch case on purpose: a distinct error
+            // here would tell a caller whether an arbitrary server path exists.
             reply.code(401);
-            return { error: 'Cannot verify PSNX file — ensure the vault files are accessible' };
+            return { error: 'PSNX file hash mismatch — vault proof failed' };
           }
+        } else if (localPsnxPath) {
+          // Remote caller trying the local-disk path. Never legitimate.
+          request.log.warn(
+            { vaultId: hintedVaultId },
+            'Rejected local-disk PSNX proof from a non-loopback peer',
+          );
+          reply.code(401);
+          return { error: 'Cannot verify PSNX proof — upload the vault file via psnxFileBase64' };
         } else {
           reply.code(401);
           return { error: 'Cannot verify PSNX proof — provide psnxHash + psnxPath (local) or psnxFileBase64 (remote)' };
@@ -590,7 +637,9 @@ export async function authRoutes(fastify: FastifyInstance) {
         resolvedVaultName = typeof request.body.vaultName === 'string' ? request.body.vaultName : undefined;
         resolvedSource = 'desktop_bridge';
         resolvedCreatedAt = new Date().toISOString();
-        resolvedAuthStrength = storedPsnxHash ? 'psnx_hash_proof' : (localPsnxPath ? 'psnx_file_proof' : 'psnx_upload_proof');
+        resolvedAuthStrength = storedPsnxHash
+          ? 'psnx_hash_proof'
+          : (localPsnxPath && isLoopbackPeer(request) ? 'psnx_file_proof' : 'psnx_upload_proof');
       } else {
         reply.code(400);
         return { error: 'vaultId or connectSessionId is required' };

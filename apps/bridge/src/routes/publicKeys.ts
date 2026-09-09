@@ -76,30 +76,27 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
         // Get public keys from database
         const publicKeys = await getDB().getPublicKeysByUserIds(userIds);
 
-        // Diagnostic: log which users came back with NULL sign_public_key —
-        // those are the accounts that will trigger "peer signPublicKey
-        // unavailable" on the call-signature verification path.
-        const missing = (publicKeys as any[])
-          .filter((k) => !k.sign_public_key)
-          .map((k) => `${k.username}(${k.user_id})`);
-        if (missing.length > 0) {
-          console.warn('[PublicKeys] sign_public_key NULL for:', missing.join(', '));
+        // Diagnostic: how many of the requested accounts have no
+        // sign_public_key — those are the ones that will trigger "peer
+        // signPublicKey unavailable" on the call-signature path.
+        //
+        // The count only, never the names: emitting the usernames of the
+        // accounts a given caller asked about rebuilds the same social graph
+        // the block below exists to protect. Query the database directly when
+        // you need to know WHICH accounts are affected.
+        const missingCount = (publicKeys as any[]).filter((k) => !k.sign_public_key).length;
+        if (missingCount > 0) {
+          request.log.warn({ missingCount }, 'accounts without sign_public_key');
         }
 
-        // Diagnostic: dump prefixes of returned keys so we can compare with
-        // what the calling client claims to be signing with. This is what we
-        // need to debug the "verify rejected" calls path.
-        console.log('[PublicKeys] POST /users/public-keys returning', {
-          requestedBy: (request.user as any)?.sub,
-          requestedUserIds: userIds,
-          returned: (publicKeys as any[]).map((k) => ({
-            userId: k.user_id,
-            username: k.username,
-            publicKeyPrefix: k.public_key ? String(k.public_key).slice(0, 12) : null,
-            signPublicKeyPrefix: k.sign_public_key ? String(k.sign_public_key).slice(0, 12) : null,
-            signPublicKeyLen: k.sign_public_key ? String(k.sign_public_key).length : 0,
-          })),
-        });
+        // Deliberately NOT logging requestedBy / requestedUserIds.
+        // Public keys are not secret, but the PAIRING of who asked for whose
+        // key is the social graph. Anyone with access to application logs (an
+        // aggregator, a backup, an attacker with no database credentials)
+        // could reconstruct who talks to whom and when, on a product sold on
+        // zero-knowledge. A count carries the diagnostic value without the
+        // identities.
+        request.log.debug({ returned: (publicKeys as any[]).length }, 'public keys served');
 
         // Return keys
         return {
@@ -175,7 +172,6 @@ export default async function publicKeysRoutes(fastify: FastifyInstance) {
       preHandler: fastify.authenticate,
     },
     async (request: FastifyRequest<GetConversationMembersRequest>, reply: FastifyReply) => {
-      console.log('[PublicKeys] GET /conversations/:id/members called for:', request.params.id);
       try {
         const userId = (request.user as any).sub;
         const conversationId = request.params.id;
