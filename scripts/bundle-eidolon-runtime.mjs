@@ -39,7 +39,18 @@ const SKIP_DIR_NAMES = new Set([
   'test',
 ]);
 
-const VENV_REQUIREMENTS = ['numpy>=1.24.0', 'cryptography>=41.0.0'];
+// pqcrypto is PINNED, not floated. 1.0.0 renamed the whole API surface:
+// mceliece6960119 / falcon_512 / sphincs_sha2_256f_simple no longer exist,
+// and hqc_256 moved from generate_keypair/encrypt/decrypt to keygen/encaps/
+// decaps. Eidolon's real_post_quantum.py calls the 0.x API, so an unpinned
+// install resolves to 1.0.0, the import fails, the try/except swallows it and
+// the ceremony silently falls back to "Post-quantum disabled" — the exact
+// state this pin exists to fix. 0.3.4 ships cp311 wheels for win_amd64 and
+// manylinux_2_17_x86_64, matching the bundled CPython and both CI runners.
+//
+// Note the coupling: these wheels are cp311-specific (unlike eidolon_crypto's
+// abi3). Moving PBS_PYTHON_VERSION off 3.11 requires re-checking this pin.
+const VENV_REQUIREMENTS = ['numpy>=1.24.0', 'cryptography>=41.0.0', 'pqcrypto==0.3.4'];
 
 // eidolon_crypto is the Rust native extension. Without it the ceremony walks
 // all the way to phase 8 and then dies writing the .psnx:
@@ -230,7 +241,12 @@ async function createBundledPython() {
       'import os, sys',
       'import numpy, cryptography, eidolon_crypto',
       'assert os.__file__.startswith(sys.prefix), "stdlib outside bundle: " + os.__file__',
-      'print("self-contained", sys.version.split()[0], "numpy", numpy.__version__)',
+      // Ask Eidolon itself whether PQ is live, rather than trusting that the
+      // pinned wheel still exposes the module names its 0.x API expects. This
+      // is what catches a pqcrypto that installs but no longer integrates.
+      'from src.crypto.real_post_quantum import check_pqcrypto_available',
+      'assert check_pqcrypto_available(), "pqcrypto installed but not usable by Eidolon"',
+      'print("self-contained", sys.version.split()[0], "numpy", numpy.__version__, "pq ok")',
     ].join(String.fromCharCode(10)) + String.fromCharCode(10),
     'utf8',
   );
