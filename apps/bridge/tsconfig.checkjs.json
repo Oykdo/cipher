@@ -1,0 +1,11 @@
+{
+  "//": "Type-checks the JavaScript under src/ that the build already compiles but never checks. Extends the build config and turns checkJs ON, but noImplicitAny OFF: with it on, database.js alone yields 133 TS7006 'parameter implicitly has an any type' errors, which is annotation busywork. With it off, 5 errors remain and every one of them is a real finding. Run: npm run typecheck:js",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "checkJs": true,
+    "noImplicitAny": false,
+    "noEmit": true
+  },
+  "include": ["src/**/*.js"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/__tests__"]
+}

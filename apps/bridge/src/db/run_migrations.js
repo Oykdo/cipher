@@ -57,7 +57,7 @@ async function runMigrations() {
                 await pool.query(sql);
 
                 console.log(`✅ ${migrationFile} applied successfully\n`);
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 console.error(`❌ Failed to apply ${migrationFile}:`);
                 console.error(error.message);
 

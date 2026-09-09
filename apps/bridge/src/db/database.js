@@ -274,6 +274,7 @@ class DatabaseService {
     }
 
     async searchUsers(query, currentUserId = null, limit = 10) {
+        /** @type {any[]} — mixes a string pattern with a numeric LIMIT */
         const params = [`%${query.toLowerCase()}%`];
         let sql = `
             SELECT id, username, security_tier 
@@ -687,7 +688,7 @@ class DatabaseService {
                 await this.purgeZeroRetentionDeliveredMessagesForConversation(conversationId);
             }
             return promotedCount;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.warn(
                 '[Database] markMessagesDeliveredFor failed:',
                 error?.message || error
@@ -1245,7 +1246,7 @@ class DatabaseService {
                 databasePath: this.getDatabasePath()
             };
         }
-        catch (error) {
+        catch (/** @type {any} */ error) {
             console.error('[Database] Failed to get stats:', error);
             return {
                 users: 0,

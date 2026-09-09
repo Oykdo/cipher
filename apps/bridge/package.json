@@ -19,7 +19,8 @@
     "db:migrate:baseline": "node scripts/migrate.mjs baseline",
     "db:migrate:groups": "node scripts/run-migration-007.js",
     "db:migrate:fix-group-type": "node scripts/run-migration-008.js",
-    "db:migrate:retention-policy": "node scripts/run-migration-009.js"
+    "db:migrate:retention-policy": "node scripts/run-migration-009.js",
+    "typecheck:js": "tsc -p tsconfig.checkjs.json"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

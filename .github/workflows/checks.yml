@@ -1,0 +1,96 @@
+name: checks
+
+# release.yml was the only workflow that existed, and it only fires on a
+# `v*` tag. The first time CI read this code, it was already building the
+# signed installer. This one runs on every pull request and every push to
+# master, so a defect is caught before it can become a release.
+#
+# Every step below exits 0 on the current tree. Nothing aspirational is
+# listed: a job that is red for reasons unrelated to the change is a job
+# people learn to ignore.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            apps/bridge/package-lock.json
+            apps/frontend/package-lock.json
+
+      - name: Install root deps
+        run: npm ci
+
+      # main.js, preload.cjs and scripts/ are matched by no other checker:
+      # eslint.config.js only covers **/*.ts and **/*.tsx, and no tsconfig
+      # reached this level. This is the check that catches code which parses
+      # but cannot run — an async IIFE that is declared and never invoked,
+      # a method that does not exist on the value it is called on.
+      - name: Typecheck main process, preload and build scripts
+        run: npm run typecheck
+
+      - name: Install bridge deps
+        run: npm ci
+        working-directory: apps/bridge
+
+      - name: Typecheck bridge (TypeScript)
+        run: npx tsc --noEmit
+        working-directory: apps/bridge
+
+      # src/db/*.js is compiled and emitted by the build with allowJs but
+      # checkJs off, so 1500 lines of the database layer went through the
+      # compiler with type checking explicitly disabled. This config turns
+      # it on, minus noImplicitAny, which alone would report 133 annotation
+      # errors and drown the five real findings.
+      - name: Typecheck bridge (JavaScript)
+        run: npm run typecheck:js
+        working-directory: apps/bridge
+
+      - name: Bridge tests
+        run: npm test
+        working-directory: apps/bridge
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: apps/frontend
+
+      - name: Typecheck frontend
+        run: npx tsc --noEmit
+        working-directory: apps/frontend
+
+      # DELIBERATELY ABSENT: the frontend test suite.
+      #
+      # `npx vitest run` exits 1 on this tree even though every test that
+      # runs passes (174 of 203, 13 files of 15). The failure is
+      # "[vitest-pool-runner]: Timeout waiting for worker to respond" during
+      # teardown, plus two files that never execute. That is an
+      # infrastructure fault, not a code fault, and wiring it in now would
+      # make this workflow permanently red.
+      #
+      # Fix the pool teardown, confirm `npx vitest run` exits 0, then add:
+      #   - name: Frontend tests
+      #     run: npx vitest run
+      #     working-directory: apps/frontend
+      # Note `npm test` there is bare `vitest`, i.e. watch mode: it would
+      # hang the runner until the job times out. It must be `vitest run`.
