@@ -20,6 +20,8 @@ declare module '@fastify/jwt' {
   interface FastifyJWT {
     payload: {
       sub: string;
+      // Optionnel : les tokens emis avant l'ajout de ce claim n'en portent pas.
+      username?: string;
       tier: string;
       b?: string;
       B?: string;
@@ -28,6 +30,7 @@ declare module '@fastify/jwt' {
     };
     user: {
       sub: string;
+      username?: string;
       tier: string;
       b?: string;
       B?: string;

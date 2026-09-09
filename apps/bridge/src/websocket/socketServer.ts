@@ -192,9 +192,17 @@ export function setupSocketServer(httpServer: HTTPServer, fastify: FastifyInstan
         return next(new Error('Invalid token'));
       }
 
-      // Attachement des infos utilisateur au socket
+      // Attachement des infos utilisateur au socket.
+      // Les tokens emis avant l'ajout du claim `username` n'en portent pas :
+      // on retombe sur la base plutot que sur 'Unknown', sinon le relais des
+      // handshakes X3DH et la presence perdent l'identite de l'expediteur.
       socket.userId = payload.sub;
-      socket.username = payload.username || 'Unknown';
+      socket.username =
+        payload.username || (await db.getUserById(payload.sub))?.username;
+
+      if (!socket.username) {
+        return next(new Error('Invalid token'));
+      }
 
       fastify.log.info({
         socketId: socket.id,

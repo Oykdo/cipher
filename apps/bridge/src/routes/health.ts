@@ -109,7 +109,11 @@ export async function healthRoutes(fastify: FastifyInstance) {
       return { error: 'Utilisateur introuvable' };
     }
 
-    const token = await reply.jwtSign({ sub: user.id, tier: user.security_tier });
+    const token = await reply.jwtSign({
+      sub: user.id,
+      username: user.username,
+      tier: user.security_tier,
+    });
     const userAgent = request.headers['user-agent'];
     const ipAddress = request.ip;
     const { token: refreshToken } = await createRefreshToken(user.id, userAgent, ipAddress);

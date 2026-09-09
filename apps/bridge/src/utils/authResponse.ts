@@ -7,7 +7,14 @@ export async function generateAuthResponse(
     user: any,
     extraData: Record<string, any> = {}
 ) {
-    const token = await reply.jwtSign({ sub: user.id, tier: user.security_tier });
+    // `username` est indispensable au middleware WebSocket : sans ce claim il
+    // retombe sur 'Unknown' et les messages relayes (handshake X3DH, presence)
+    // perdent l'identite de l'expediteur.
+    const token = await reply.jwtSign({
+        sub: user.id,
+        username: user.username,
+        tier: user.security_tier,
+    });
     const userAgent = request.headers['user-agent'];
     const ipAddress = request.ip;
     const { token: refreshToken } = await createRefreshToken(user.id, userAgent, ipAddress);
