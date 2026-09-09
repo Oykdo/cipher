@@ -491,9 +491,16 @@ export async function handleHandshakeInit(
   // Generate ephemeral key pair for the response
   const ephemeralKeyPair = generateX25519KeyPair();
   
-  // Initialize Double Ratchet as Bob
-  // Bob uses the shared secret and his identity key
-  const ratchetState = initializeBob(sharedSecret, myIdentityPrivateKey, peerUsername);
+  // Initialize Double Ratchet as Bob.
+  // Bob's initial ratchet key pair MUST be his signed pre-key pair: that is
+  // the public key the initiator ratchets against (see handleHandshakeAck,
+  // which passes `peerSignedPreKey` to initializeAlice). Seeding it with the
+  // identity key instead made both sides derive different root keys, so every
+  // Double Ratchet message failed with "ciphertext cannot be decrypted using
+  // that key" and sessions silently fell back to NaCl box. This restores the
+  // pairing asserted by the e2ee tests (Alice gets bobSPK.publicKey, Bob gets
+  // bobSPK.privateKey).
+  const ratchetState = initializeBob(sharedSecret, localKeyBundle.signedPreKey.privateKey, peerUsername);
   
   // Create ACK message with same sessionId as INIT
   const ackMessage = createHandshakeAck(initMessage.sessionId, ephemeralKeyPair.publicKey, initMessage.nonce);
