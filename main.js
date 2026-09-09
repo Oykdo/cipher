@@ -978,15 +978,32 @@ function resolveEidolonPython() {
     return process.env.EIDOLON_PYTHON;
   }
 
-  // Prefer the bundled venv Python (ships with numpy + cryptography so the
-  // keybundle CLI doesn't depend on the user having them installed globally).
+  // Preferred: the self-contained CPython staged by
+  // scripts/bundle-eidolon-runtime.mjs (python-build-standalone + numpy,
+  // cryptography, eidolon_crypto). It carries its own stdlib, so the ceremony
+  // runs on a machine with no Python installed at all.
+  for (const root of getEidolonRootCandidates()) {
+    const bundled = process.platform === 'win32'
+      ? path.join(root, 'python', 'python.exe')
+      : path.join(root, 'python', 'bin', 'python3');
+    if (existsSync(bundled)) return bundled;
+  }
+
+  // Legacy fallback: a `python -m venv` tree staged by older builds.
+  //
+  // Existing on disk is not enough: a venv created by `python -m venv` keeps
+  // only site-packages and points `pyvenv.cfg home` at the BUILD machine's
+  // interpreter, so its stdlib is missing on a user's machine. Such a venv
+  // must lose to a working system Python instead of silently winning and
+  // failing later inside the ceremony.
   for (const root of getEidolonRootCandidates()) {
     const venvPython = process.platform === 'win32'
       ? path.join(root, 'venv', 'Scripts', 'python.exe')
       : path.join(root, 'venv', 'bin', 'python');
-    if (existsSync(venvPython)) {
-      return venvPython;
-    }
+    if (!existsSync(venvPython)) continue;
+    const probe = spawnSync(venvPython, ['-c', 'import os, sys'], { timeout: 15000 });
+    if (probe.status === 0) return venvPython;
+    console.warn('[eidolon] Ignoring non-functional bundled venv at', venvPython);
   }
 
   if (process.platform !== 'win32') {
@@ -1252,6 +1269,149 @@ function getAllowedPsnxPaths() {
   }
   return allowed;
 }
+
+// --- Genesis ceremony (local Eidolon Python CLI) -----------------------------
+// The ceremony mints the user's master seed and writes the .psnx/.blend vault
+// files on THIS machine. It must never run server-side: the bridge's
+// /api/v2/auth/genesis-stream route exists for localhost dev only, and the
+// hosted bridge has no Python (`spawn python3 ENOENT`). Packaged Cipher loads
+// from file://, so an EventSource on a root-relative URL would resolve to
+// file:///api/... and never leave the renderer. Both problems disappear by
+// spawning the CLI here and streaming its JSON lines over IPC.
+//
+// Mirrors the SSE contract of apps/bridge/src/routes/genesis.ts so
+// GenesisAnimation can consume either transport unchanged:
+//   'phase' -> one JSON object per ceremony phase / progress tick
+//   'log'   -> non-JSON stdout line
+//   'done'  -> exit 0
+//   'error' -> spawn failure or non-zero exit (with stderr tail)
+const GENESIS_CLI_REL = path.join('src', 'crypto', 'vault_auto_provision.py');
+const GENESIS_NAME_REGEX = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,63}$/;
+const genesisRuns = new Map();
+let genesisSeq = 0;
+
+async function resolveGenesisRoot() {
+  const root = await resolveEidolonRoot();
+  if (!root) return null;
+  return existsSync(path.join(root, GENESIS_CLI_REL)) ? root : null;
+}
+
+function stopGenesisRun(runId) {
+  const run = genesisRuns.get(runId);
+  if (!run) return false;
+  genesisRuns.delete(runId);
+  try {
+    if (!run.child.killed) run.child.kill('SIGTERM');
+  } catch {
+    // already gone
+  }
+  return true;
+}
+
+async function startGenesisCeremony(event, rawName) {
+  const name = String(rawName ?? '').trim();
+  if (!GENESIS_NAME_REGEX.test(name)) {
+    return {
+      ok: false,
+      error: 'invalid_name',
+      message: 'name must be 1-64 chars, alnum + space/underscore/dash',
+    };
+  }
+
+  const eidolonRoot = await resolveGenesisRoot();
+  if (!eidolonRoot) {
+    return {
+      ok: false,
+      error: 'eidolon_missing',
+      message:
+        "Runtime Eidolon introuvable (src/crypto/vault_auto_provision.py). " +
+        "Réinstallez Cipher, ou définissez EIDOLON_ROOT vers un checkout Eidolon complet.",
+    };
+  }
+
+  const python = resolveEidolonPython();
+  const dataDir = getEidolonDataDir();
+  const runId = `genesis-${++genesisSeq}`;
+  const sender = event.sender;
+
+  let child;
+  try {
+    child = spawn(python, ['-m', 'src.crypto.vault_auto_provision', '--name', name, '--json'], {
+      cwd: eidolonRoot,
+      env: {
+        ...process.env,
+        PYTHONUNBUFFERED: '1',
+        EIDOLON_ROOT: eidolonRoot,
+        ...(dataDir ? { EIDOLON_DATA_DIR: dataDir } : {}),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (err) {
+    return { ok: false, error: 'spawn_failed', message: String(err?.message || err) };
+  }
+
+  genesisRuns.set(runId, { child, sender });
+
+  const emit = (kind, payload) => {
+    if (sender.isDestroyed()) return;
+    sender.send('genesis:event', { runId, event: kind, data: payload });
+  };
+
+  emit('hello', { ceremony: 'genesis', name, started_at: new Date().toISOString() });
+
+  let stdoutBuf = '';
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (chunk) => {
+    stdoutBuf += chunk;
+    let nl;
+    while ((nl = stdoutBuf.indexOf('\n')) >= 0) {
+      const line = stdoutBuf.slice(0, nl).trim();
+      stdoutBuf = stdoutBuf.slice(nl + 1);
+      if (!line) continue;
+      try {
+        emit('phase', JSON.parse(line));
+      } catch {
+        emit('log', { line });
+      }
+    }
+  });
+
+  let stderrBuf = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk) => {
+    stderrBuf += chunk;
+  });
+
+  child.on('error', (err) => {
+    genesisRuns.delete(runId);
+    emit('error', { message: err.message });
+  });
+
+  child.on('close', (code) => {
+    genesisRuns.delete(runId);
+    if (code === 0) {
+      emit('done', { code });
+    } else {
+      emit('error', { code, stderr: stderrBuf.slice(-2000) });
+    }
+  });
+
+  // The ceremony writes vault files; a reload or window close must not leave
+  // an orphaned Python process holding the keys directory.
+  sender.once('destroyed', () => stopGenesisRun(runId));
+
+  return { ok: true, runId };
+}
+
+ipcMain.handle('genesis:start', async (event, name) => {
+  requireTrustedRenderer(event);
+  return startGenesisCeremony(event, name);
+});
+
+ipcMain.handle('genesis:cancel', async (event, runId) => {
+  requireTrustedRenderer(event);
+  return { ok: stopGenesisRun(String(runId || '')) };
+});
 
 ipcMain.handle('vault-bridge:get-context', async (event) => {
   requireTrustedRenderer(event);

@@ -39,6 +39,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The Genesis ceremony runs locally on the user's machine (it mints the
+      # master seed — it must never run server-side). bundle-eidolon-runtime
+      # stages Eidolon's Python tree + deps into assets/eidolon-runtime, which
+      # electron-builder ships as extraResources. Public repo, no token needed.
+      - name: Checkout Eidolon (ceremony runtime source)
+        uses: actions/checkout@v4
+        with:
+          repository: Oykdo/Eidolon
+          path: eidolon-src
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -61,6 +75,13 @@ jobs:
 
       - name: Build frontend + bridge
         run: npm run build:all
+
+      # Fails the job if the ceremony runtime is incomplete — better a red
+      # build than an installer that cannot create an account.
+      - name: Bundle Eidolon ceremony runtime
+        run: npm run bundle:eidolon
+        env:
+          EIDOLON_ROOT: ${{ github.workspace }}/eidolon-src
 
       # Always build with --publish never. The release upload is done in
       # the separate "Publish to GitHub Release" step below so the Windows
@@ -124,6 +145,14 @@ jobs:
           ./"$APPIMAGE" --appimage-extract > /dev/null
           test -f squashfs-root/AppRun
           echo "✓ AppImage extracts cleanly and contains AppRun"
+          # The ceremony entry point must be inside the bundle, or signup
+          # dies at the Genesis screen on a machine with no Eidolon checkout.
+          CEREMONY=squashfs-root/resources/Eidolon/src/crypto/vault_auto_provision.py
+          if [ ! -f "$CEREMONY" ]; then
+            echo "::error::Ceremony runtime missing from AppImage ($CEREMONY)"
+            exit 1
+          fi
+          echo "✓ Genesis ceremony runtime present in bundle"
 
       # Generate a per-platform SHA256SUMS.txt next to the binaries so a
       # tester can verify their download with `sha256sum -c SHA256SUMS.txt`

@@ -43,6 +43,22 @@ type EidolonVaultMetricsResult = {
   };
 };
 
+/**
+ * Genesis ceremony IPC. The ceremony mints the master seed and writes the
+ * vault files locally, so it runs as a child process of the main process —
+ * never against a remote endpoint. Event kinds mirror the SSE contract of
+ * apps/bridge/src/routes/genesis.ts.
+ */
+type GenesisStartResult =
+  | { ok: true; runId: string }
+  | { ok: false; error: string; message?: string };
+
+type GenesisStreamEvent = {
+  runId: string;
+  event: 'hello' | 'phase' | 'log' | 'done' | 'error';
+  data: Record<string, unknown>;
+};
+
 type SelectPsnxResult =
   | { ok: true; psnxPath: string; psnxHash: string }
   | { ok: false; error: string };
@@ -62,6 +78,11 @@ declare global {
       ) => Promise<EidolonVaultMetricsResult>;
       selectPsnxFile?: () => Promise<SelectPsnxResult>;
       readPsnxFile?: (psnxPath: string) => Promise<ReadPsnxResult>;
+      genesis?: {
+        start: (name: string) => Promise<GenesisStartResult>;
+        cancel: (runId: string) => Promise<{ ok: boolean }>;
+        onEvent: (callback: (payload: GenesisStreamEvent) => void) => () => void;
+      };
       probeEidolonConnect?: (payload: {
         baseUrl?: string;
         appId?: string;

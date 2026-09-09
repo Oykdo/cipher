@@ -17,6 +17,21 @@ contextBridge.exposeInMainWorld('electron', {
   // cannot access the user's Eidolon vault files.
   importVaultKeybundle: (bytes) => ipcRenderer.invoke('keybundle:import', bytes),
   exportVaultKeybundle: (vaultId) => ipcRenderer.invoke('keybundle:export', vaultId),
+
+  // Genesis ceremony. Runs the Eidolon CLI locally and streams its phase
+  // events back — the master seed and vault files are minted on this machine
+  // and never touch a server. `start` resolves with { ok, runId } once the
+  // process is spawned; phases arrive through the `onEvent` callback until
+  // 'done' or 'error'. Returns an unsubscribe function.
+  genesis: {
+    start: (name) => ipcRenderer.invoke('genesis:start', name),
+    cancel: (runId) => ipcRenderer.invoke('genesis:cancel', runId),
+    onEvent: (callback) => {
+      const wrapped = (_event, payload) => callback(payload);
+      ipcRenderer.on('genesis:event', wrapped);
+      return () => ipcRenderer.removeListener('genesis:event', wrapped);
+    },
+  },
   openStripeCheckout: (url) => ipcRenderer.invoke('stripe:open-checkout', url),
 
   // System power-resume signal. Fires after the OS wakes from sleep so

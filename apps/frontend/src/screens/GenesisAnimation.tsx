@@ -31,6 +31,8 @@ type AwakeningPayload = {
   anchor_url?: string | null;
 };
 
+type GenesisApi = NonNullable<NonNullable<Window['electron']>['genesis']>;
+
 type CeremonyState =
   | { kind: 'idle' }
   | { kind: 'running'; startedAt: number }
@@ -81,19 +83,90 @@ export default function GenesisAnimation() {
   const [awakeningPayload, setAwakeningPayload] = useState<AwakeningPayload | null>(null);
   const [exportState, setExportState] = useState<'idle' | 'downloading' | 'ok' | 'error'>('idle');
   const [exportMessage, setExportMessage] = useState('');
-  const sourceRef = useRef<EventSource | null>(null);
+  /**
+   * Tear-down for whichever transport is currently driving the ceremony
+   * (IPC subscription in Electron, EventSource in the browser).
+   */
+  const stopRef = useRef<(() => void) | null>(null);
 
   useEffect(() => () => {
-    sourceRef.current?.close();
+    stopRef.current?.();
+    stopRef.current = null;
   }, []);
 
-  const startCeremony = () => {
-    sourceRef.current?.close();
-    setState({ kind: 'running', startedAt: Date.now() });
-    setCurrentPhase(null);
-    setFinalPayload(null);
-    setAwakeningPayload(null);
+  const handlePhase = (data: PhaseEvent) => {
+    if (data.phase === -1 || data.label === 'ERROR') {
+      const errMeta = data.metadata as { error?: string } | undefined;
+      setState({ kind: 'error', message: errMeta?.error ?? t('genesis.generation_failed') });
+      return;
+    }
+    setCurrentPhase(data);
+    if (data.phase === 9 && data.label === 'HOLOGRAPHIC_CERTIFICATE') {
+      setFinalPayload(data.metadata);
+    }
+    if (data.phase === 10 && data.label === 'GENESIS_AWAKENING') {
+      setAwakeningPayload(data.metadata as AwakeningPayload);
+    }
+  };
 
+  /** Settle the ceremony and release the transport. */
+  const finish = (next: CeremonyState) => {
+    stopRef.current?.();
+    stopRef.current = null;
+    setState(next);
+  };
+
+  /**
+   * Electron path. The ceremony mints the master seed and writes the .psnx /
+   * .blend vault files, so it runs as a local Python child process driven by
+   * main.js. It must never be a remote call: the hosted bridge has no Python
+   * (`spawn python3 ENOENT`), and shipping the seed to a server would break
+   * the guarantee that no private key ever leaves the device.
+   */
+  const startViaIpc = async (genesis: GenesisApi) => {
+    let runId: string | null = null;
+
+    // Subscribe before spawning so no phase emitted during start-up is lost.
+    const unsubscribe = genesis.onEvent((payload) => {
+      if (runId && payload.runId !== runId) return;
+      if (payload.event === 'phase') {
+        handlePhase(payload.data as unknown as PhaseEvent);
+      } else if (payload.event === 'done') {
+        finish({ kind: 'done', finishedAt: Date.now() });
+      } else if (payload.event === 'error') {
+        const data = payload.data as { stderr?: string; message?: string; code?: number };
+        finish({
+          kind: 'error',
+          message:
+            data.stderr?.trim() ||
+            data.message ||
+            (data.code !== undefined ? `exit ${data.code}` : t('genesis.stream_generic_error')),
+        });
+      }
+    });
+
+    stopRef.current = () => {
+      unsubscribe();
+      if (runId) void genesis.cancel(runId);
+    };
+
+    const started = await genesis.start(name);
+    if (!started.ok) {
+      finish({
+        kind: 'error',
+        message: started.message || started.error || t('genesis.stream_generic_error'),
+      });
+      return;
+    }
+    runId = started.runId;
+  };
+
+  /**
+   * Browser path (dev via the Vite /api proxy, hosted web via same-origin).
+   * Kept relative on purpose — the packaged app never reaches this branch,
+   * where a root-relative URL would resolve against file://.
+   */
+  const startViaEventSource = () => {
     const url = `/api/v2/auth/genesis-stream?name=${encodeURIComponent(name)}`;
     let src: EventSource;
     try {
@@ -102,32 +175,18 @@ export default function GenesisAnimation() {
       setState({ kind: 'error', message: `${t('genesis.stream_open_error')} ${String(err)}` });
       return;
     }
-    sourceRef.current = src;
+    stopRef.current = () => src.close();
 
     src.addEventListener('phase', (ev) => {
       try {
-        const data = JSON.parse((ev as MessageEvent).data) as PhaseEvent;
-        if (data.phase === -1 || data.label === 'ERROR') {
-          const errMeta = data.metadata as { error?: string } | undefined;
-          setState({ kind: 'error', message: errMeta?.error ?? t('genesis.generation_failed') });
-          return;
-        }
-        setCurrentPhase(data);
-        if (data.phase === 9 && data.label === 'HOLOGRAPHIC_CERTIFICATE') {
-          setFinalPayload(data.metadata);
-        }
-        if (data.phase === 10 && data.label === 'GENESIS_AWAKENING') {
-          setAwakeningPayload(data.metadata as AwakeningPayload);
-        }
+        handlePhase(JSON.parse((ev as MessageEvent).data) as PhaseEvent);
       } catch {
         // ignore malformed events
       }
     });
 
     src.addEventListener('done', () => {
-      src.close();
-      sourceRef.current = null;
-      setState({ kind: 'done', finishedAt: Date.now() });
+      finish({ kind: 'done', finishedAt: Date.now() });
     });
 
     src.addEventListener('error', (ev) => {
@@ -143,10 +202,24 @@ export default function GenesisAnimation() {
       } else if (src.readyState === EventSource.CLOSED) {
         msg = t('genesis.stream_closed_early');
       }
-      setState({ kind: 'error', message: msg });
-      src.close();
-      sourceRef.current = null;
+      finish({ kind: 'error', message: msg });
     });
+  };
+
+  const startCeremony = () => {
+    stopRef.current?.();
+    stopRef.current = null;
+    setState({ kind: 'running', startedAt: Date.now() });
+    setCurrentPhase(null);
+    setFinalPayload(null);
+    setAwakeningPayload(null);
+
+    const genesis = window.electron?.genesis;
+    if (genesis) {
+      void startViaIpc(genesis);
+      return;
+    }
+    startViaEventSource();
   };
 
   const phase = currentPhase?.phase ?? 0;

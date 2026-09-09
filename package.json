@@ -20,8 +20,8 @@
     "build": "npm run build:all && electron-builder",
     "bundle:eidolon": "node scripts/bundle-eidolon-runtime.mjs",
     "build:win": "npm run bundle:eidolon && npm run build:all && electron-builder --win",
-    "build:mac": "npm run build:all && electron-builder --mac",
-    "build:linux": "npm run build:all && electron-builder --linux"
+    "build:mac": "npm run bundle:eidolon && npm run build:all && electron-builder --mac",
+    "build:linux": "npm run bundle:eidolon && npm run build:all && electron-builder --linux"
   },
   "repository": {
     "type": "git",

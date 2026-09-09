@@ -196,3 +196,6 @@ docs/UPDATE_NOTE_*.md
 # the positioning is finalized.
 META_BURN_HANDOVER.md
 META_BURN_VALUE.md
+
+# Portable CPython archives cached by scripts/bundle-eidolon-runtime.mjs
+assets/.python-cache/
