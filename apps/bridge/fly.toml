@@ -17,6 +17,9 @@ kill_timeout = '30s'
   BRIDGE_MESSAGE_TTL_DAYS = '7'
   BRIDGE_PURGE_INTERVAL_MINUTES = '60'
   BRIDGE_SECURITY_EVENT_BUFFER_SIZE = '10000'
+  # Sans ce drapeau, cipherActivityReporter ne demarre pas du tout
+  # (cipherActivityReporter.ts:24) : aucune activite ne remonte vers Eidolon.
+  EIDOLON_ACTIVITY_REPORT_ENABLED = 'true'
   EIDOLON_CONNECT_ENABLED = 'true'
   NODE_ENV = 'production'
   PORT = '4000'
@@ -31,7 +34,10 @@ kill_timeout = '30s'
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 0
+  # Le reporter d'activite est un setInterval en process (4 h par defaut) :
+  # une machine arretee ne declenche aucun timer. Avec min_machines_running = 0
+  # et auto_stop_machines, le rapport ne partait jamais.
+  min_machines_running = 1
   processes = ['app']
 
   [http_service.concurrency]

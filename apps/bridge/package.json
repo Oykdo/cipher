@@ -13,6 +13,10 @@
     "db:check-encryption": "node -e \"import { existsSync } from 'fs'; import { join } from 'path'; const keyPath = join(process.env.BRIDGE_DATA_DIR || './data', '.db.key'); console.log(existsSync(keyPath) ? '✅ Database is encrypted' : '❌ Database is NOT encrypted');\"",
     "db:clear": "node scripts/clear-database.cjs",
     "db:migrate": "node scripts/migrate-conversation-requests.js",
+    "db:status": "node scripts/migrate.mjs status",
+    "db:migrate:up": "node scripts/migrate.mjs up",
+    "db:migrate:plan": "node scripts/migrate.mjs up --dry-run",
+    "db:migrate:baseline": "node scripts/migrate.mjs baseline",
     "db:migrate:groups": "node scripts/run-migration-007.js",
     "db:migrate:fix-group-type": "node scripts/run-migration-008.js",
     "db:migrate:retention-policy": "node scripts/run-migration-009.js"

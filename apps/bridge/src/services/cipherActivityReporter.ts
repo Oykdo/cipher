@@ -201,19 +201,17 @@ export class CipherActivityReporter {
     );
   }
 
-  private canonicalWebhookPayload(metrics: AggregatedMetrics): string {
-    return `{${Object.keys(metrics)
-      .sort()
-      .map((key) => `"${key}": ${JSON.stringify(metrics[key as keyof AggregatedMetrics])}`)
-      .join(', ')}}`;
-  }
-
   private async postToEidolon(metrics: AggregatedMetrics): Promise<void> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     const body = JSON.stringify(metrics);
     if (CIPHER_WEBHOOK_SECRET) {
+      // Eidolon verifies HMAC-SHA256 over the raw request body
+      // (apps/eidolon src/api/cipher_webhook.py::verify_webhook_signature),
+      // so the signature must cover exactly the bytes sent — signing a
+      // re-serialised "canonical" form never matched and every authenticated
+      // call was rejected with 401.
       headers['X-Cipher-Signature'] = `sha256=${createHmac('sha256', CIPHER_WEBHOOK_SECRET)
-        .update(this.canonicalWebhookPayload(metrics))
+        .update(body)
         .digest('hex')}`;
     }
     if (EIDOLON_SECRET) {
@@ -227,6 +225,47 @@ export class CipherActivityReporter {
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
       throw new Error(`Eidolon activity HTTP ${response.status}: ${detail.slice(0, 200)}`);
+    }
+
+    await this.persistVaultState(metrics.vault_id, response);
+  }
+
+  /**
+   * Feeds the economy state returned by Eidolon back into Cipher.
+   *
+   * Without this the loop stays open: `current_resonance` / `current_entropy`
+   * are read from users.last_known_* on every report, so if nothing ever
+   * writes them back, every report claims the vault is at its default 50/0
+   * and the resonance computed by Eidolon never reaches Cipher.
+   */
+  private async persistVaultState(vaultId: string, response: Response): Promise<void> {
+    try {
+      const payload = (await response.json()) as {
+        resonance_after?: number;
+        entropy_after?: number;
+      };
+
+      if (
+        typeof payload.resonance_after !== 'number' ||
+        typeof payload.entropy_after !== 'number'
+      ) {
+        return;
+      }
+
+      await this.db.pool.query(
+        `UPDATE users
+            SET last_known_resonance = $1,
+                last_known_entropy    = $2
+          WHERE linked_vault_id = $3`,
+        [payload.resonance_after, payload.entropy_after, vaultId],
+      );
+    } catch (error) {
+      // A readable response is a bonus, not a requirement: the activity was
+      // already accepted upstream.
+      this.fastify?.log.warn(
+        { err: error, vaultId },
+        'Could not persist Eidolon vault state returned by the webhook',
+      );
     }
   }
 }

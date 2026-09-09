@@ -8,6 +8,7 @@ import { logAuthAction } from '../utils/auditLog.js';
 import { generateAuthResponse } from '../utils/authResponse.js';
 import { UsernameSchema, AvatarHashSchema, UserIdSchema } from '../validation/securitySchemas.js';
 import { buildPsnxEnrollmentPayload, buildPsnxLoginProof } from '../utils/psnxAuth.js';
+import { registerVaultWithEidolon } from '../services/eidolonVaultRegistry.js';
 import { config } from '../config.js';
 
 const db = getDatabase();
@@ -660,6 +661,31 @@ export async function authRoutes(fastify: FastifyInstance) {
             ...(psnxHashToStore ? { psnxHash: psnxHashToStore } : {}),
           },
         });
+
+        // Mirror the link onto users.linked_vault_id. The activity reporter
+        // (services/cipherActivityReporter.ts) selects linked vaults from that
+        // column, not from the settings JSON: until it is written, no user is
+        // ever considered linked and nothing is reported to Eidolon.
+        await db.pool.query(
+          'UPDATE users SET linked_vault_id = $1 WHERE id = $2',
+          [bridgeIdentity.normalizedVaultId, user.id],
+        );
+
+        // Make sure the vault exists in the hosted Eidolon registry. Vaults
+        // created by the local genesis ceremony or the desktop app only live
+        // in that machine's registry, and the tick reads the server's — so
+        // without this the economy never sees them. Non-fatal by design.
+        void registerVaultWithEidolon(
+          {
+            vaultId: bridgeIdentity.normalizedVaultId,
+            vaultName: resolvedVaultName || null,
+            vaultNumber:
+              typeof resolvedVaultNumber === 'number' ? resolvedVaultNumber : null,
+            createdAt: resolvedCreatedAt || null,
+            source: resolvedSource || 'eidolon',
+          },
+          request.log,
+        );
       } catch (settingsError) {
         request.log.warn({ error: settingsError, userId: user.id }, 'Failed to persist Eidolon bridge metadata');
       }
@@ -892,6 +918,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 
       const newAccessToken = await reply.jwtSign({
         sub: user.id,
+        username: user.username,
         tier: user.security_tier,
       });
 
