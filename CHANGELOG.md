@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.4.0 — Cipher <-> Eidolon link goes live
+
+### Added
+
+- **The Cipher <-> Eidolon link is now effective.** A vault-bridge login writes
+  `users.linked_vault_id`, which is the column the activity reporter selects on:
+  until it was written, no user was ever considered linked and nothing reached
+  Eidolon. The reporter is enabled in `fly.toml`
+  (`EIDOLON_ACTIVITY_REPORT_ENABLED`) and reports every 4 hours.
+- **The genesis ceremony ships as a frozen cipher-runtime**, with the Python
+  tree kept as a fallback, and CI now verifies the runtime is staged before
+  packaging.
+
+### Fixed
+
+- **Security: an unauthenticated vault-binding path is closed**, along with two
+  information leaks.
+- **E2EE: Bob's ratchet is seeded with his signed pre-key**, not his identity
+  key.
+- **The username travels in the JWT**, so sockets stop relaying "Unknown".
+- **The genesis ceremony runs locally** instead of against the hosted bridge,
+  and `pqcrypto` is pinned so post-quantum sealing actually runs.
+
+### Changed
+
+- **The bridge machine stays up** (`min_machines_running = 1`). The activity
+  reporter is an in-process `setInterval`: a stopped machine runs no timer, so
+  with autostop and zero minimum the report never left.
+
 ## v1.3.6 — Eidolon endpoints moved to logos-project.xyz
 
 ### Changed
