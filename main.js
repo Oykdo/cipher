@@ -142,6 +142,52 @@ async function resolveEidolonInstaller() {
 
 const KEYBUNDLE_CLI_REL = path.join('scripts', 'public', 'keybundle_cli.py');
 
+// The frozen ceremony runtime, published as an Eidolon release asset. One
+// binary exposing two subcommands, `ceremony` and `keybundle`, so Cipher can
+// ship Genesis without shipping the Eidolon crypto core or a Python tree.
+const CIPHER_RUNTIME_NAME = process.platform === 'win32' ? 'cipher-runtime.exe' : 'cipher-runtime';
+
+let _cipherRuntimeCache;
+
+/**
+ * Absolute path to the frozen runtime, or null when only the legacy Python
+ * tree is available. Resolved once: the answer cannot change while the app is
+ * running, and every ceremony and keybundle call would otherwise re-stat the
+ * same dozen candidate directories.
+ */
+function resolveCipherRuntime() {
+  if (_cipherRuntimeCache !== undefined) return _cipherRuntimeCache;
+
+  const candidates = [];
+  if (process.env.CIPHER_RUNTIME_BIN) candidates.push(process.env.CIPHER_RUNTIME_BIN);
+  // electron-builder extraResources drops it next to the Eidolon tree.
+  if (process.resourcesPath) {
+    candidates.push(path.join(process.resourcesPath, CIPHER_RUNTIME_NAME));
+    candidates.push(path.join(process.resourcesPath, 'Eidolon', CIPHER_RUNTIME_NAME));
+  }
+  for (const root of getEidolonRootCandidates()) {
+    candidates.push(path.join(root, CIPHER_RUNTIME_NAME));
+    // Where the build scripts leave it during development.
+    candidates.push(path.join(root, 'dist-cipher-runtime', CIPHER_RUNTIME_NAME));
+    candidates.push(path.join(root, 'dist-cipher-runtime-linux', CIPHER_RUNTIME_NAME));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      if (candidate && existsSync(candidate)) {
+        _cipherRuntimeCache = path.resolve(candidate);
+        console.log('[eidolon] frozen runtime:', _cipherRuntimeCache);
+        return _cipherRuntimeCache;
+      }
+    } catch {
+      // unreadable candidate, try the next
+    }
+  }
+
+  _cipherRuntimeCache = null;
+  return null;
+}
+
 function getEidolonRootCandidates() {
   const seen = new Set();
   const add = (candidate) => {
@@ -173,13 +219,19 @@ function getEidolonRootCandidates() {
 }
 
 async function resolveEidolonRoot() {
+  // The marker must accept EITHER layout. Gating only on keybundle_cli.py
+  // meant that the day the Python tree is replaced by the frozen binary, this
+  // returns null and the two consumers that never spawn anything — the vault
+  // metrics reader and the vault-bridge context reader — silently degrade to
+  // "Eidolon workspace not found".
   for (const root of getEidolonRootCandidates()) {
-    const cli = path.join(root, KEYBUNDLE_CLI_REL);
-    try {
-      await fs.access(cli);
-      return root;
-    } catch {
-      // try next candidate
+    for (const marker of [KEYBUNDLE_CLI_REL, CIPHER_RUNTIME_NAME]) {
+      try {
+        await fs.access(path.join(root, marker));
+        return root;
+      } catch {
+        // try the next marker, then the next candidate
+      }
     }
   }
   return null;
@@ -961,6 +1013,10 @@ ipcMain.handle('tray.quitNow', () => {
 function getVaultBridgeCandidates() {
   return [
     path.join(app.getPath('userData'), VAULT_BRIDGE_FILE),
+    // The frozen runtime writes the bridge file next to sys._MEIPASS, i.e.
+    // into TMPDIR. None of the source-tree relative candidates below can ever
+    // find it, so the vault context was lost on every frozen ceremony.
+    path.join(os.tmpdir(), VAULT_BRIDGE_FILE),
     path.join(__dirname, '..', VAULT_BRIDGE_FILE),
     path.join(process.cwd(), '..', VAULT_BRIDGE_FILE),
     path.join(process.cwd(), VAULT_BRIDGE_FILE),
@@ -1048,9 +1104,23 @@ async function resolveKeybundleCliScript() {
 
 function getEidolonDataDir() {
   if (process.env.EIDOLON_DATA_DIR) return process.env.EIDOLON_DATA_DIR;
-  const localApp = process.env.LOCALAPPDATA;
-  if (localApp) return path.join(localApp, 'Eidolon');
-  return null;
+
+  // Returning null on Linux and macOS was a hard blocker for the frozen
+  // runtime. The spawn sites drop EIDOLON_DATA_DIR from the child env when
+  // this is null, and config/paths.get_user_data_root() then falls through
+  // LOCALAPPDATA to get_project_root(), which for a frozen binary is
+  // Path(sys.executable).parent — inside the read-only AppImage squashfs or a
+  // root-owned /opt. get_keys_dir() mkdirs there and the ceremony dies before
+  // phase 1.
+  if (process.platform === 'win32') {
+    const localApp = process.env.LOCALAPPDATA;
+    return localApp ? path.join(localApp, 'Eidolon') : path.join(os.homedir(), 'AppData', 'Local', 'Eidolon');
+  }
+  if (process.platform === 'darwin') {
+    return path.join(os.homedir(), 'Library', 'Application Support', 'Eidolon');
+  }
+  const xdg = process.env.XDG_DATA_HOME;
+  return xdg ? path.join(xdg, 'Eidolon') : path.join(os.homedir(), '.local', 'share', 'Eidolon');
 }
 
 function parseKeybundleCliJson(stdout) {
@@ -1067,31 +1137,43 @@ function parseKeybundleCliJson(stdout) {
 
 function runKeybundleCli(args) {
   return new Promise((resolve, reject) => {
-    resolveKeybundleCliScript()
-      .then(async (script) => {
+    (async () => {
+      // Same preference order as the ceremony: frozen binary, then source.
+      const runtime = resolveCipherRuntime();
+      let command;
+      let commandArgs;
+
+      if (runtime) {
+        command = runtime;
+        commandArgs = ['keybundle', ...args];
+      } else {
+        const script = await resolveKeybundleCliScript();
         if (!script) {
           reject(
             new Error(
-              'Eidolon introuvable (keybundle_cli.py). ' +
+              'Eidolon introuvable (ni cipher-runtime, ni keybundle_cli.py). ' +
                 'Rebuild Cipher depuis Chimera (Eidolon à côté de Cipher), ou définissez EIDOLON_ROOT ' +
                 'vers un checkout Eidolon complet, avec Python 3 et eidolon_crypto installés.',
             ),
           );
           return;
         }
-        const eidolonRoot = await resolveEidolonRoot();
-        const python = resolveEidolonPython();
-        const dataDir = getEidolonDataDir();
-        const child = spawn(python, [script, ...args], {
-          cwd: eidolonRoot,
-          env: {
-            ...process.env,
-            PYTHONUNBUFFERED: '1',
-            EIDOLON_ROOT: eidolonRoot,
-            ...(dataDir ? { EIDOLON_DATA_DIR: dataDir } : {}),
-          },
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
+        command = resolveEidolonPython();
+        commandArgs = [script, ...args];
+      }
+
+      const eidolonRoot = await resolveEidolonRoot();
+      const dataDir = getEidolonDataDir();
+      const child = spawn(command, commandArgs, {
+        cwd: runtime ? path.dirname(runtime) : eidolonRoot,
+        env: {
+          ...process.env,
+          PYTHONUNBUFFERED: '1',
+          ...(eidolonRoot ? { EIDOLON_ROOT: eidolonRoot } : {}),
+          ...(dataDir ? { EIDOLON_DATA_DIR: dataDir } : {}),
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
         let stdout = '';
         let stderr = '';
         child.stdout.setEncoding('utf8');
@@ -1100,8 +1182,7 @@ function runKeybundleCli(args) {
         child.stderr.on('data', (d) => { stderr += d; });
         child.on('error', (err) => reject(err));
         child.on('close', (code) => resolve({ stdout, stderr, code: code ?? -1 }));
-      })
-      .catch(reject);
+    })().catch(reject);
   });
 }
 
@@ -1318,30 +1399,43 @@ async function startGenesisCeremony(event, rawName) {
     };
   }
 
-  const eidolonRoot = await resolveGenesisRoot();
-  if (!eidolonRoot) {
+  // Prefer the frozen runtime; fall back to the Python source tree.
+  const runtime = resolveCipherRuntime();
+  const eidolonRoot = runtime ? await resolveEidolonRoot() : await resolveGenesisRoot();
+
+  if (!runtime && !eidolonRoot) {
     return {
       ok: false,
       error: 'eidolon_missing',
       message:
-        "Runtime Eidolon introuvable (src/crypto/vault_auto_provision.py). " +
+        "Runtime Eidolon introuvable (ni cipher-runtime, ni src/crypto/vault_auto_provision.py). " +
         "Réinstallez Cipher, ou définissez EIDOLON_ROOT vers un checkout Eidolon complet.",
     };
   }
 
-  const python = resolveEidolonPython();
   const dataDir = getEidolonDataDir();
   const runId = `genesis-${++genesisSeq}`;
   const sender = event.sender;
 
+  // The frozen binary carries its own interpreter and source, so it needs
+  // neither a source tree as cwd nor EIDOLON_ROOT. It DOES need
+  // EIDOLON_DATA_DIR, which is now non-null on every platform: without it
+  // config/paths falls back to the executable's own directory, unwritable
+  // inside an AppImage.
+  const command = runtime || resolveEidolonPython();
+  const commandArgs = runtime
+    ? ['ceremony', '--name', name, '--json']
+    : ['-m', 'src.crypto.vault_auto_provision', '--name', name, '--json'];
+  const spawnCwd = runtime ? path.dirname(runtime) : eidolonRoot;
+
   let child;
   try {
-    child = spawn(python, ['-m', 'src.crypto.vault_auto_provision', '--name', name, '--json'], {
-      cwd: eidolonRoot,
+    child = spawn(command, commandArgs, {
+      cwd: spawnCwd,
       env: {
         ...process.env,
         PYTHONUNBUFFERED: '1',
-        EIDOLON_ROOT: eidolonRoot,
+        ...(eidolonRoot ? { EIDOLON_ROOT: eidolonRoot } : {}),
         ...(dataDir ? { EIDOLON_DATA_DIR: dataDir } : {}),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
