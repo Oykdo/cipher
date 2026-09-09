@@ -154,21 +154,21 @@ export class CipherActivityReporter {
   ): Promise<AggregatedMetrics> {
     const [sentResult, receivedResult, convResult] = await Promise.all([
       this.db.pool.query(
-        'SELECT COUNT(*)::int AS count FROM messages WHERE sender_id = $1 AND created_at > $2',
+        'SELECT COUNT(*)::int AS count FROM messages WHERE sender_id = $1 AND created_at > to_timestamp($2::double precision / 1000.0)',
         [userId, sinceMs],
       ),
       this.db.pool.query(
         `SELECT COUNT(*)::int AS count
            FROM messages m
            JOIN conversation_members cm ON cm.conversation_id = m.conversation_id
-          WHERE cm.user_id = $1 AND m.sender_id <> $1 AND m.created_at > $2`,
+          WHERE cm.user_id = $1 AND m.sender_id <> $1 AND m.created_at > to_timestamp($2::double precision / 1000.0)`,
         [userId, sinceMs],
       ),
       this.db.pool.query(
         `SELECT COUNT(DISTINCT m.conversation_id)::int AS count
            FROM messages m
            JOIN conversation_members cm ON cm.conversation_id = m.conversation_id
-          WHERE cm.user_id = $1 AND m.created_at > $2`,
+          WHERE cm.user_id = $1 AND m.created_at > to_timestamp($2::double precision / 1000.0)`,
         [userId, sinceMs],
       ),
     ]);
