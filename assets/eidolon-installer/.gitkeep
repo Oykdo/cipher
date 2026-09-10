@@ -1,0 +1,21 @@
+# Dossier volontairement vide, garde-place pour electron-builder.
+#
+# package.json declare `assets/eidolon-installer` en extraResources (vers
+# `eidolon-installer/` dans le paquet). Quand le dossier n'existe pas,
+# electron-builder ecrit a chaque build :
+#
+#     file source doesn't exist  from=...\assets\eidolon-installer
+#
+# Deposer ici un `Eidolon-Setup.exe`, `Eidolon-Installer.exe` ou
+# `Eidolon-Setup.msi` suffit a le faire embarquer : main.js les cherche dans
+# cet ordre (getEidolonInstallerCandidates), d'abord dans les ressources du
+# paquet puis dans ce dossier en developpement.
+#
+# Laisser le dossier vide est un choix valable : openEidolonInstaller()
+# retombe alors sur shell.openExternal(DEFAULT_EIDOLON_DOWNLOAD_URL) et
+# renvoie `status: 'download_opened'`. L'utilisateur telecharge Eidolon au
+# lieu de lancer un installeur embarque.
+#
+# Les binaires deposes ici ne partent pas dans git (.gitignore:171) et ne
+# partent pas non plus dans le paquet en tant que fichier de garde : le
+# filtre `!.gitkeep` de package.json exclut ce fichier-ci.
