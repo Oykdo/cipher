@@ -1,0 +1,35 @@
+{
+  "_comment": "Vecteurs d interop desktop/mobile. Materiel de test uniquement, aucune cle reelle. Genere par src/crypto/e2ee/__tests__/interopVectors.test.ts (CIPHER_UPDATE_VECTORS=1) et duplique a l identique cote desktop.",
+  "version": 1,
+  "seeds": {
+    "alice": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "bob": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+    "bobSignedPreKey": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+    "bobOneTimePreKey": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+    "aliceEphemeral": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5"
+  },
+  "signedPreKeyId": 1,
+  "alice": {
+    "identityPublicKey": "ai8nLZF6swbsCDArRRA0HlYAm4M5dCJS4EKSDH3Z8gQ",
+    "identityPrivateKey": "xMyXnr-eHGGyW9_-ENYhw-83A2EOzCBtSTAqi_phkYo",
+    "identityFingerprint": "FED3 CFE3 D8D1 2C60 BB54 6ECA C7E7 6E93 41D5 33BA DFBB DC6B E69B 22E8 F146 DE95",
+    "signingPublicKey": "pdQqo6n1v6kt6L66GfFFTyCfaLSh7wWO9JiROrwcxZw",
+    "ephemeralPublicKey": "2XiQB69DqMgfhkgJkhz-iPORKO5K7ulC9z-esuJTGBM",
+    "ephemeralPrivateKey": "KZaa5AQ4d8MuDl0fVoEX6vz_PQl0sHM3TEYyCd7M1UA"
+  },
+  "bob": {
+    "identityPublicKey": "wvuSBEybkCNK-vP2619VCPS8ZyTZsTKjsLSiG6LTTgk",
+    "identityPrivateKey": "PI-I0hG8xXlUD3FKJ91GhQvcOzMcD0qWD6jhxZdIHZ0",
+    "identityFingerprint": "68AE 8EC1 34EC FB55 B236 7331 0024 E833 1962 858B 047B 05B1 5E2A AD09 60C5 BA54",
+    "signingPublicKey": "Ut_eJKwL0ZagnLkBufXzuAYMpgw5F8OSF3hEZq1CSuw",
+    "signedPreKeyPublic": "TZEfgYRHlRTQ1Jc6qutLA5R3YJY84SWQUn2Nbl5zUmo",
+    "signedPreKeyPrivate": "mkOBCZttA_ufQos2JQ-r5f9qU7XYB-4u6Fy5h7yI8N8",
+    "signedPreKeySignature": "rg0giWStpPgbfx8oqFon6aiUq6tYtlUGUf8TLDXIqbRYAOgBvTkpRU__VPgGtww06_F6sCs22wMdCwI_MLPbCg",
+    "oneTimePreKeyPublic": "EQBGmMov33z5VPkjAR3sUZ2xvWnL4e5MnOjDcbHhUSo",
+    "oneTimePreKeyPrivate": "II2EDeU4IERkJvHZx-_MAJkP1j3soa0sofkvvc-SfgI"
+  },
+  "x3dh": {
+    "sharedSecretWithOpk": "vQaK-L3r_flsPEBMLiN-AMkU4uYnPDHkxrksRSv0nxc",
+    "sharedSecretWithoutOpk": "yVwImg7cQz3npS_mIVUA9uzkso-tduKmGO5pVwXkp4I"
+  }
+}
