@@ -89,8 +89,12 @@ export const setEidolonConnectUrlOverride = (value: string | null): void => {
 
 export const getEidolonConnectBaseUrl = (): string =>
   getEidolonConnectUrlOverride() || EIDOLON_CONNECT_DEFAULT_BASE_URL;
-export const EIDOLON_CONNECT_SESSION_SECRET =
-  import.meta.env.VITE_EIDOLON_CONNECT_SESSION_SECRET || '';
+// No Eidolon shared secret here, deliberately. The Eidolon API routes that
+// require one — /connect/vault/economy among them — are called by the bridge,
+// which holds the secret server-side (apps/bridge/src/services/
+// eidolonVaultEconomy.ts) and republishes the result under /api/v2/. A VITE_*
+// variable is inlined verbatim into the bundle, readable by anyone who opens
+// the app, so a secret must never be declared here.
 
 // Gate Eidolon Connect integration behind a flag until the Eidolon ecosystem
 // is publicly released. When false, the frontend skips probe/registration
