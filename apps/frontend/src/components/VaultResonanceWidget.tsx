@@ -14,6 +14,13 @@ interface VaultResonanceWidgetProps {
   compact?: boolean;
 }
 
+// One decimal, matching the `{value:.2f}/100` the Eidolon vault summary
+// prints from the same registry field. Rounding to an integer here was the
+// last place the two apps could still disagree about the same number.
+function formatScore(value: number): string {
+  return value.toFixed(1);
+}
+
 function resonanceLabel(value: number): string {
   if (value >= 80) return 'Radiant';
   if (value >= 60) return 'Active';
@@ -54,7 +61,7 @@ export default function VaultResonanceWidget({
       <div className="vault-resonance-widget__metrics">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span className={valueClass(resonance)}>
-            {Math.round(resonance)}
+            {formatScore(resonance)}
           </span>
           <span className="vault-resonance-widget__label">
             {resonanceLabel(resonance)}
@@ -67,7 +74,7 @@ export default function VaultResonanceWidget({
               className="vault-resonance-widget__value"
               style={{ color: entropy > 50 ? 'var(--error-glow)' : 'var(--muted-grey)' }}
             >
-              {Math.round(entropy)}
+              {formatScore(entropy)}
             </span>
             <span className="vault-resonance-widget__label">
               Aura {entropyLabel(entropy)}

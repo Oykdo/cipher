@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { useAuthStore } from '../store/auth';
 
 export interface VaultMetrics {
@@ -14,20 +15,6 @@ export interface VaultMetrics {
   consecutiveActiveEpochs: number;
   rosettaSource: 'streak' | 'spheres' | 'server' | null;
 }
-
-const DEFAULT_METRICS: VaultMetrics = {
-  resonance: 50,
-  entropy: 0,
-  eidolonBalance: 0,
-  holographicDepth: 0,
-  pioneerTier: 'standard',
-  rosettaBonus: false,
-  dailyYield: 0,
-  evolvingSpheres: 0,
-  mythicalOrHigherSpheres: 0,
-  consecutiveActiveEpochs: 0,
-  rosettaSource: null,
-};
 
 // Base yield per tier (EIDOLON tokens/tick)
 // Aligned with PSNX tokenomics (21M supply)
@@ -74,22 +61,39 @@ export function useVaultMetrics(pollIntervalMs = 30_000): VaultMetrics | null {
     let cancelled = false;
 
     const fetchMetrics = async () => {
-      // Production: fetch from VPS API (Eidolon Connect)
+      // Authoritative economy state, proxied by the bridge from Eidolon's
+      // vault registry (GET /api/v2/vault/economy).
+      //
+      // This used to poll the standalone Connect server directly. That server
+      // keeps its own stub economy — resonance nudged +2 per activity ping and
+      // truncated to an int, balance 0, tier "standard" — so Cipher displayed
+      // 51 "Steady" for a vault whose Eidolon summary read 46.70. The registry
+      // is what Eidolon itself shows, and the bridge holds the shared secret
+      // that route requires, which has no place in a renderer bundle.
       try {
-        const connectUrl = import.meta.env.VITE_EIDOLON_CONNECT_URL || 'https://eidolon.logos-project.xyz';
-        const connectSecret = import.meta.env.VITE_EIDOLON_CONNECT_SESSION_SECRET || '';
-        const headers: Record<string, string> = {};
-        if (connectSecret) headers['X-Eidolon-Connect-Secret'] = connectSecret;
-
-        const resp = await fetch(`${connectUrl}/connect/vault/economy/${linkedVault.vaultId}`, { headers });
+        const base = API_BASE_URL.replace(/\/$/, '');
+        const accessToken = useAuthStore.getState().session?.accessToken;
+        const resp = await fetch(
+          `${base}/api/v2/vault/economy?vaultId=${encodeURIComponent(linkedVault.vaultId)}`,
+          { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined },
+        );
         if (resp.ok && !cancelled) {
           const data = await resp.json();
           const tier = linkedVault.vaultNumber
             ? tierFromVaultNumber(linkedVault.vaultNumber)
             : (data.pioneer_tier || 'standard');
-          const resonance = data.resonance_score ?? 50;
-          const entropy = data.operational_entropy ?? 0;
-          // Rosetta (+20% yield) eligibility — comes from the VPS:
+          // The bridge rejects a payload without these two, so a missing
+          // value here means the contract drifted — keep whatever we had
+          // instead of publishing a default dressed up as a reading.
+          if (
+            typeof data.resonance_score !== 'number' ||
+            typeof data.operational_entropy !== 'number'
+          ) {
+            return;
+          }
+          const resonance: number = data.resonance_score;
+          const entropy: number = data.operational_entropy;
+          // Rosetta (+20% yield) eligibility — comes from the server:
           //  - explicit `rosetta_active` flag
           //  - or streak >= 42 active 4h-epochs (7 days)
           //  - or holding >= 10 mythical-or-higher unique spheres
@@ -124,13 +128,12 @@ export function useVaultMetrics(pollIntervalMs = 30_000): VaultMetrics | null {
           return;
         }
       } catch {
-        // VPS unreachable
+        // Bridge unreachable
       }
 
-      // Last resort: defaults
-      if (!cancelled) {
-        setMetrics(DEFAULT_METRICS);
-      }
+      // A failed read leaves the previous value in place, and shows nothing
+      // at all until the first success. Substituting defaults here is what
+      // made an unreadable economy look like a vault sitting at 50.
     };
 
     fetchMetrics();
