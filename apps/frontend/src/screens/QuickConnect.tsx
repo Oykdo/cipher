@@ -51,7 +51,6 @@ import {
 } from '../lib/srpSeed';
 import { getErrorMessage } from '../lib/errors';
 import { readVaultBridgeContext } from '../lib/vaultBridge';
-import { pingVaultActivity } from '../lib/vaultActivity';
 import { EIDOLON_CONNECT_APP_ID } from '../config';
 
 export default function QuickConnect() {
@@ -332,8 +331,6 @@ function UnlockForm({
         refreshToken: data.refreshToken,
       });
 
-      pingVaultActivity(linkedVault?.vaultId);
-
       try { await initializeE2EE(data.user.username); } catch { /* non-blocking */ }
 
       navigate('/conversations');
@@ -554,8 +551,6 @@ function ProvisionForm({
         accessToken: verifyData.accessToken,
         refreshToken: verifyData.refreshToken,
       });
-
-      pingVaultActivity(linkedVault?.vaultId);
 
       try {
         await initializeE2EE(verifyData.user.username);

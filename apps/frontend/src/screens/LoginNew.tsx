@@ -16,7 +16,6 @@ import { API_BASE_URL, API_SUPPORTS_LOCAL_PSNX, EIDOLON_CONNECT_APP_ID, EIDOLON_
 import { saveKnownAccount, clearPasswordCache } from '../lib/localStorage';
 import { createEidolonConnectSession, ensureEidolonConnectRegistration } from '../lib/eidolonConnect';
 import { readVaultBridgeContext, type VaultBridgeContext } from '../lib/vaultBridge';
-import { pingVaultActivity } from '../lib/vaultActivity';
 import { importVaultKeybundle } from '../lib/keybundle';
 import { getErrorMessage } from '../lib/errors';
 import {
@@ -247,8 +246,6 @@ export default function LoginNew() {
         refreshToken: data.refreshToken,
       });
 
-      pingVaultActivity(data.vaultBridge?.vaultId);
-
       saveKnownAccount({
         username: data.user.username,
         securityTier: data.user.securityTier,
@@ -391,7 +388,6 @@ export default function LoginNew() {
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
       });
-      pingVaultActivity(data.vaultBridge?.vaultId);
       saveKnownAccount({
         username: data.user.username,
         securityTier: data.user.securityTier,

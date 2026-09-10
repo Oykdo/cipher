@@ -1,10 +1,11 @@
 /**
  * Cipher Activity Reporter
  *
- * Periodically aggregates each linked-vault user's Cipher activity (messages,
- * conversations, key verifications, realm actions) and POSTs the result to
- * Eidolon's webhook so that the new resonance/yield economy actually receives
- * real usage signals.
+ * Periodically aggregates each linked-vault user's Cipher activity (messages
+ * sent and received, active conversations, files shared) and POSTs the result
+ * to Eidolon's webhook so that the resonance/yield economy actually receives
+ * real usage signals. See aggregateForUser for the signals Cipher cannot
+ * report yet, and why.
  *
  * Wire-up (in bridge/src/index.ts):
  *     import { CipherActivityReporter } from './services/cipherActivityReporter.js';
@@ -152,7 +153,7 @@ export class CipherActivityReporter {
     currentResonance: number,
     currentEntropy: number,
   ): Promise<AggregatedMetrics> {
-    const [sentResult, receivedResult, convResult] = await Promise.all([
+    const [sentResult, receivedResult, convResult, filesResult] = await Promise.all([
       this.db.pool.query(
         'SELECT COUNT(*)::int AS count FROM messages WHERE sender_id = $1 AND created_at > to_timestamp($2::double precision / 1000.0)',
         [userId, sinceMs],
@@ -171,6 +172,10 @@ export class CipherActivityReporter {
           WHERE cm.user_id = $1 AND m.created_at > to_timestamp($2::double precision / 1000.0)`,
         [userId, sinceMs],
       ),
+      this.db.pool.query(
+        'SELECT COUNT(*)::int AS count FROM attachments WHERE uploader_id = $1 AND created_at > to_timestamp($2::double precision / 1000.0)',
+        [userId, sinceMs],
+      ),
     ]);
 
     return {
@@ -178,10 +183,25 @@ export class CipherActivityReporter {
       messages_sent: sentResult.rows[0]?.count ?? 0,
       messages_received: receivedResult.rows[0]?.count ?? 0,
       active_conversations: convResult.rows[0]?.count ?? 0,
+      files_shared: filesResult.rows[0]?.count ?? 0,
+
+      // The four below are 0 because Cipher stores nothing to count, not
+      // because the period was empty. Left explicit so the next reader does
+      // not take them for a wiring oversight:
+      //
+      //   key_verifications  Worth 0.33 apiece upstream — the biggest lever
+      //     short of a sphere hatching, and enough on its own to pull an
+      //     epoch out of its idle decay. The only store is the metadata key
+      //     `trust_star:last_verification_at:<userId>`, which
+      //     services/trust-star.ts reads and nothing anywhere writes.
+      //     Reporting it means first recording verifications: a feature, not
+      //     a query.
+      //   realm_votes / realm_proposals  Realms are an Eidolon concept; this
+      //     schema has no table behind them.
+      //   reactions_sent  Reactions are not persisted at all.
       key_verifications: 0,
       realm_votes: 0,
       realm_proposals: 0,
-      files_shared: 0,
       reactions_sent: 0,
       period_start: periodStart,
       period_end: periodEnd,
@@ -190,6 +210,14 @@ export class CipherActivityReporter {
     };
   }
 
+  /**
+   * Whether the period is worth a POST at all.
+   *
+   * Deliberately mirrors Eidolon's own `CipherActivityMetrics.is_active()`,
+   * which counts neither files nor reactions. A files-only report would be
+   * booked upstream as an inactive epoch and take the same -0.33 as sending
+   * nothing, so files ride along with a report but never trigger one.
+   */
   private hasSignal(m: AggregatedMetrics): boolean {
     return (
       m.messages_sent > 0 ||
