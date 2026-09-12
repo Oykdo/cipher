@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.4.2 — the shipped ceremony runtime gets the machine-lock fix
+
+### Fixed
+
+- **The Genesis ceremony runtime now contains the machine-lock fix.** The
+  `cipher-runtime-20260909` binaries embedded in v1.4.0 and v1.4.1 were built
+  hours before the commit that closes the three holes letting one machine
+  mint unlimited vaults: fail-open when the lock server is unreachable, key
+  generated before the check, client-chosen vault number. The Linux binary
+  also carried `requests`, which turned an unreachable server from a blocking
+  `MISSING_DEPENDENCY` into a silently authorising `CONNECTION_ERROR`. The
+  runtime is rebuilt as `cipher-runtime-20260912` from the private core after
+  that fix, and was verified under confinement on both platforms: refused with
+  no `.psnx` when the lock server is unreachable, one vault registered when it
+  answers, refused again on the second ceremony.
+
+### Added
+
+- **A balance counter in the Conversations header.** It shows the EIDOLON
+  balance of the linked vault next to the resonance orb, from the same
+  `/api/v2/vault/economy` read. It takes the metrics by props, so the screen
+  still polls the bridge once every 30 seconds rather than twice.
+
+### Changed
+
+- **The release workflow executes the ceremony runtime instead of checking it
+  exists.** `cipher-runtime --version` runs on both legs before packaging and
+  again from the extracted AppImage: a glibc floor violation or a truncated
+  download now fails the build instead of the first signup.
+- **The Linux runner is pinned to `ubuntu-24.04`.** `ubuntu-latest` would move
+  to 26.04 one day and silently change what that execution proves.
+- **The `.deb` declares `libc6 (>= 2.35)`**, the measured floor of the runtime,
+  so apt refuses cleanly on an older system rather than the ceremony dying in a
+  loader error. The rest of the dependency list is the one electron-builder
+  already emitted, restated because an explicit `depends` replaces the default
+  instead of extending it.
+
 ## v1.4.1 — the code is checked before it becomes a release
 
 No user-facing change. This release exists so the checks below are the ones
