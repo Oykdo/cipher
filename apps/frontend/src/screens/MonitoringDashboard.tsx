@@ -79,7 +79,7 @@ export default function MonitoringDashboard() {
             </h1>
             <p className="text-slate-400 mt-1">Real-time system observability</p>
           </div>
-          <button onClick={() => window.location.href = '/conversations'} className="cosmic-btn-ghost">
+          <button onClick={() => { window.location.hash = '#/conversations'; }} className="cosmic-btn-ghost">
             Back
           </button>
         </div>

@@ -87,7 +87,7 @@ export default function P2PChat() {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-white text-center">
           <h1 className="text-2xl font-bold mb-4">Please login first</h1>
-          <a href="/login" className="text-brand-400 hover:underline">
+          <a href="#/login" className="text-brand-400 hover:underline">
             Go to login
           </a>
         </div>

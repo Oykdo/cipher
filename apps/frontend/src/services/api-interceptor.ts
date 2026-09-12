@@ -89,8 +89,18 @@ async function refreshAccessToken(): Promise<string> {
     // Si le refresh échoue, déconnecter l'utilisateur
     clearSession();
 
-    // Rediriger vers la page de login
-    window.location.href = '/login';
+    // Rediriger vers la page de login.
+    //
+    // Jamais par un chemin racine-relatif : l'app empaquetée est chargée
+    // depuis file://, où '/login' se résout en file:///C:/login, que
+    // Chromium bloque ("Not allowed to load local resource"). Comme
+    // proactiveTokenRefresh() tourne au démarrage, un refresh token périmé
+    // laissait l'application sur une page morte au lieu de l'écran de
+    // connexion. Le routeur est un HashRouter : la route vit dans le
+    // fragment, valable sous file:// comme sous http://. clearSession()
+    // suffit déjà à faire rediriger App.tsx ; le fragment est la ceinture
+    // pour le cas où aucun composant protégé n'est monté.
+    window.location.hash = '#/login';
 
     throw error;
   }
