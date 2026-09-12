@@ -146,6 +146,36 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
+      # The Linux leg executes the runtime from the extracted AppImage. Until
+      # v1.4.3 nothing exercised the NSIS layer at all: the installer was
+      # published on the strength of electron-builder exiting 0. This installs
+      # it silently into a throwaway directory on the runner, checks what the
+      # installed tree must contain for Genesis to work, runs the frozen
+      # runtime from there, then uninstalls silently and checks the directory
+      # is gone. It runs after signing, so it exercises the signed binary.
+      - name: Smoke test Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Get-ChildItem release -Filter 'Cipher-Setup-*.exe' | Select-Object -First 1
+          if (-not $setup) { Write-Error 'No Cipher-Setup-*.exe in release/' }
+          $dir = Join-Path $env:RUNNER_TEMP 'cipher-smoke'
+          # NSIS: /S is silent, /D=<dir> must be the last argument and unquoted.
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList @('/S', "/D=$dir") -PassThru -Wait
+          if ($p.ExitCode -ne 0) { Write-Error "installer exited $($p.ExitCode)" }
+          foreach ($f in 'Cipher.exe', 'resources\app.asar', 'resources\Eidolon\cipher-runtime.exe', 'Uninstall Cipher.exe') {
+            if (-not (Test-Path (Join-Path $dir $f))) { Write-Error "installed tree lacks $f" }
+          }
+          $v = & (Join-Path $dir 'resources\Eidolon\cipher-runtime.exe') --version
+          if (-not $v) { Write-Error 'installed cipher-runtime.exe --version printed nothing' }
+          Write-Host "installed to $dir, cipher-runtime --version -> $v"
+          $u = Start-Process -FilePath (Join-Path $dir 'Uninstall Cipher.exe') -ArgumentList @('/S') -PassThru -Wait
+          if ($u.ExitCode -ne 0) { Write-Error "uninstaller exited $($u.ExitCode)" }
+          Start-Sleep -Seconds 5
+          if (Test-Path (Join-Path $dir 'Cipher.exe')) { Write-Error 'uninstaller left Cipher.exe behind' }
+          Write-Host 'installer round-trip OK'
+
       - name: Smoke test Linux artifacts
         if: runner.os == 'Linux'
         shell: bash
