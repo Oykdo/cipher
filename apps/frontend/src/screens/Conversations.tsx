@@ -50,6 +50,7 @@ import { base64ToBytes } from '../shared/crypto';
 import { loadPendingBurnAcks, removePendingBurnAck, upsertPendingBurnAck } from '../lib/burn/pendingBurnAcks';
 import { clearKeyCache } from '../lib/encryption';
 import VaultResonanceWidget from '../components/VaultResonanceWidget';
+import EidolonCurrencyCounter from '../components/EidolonCurrencyCounter';
 import { useVaultMetrics } from '../hooks/useVaultMetrics';
 import '../styles/fluidCrypto.css';
 
@@ -1753,6 +1754,10 @@ export default function Conversations() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Solde EIDOLON — mêmes métriques que l'orbe de résonance, un seul poll */}
+            {linkedVault && vaultMetrics && (
+              <EidolonCurrencyCounter metrics={vaultMetrics} />
+            )}
             <button
               onClick={() => navigate('/settings')}
               className="cosmic-btn-ghost p-2 md:px-4 flex items-center"

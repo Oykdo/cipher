@@ -2313,3 +2313,71 @@ body {
   font-weight: var(--font-semibold);
   white-space: nowrap;
 }
+
+/* ============================================================================
+   EIDOLON CURRENCY COUNTER — solde du vault lié, en-tête de Conversations
+   ============================================================================ */
+
+.eidolon-currency-counter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  backdrop-filter: blur(8px);
+  transition: all var(--duration-normal) var(--ease-fluid);
+}
+
+.eidolon-currency-counter:hover {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: var(--cosmic-cyan-glow);
+  box-shadow: 0 0 15px var(--cosmic-cyan-glow);
+}
+
+.eidolon-currency-counter__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cosmic-cyan) 0%, #0080ff 100%);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  animation: eidolon-icon-pulse 3s ease-in-out infinite;
+}
+
+@keyframes eidolon-icon-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px var(--cosmic-cyan-glow);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px var(--cosmic-cyan-glow);
+  }
+}
+
+.eidolon-currency-counter__value {
+  font-family: monospace;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--cosmic-cyan);
+  transition: color var(--duration-fast) var(--ease-fluid);
+}
+
+.eidolon-currency-counter:hover .eidolon-currency-counter__value {
+  color: var(--cosmic-cyan-soft);
+  text-shadow: 0 0 10px var(--cosmic-cyan-glow);
+}
+
+.eidolon-currency-counter__status {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: cosmic-dot-pulse 2s ease-in-out infinite;
+}
