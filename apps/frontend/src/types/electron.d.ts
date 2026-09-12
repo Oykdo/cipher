@@ -67,6 +67,50 @@ type ReadPsnxResult =
   | { ok: true; base64: string; hash: string }
   | { ok: false; error: string };
 
+/**
+ * End-of-ceremony vault file handover (`vault-files:*`). The renderer only
+ * ever names a file kind; every source path is resolved in the main process
+ * and every destination comes from a native dialog. No result carries an
+ * absolute path or file contents — only filename, size and sha256.
+ */
+type VaultFileKind = 'psnx' | 'blend' | 'keybundle';
+
+type VaultFileInfo = {
+  kind: VaultFileKind;
+  filename: string;
+  size: number;
+  sha256: string;
+};
+
+type VaultFileSkipped = {
+  kind: VaultFileKind;
+  filename: string;
+  reason: 'exists' | 'missing' | 'copy_failed';
+};
+
+type VaultFilesListResult =
+  | { ok: true; files: VaultFileInfo[] }
+  | { ok: false; files: VaultFileInfo[]; error: string };
+
+type VaultFilesSaveCopiesResult =
+  | { ok: true; saved: VaultFileInfo[]; skipped?: VaultFileSkipped[] }
+  | { ok: false; saved: VaultFileInfo[]; skipped?: VaultFileSkipped[]; error: string };
+
+type VaultFilesSaveKeybundleResult =
+  | { ok: true; filename: string; size: number; sha256: string }
+  | { ok: false; error: string };
+
+type VaultFilesRevealResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Vault → E2EE root (`vault-e2ee:derive-seed`, contract v1). The renderer
+ * names a vault id; main resolves the .psnx and runs the Eidolon runtime.
+ * `masterKeyHex` is the account's E2EE root: consumed once, never logged.
+ */
+type VaultE2EESeedResult =
+  | { ok: true; keyId: string; vaultId: string; masterKeyHex: string }
+  | { ok: false; error: string; errorCode?: string };
+
 declare global {
   interface Window {
     electron?: {
@@ -134,6 +178,13 @@ declare global {
           }
         | { ok: false; error: string }
       >;
+      vaultFiles?: {
+        list: () => Promise<VaultFilesListResult>;
+        saveCopies: (kinds: VaultFileKind[]) => Promise<VaultFilesSaveCopiesResult>;
+        saveKeybundle: (vaultId: string) => Promise<VaultFilesSaveKeybundleResult>;
+        reveal: () => Promise<VaultFilesRevealResult>;
+      };
+      deriveVaultE2EESeed?: (vaultId: string) => Promise<VaultE2EESeedResult>;
       backupPassword?: {
         has: (username: string) => Promise<boolean>;
         get: (username: string) => Promise<{ exists: boolean; password?: string; error?: string }>;

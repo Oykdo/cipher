@@ -18,6 +18,23 @@ contextBridge.exposeInMainWorld('electron', {
   importVaultKeybundle: (bytes) => ipcRenderer.invoke('keybundle:import', bytes),
   exportVaultKeybundle: (vaultId) => ipcRenderer.invoke('keybundle:export', vaultId),
 
+  // End-of-ceremony vault file handover. The renderer only names a file
+  // *kind*; sources are resolved in main from the bridge context and the
+  // Eidolon registry, and the destination always comes from a native dialog.
+  // Replies carry filename / size / sha256 only — never a path or contents.
+  vaultFiles: {
+    list: () => ipcRenderer.invoke('vault-files:list'),
+    saveCopies: (kinds) => ipcRenderer.invoke('vault-files:save-copies', { kinds }),
+    saveKeybundle: (vaultId) => ipcRenderer.invoke('vault-files:save-keybundle', vaultId),
+    reveal: () => ipcRenderer.invoke('vault-files:reveal'),
+  },
+
+  // Vault → E2EE root (contract v1). A vault-native account has no mnemonic:
+  // its masterKeyHex is the seed the Eidolon runtime derives from the .psnx.
+  // The renderer names a vault id, main resolves the file and spawns the
+  // runtime; the reply carries the seed once and nothing else secret.
+  deriveVaultE2EESeed: (vaultId) => ipcRenderer.invoke('vault-e2ee:derive-seed', { vaultId }),
+
   // Genesis ceremony. Runs the Eidolon CLI locally and streams its phase
   // events back — the master seed and vault files are minted on this machine
   // and never touch a server. `start` resolves with { ok, runId } once the

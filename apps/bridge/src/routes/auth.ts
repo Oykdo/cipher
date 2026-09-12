@@ -9,6 +9,15 @@ import { generateAuthResponse } from '../utils/authResponse.js';
 import { UsernameSchema, AvatarHashSchema, UserIdSchema } from '../validation/securitySchemas.js';
 import { buildPsnxEnrollmentPayload, buildPsnxLoginProof } from '../utils/psnxAuth.js';
 import { registerVaultWithEidolon } from '../services/eidolonVaultRegistry.js';
+import {
+  buildEidolonBridgeIdentity,
+  decideVaultLinkConflict,
+  hasSrpCredentials,
+  normalizeVaultId,
+  resolveE2eeRoot,
+  verifyPsnxUpload,
+} from '../utils/vaultLink.js';
+import { verifyVaultTokenHmac, verifyVaultTokenPsnxProof } from '../utils/vaultToken.js';
 import { config } from '../config.js';
 
 const db = getDatabase();
@@ -99,46 +108,6 @@ const EIDOLON_CONNECT_SESSION_SECRET = process.env.EIDOLON_CONNECT_SESSION_SECRE
 const EIDOLON_VAULT_TOKEN_SECRET =
   process.env.EIDOLON_VAULT_TOKEN_SECRET || EIDOLON_CONNECT_SESSION_SECRET;
 
-function stableJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map(stableJson).join(',')}]`;
-  }
-  const objectValue = value as Record<string, unknown>;
-  return `{${Object.keys(objectValue)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${stableJson(objectValue[key])}`)
-    .join(',')}}`;
-}
-
-function verifyVaultTokenHmac(tokenData: Record<string, unknown>): boolean {
-  if (!EIDOLON_VAULT_TOKEN_SECRET) {
-    return false;
-  }
-  const providedHmac = typeof tokenData.hmac === 'string' ? tokenData.hmac.trim() : '';
-  if (!providedHmac) {
-    return false;
-  }
-
-  const { hmac: _hmac, ...signedPayload } = tokenData;
-  const expected = createHmac('sha256', EIDOLON_VAULT_TOKEN_SECRET)
-    .update(stableJson(signedPayload))
-    .digest('hex');
-
-  const providedHex = /^[a-f0-9]{64}$/i.test(providedHmac)
-    ? providedHmac.toLowerCase()
-    : Buffer.from(providedHmac.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('hex');
-
-  const expectedBuffer = Buffer.from(expected, 'hex');
-  const providedBuffer = Buffer.from(providedHex, 'hex');
-  return (
-    providedBuffer.length === expectedBuffer.length &&
-    timingSafeEqual(providedBuffer, expectedBuffer)
-  );
-}
-
 /**
  * True only when the TCP peer is the loopback interface.
  *
@@ -159,14 +128,25 @@ function isLoopbackPeer(request: FastifyRequest): boolean {
   return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
 }
 
-function buildEidolonBridgeIdentity(vaultId: string) {
-  const normalizedVaultId = vaultId.trim().toLowerCase();
-  const hash = createHash('sha256').update(normalizedVaultId).digest('hex');
-  return {
-    normalizedVaultId,
-    userId: `eidolon_${hash.slice(0, 24)}`,
-    username: `eidolon_${hash.slice(0, 12)}`,
-  };
+// buildEidolonBridgeIdentity (eidolon_<sha256(vaultId)>) now lives in
+// utils/vaultLink.ts so it can be unit-tested without a database. It remains
+// the fallback identity for vaults no account has explicitly linked.
+
+/**
+ * Account behind a vault id (decision D1, HANDOVER_PSNX_PARITE_DESKTOP.md §2).
+ *
+ * users.linked_vault_id is consulted first: an account that linked the vault
+ * through POST /auth/vault-link keeps its userId, username, conversations and
+ * mnemonic E2EE root — `linkedMnemonicAccount` tells the caller not to rename
+ * it to the vault name. Only when no row claims the vault does the lookup fall
+ * back to the deterministic identity (created by the caller if missing).
+ */
+async function findVaultAccount(normalizedVaultId: string, deterministicUserId: string) {
+  const linkedUser = await db.getUserByLinkedVaultId(normalizedVaultId);
+  if (linkedUser) {
+    return { user: linkedUser, linkedMnemonicAccount: hasSrpCredentials(linkedUser) };
+  }
+  return { user: await db.getUserById(deterministicUserId), linkedMnemonicAccount: false };
 }
 
 async function exchangeEidolonConnectSession(appId: string, connectSessionId: string) {
@@ -495,16 +475,21 @@ export async function authRoutes(fastify: FastifyInstance) {
 
         if (typeof psnxPath === 'string' && psnxPath.trim() && hintedVaultId && bridgeIdentityHint) {
           try {
+            // D1: the Cipher account announced to Eidolon is the one that
+            // linked the vault when there is one, not the deterministic id.
+            const hintedLinkedUser = await db.getUserByLinkedVaultId(bridgeIdentityHint.normalizedVaultId);
             const eidolonAuth = await authenticateWithEidolonPsnx({
               vaultId: hintedVaultId,
               vaultNumber: typeof vaultNumber === 'number' ? vaultNumber : undefined,
               psnxPath: psnxPath.trim(),
-              cipherAccountId: bridgeIdentityHint.userId,
+              cipherAccountId: hintedLinkedUser?.id ?? bridgeIdentityHint.userId,
             });
             resolvedAuthStrength = eidolonAuth.auth_strength || 'zkp_psnx';
           } catch (error: any) {
+            // psnxPath is deliberately not logged: an absolute path carries
+            // the OS account name (PII, CIPHER_PRIVACY_GUARANTEES.md).
             request.log.warn(
-              { error, vaultId: hintedVaultId, psnxPath: psnxPath.trim() },
+              { error, vaultId: hintedVaultId },
               'Eidolon PSNX authentication failed',
             );
             reply.code(401);
@@ -547,10 +532,20 @@ export async function authRoutes(fastify: FastifyInstance) {
         const localPsnxPath = typeof psnxPath === 'string' ? psnxPath.trim() : '';
         const psnxFileB64 = typeof request.body.psnxFileBase64 === 'string' ? request.body.psnxFileBase64 : '';
 
+        // D1: the stored proof belongs to the account that linked this vault
+        // (POST /auth/vault-link) when there is one — a mnemonic account's
+        // "return visit" verifies against the hash recorded at link time.
+        // The deterministic identity is only the fallback.
         const bridgeIdentityHint = buildEidolonBridgeIdentity(hintedVaultId);
-        const existingUser = await db.getUserById(bridgeIdentityHint.userId);
+        const existingUser =
+          (await db.getUserByLinkedVaultId(bridgeIdentityHint.normalizedVaultId)) ??
+          (await db.getUserById(bridgeIdentityHint.userId));
         const existingSettings = existingUser ? await db.getUserSettings(existingUser.id) : {};
-        const storedPsnxHash: string | undefined = existingSettings?.eidolonBridge?.psnxHash;
+        const existingBridge = existingSettings?.eidolonBridge;
+        const storedPsnxHash: string | undefined =
+          existingBridge && (!existingBridge.vaultId || existingBridge.vaultId === bridgeIdentityHint.normalizedVaultId)
+            ? existingBridge.psnxHash
+            : undefined;
 
         if (storedPsnxHash) {
           // Return visit: verify against the stored hash
@@ -562,25 +557,17 @@ export async function authRoutes(fastify: FastifyInstance) {
           // First registration: client uploaded the .psnx file.
           // The bridge computes the hash itself — proof of possession.
           // This works for both local and remote bridges; prefer it when available.
-          try {
-            const fileBuffer = Buffer.from(psnxFileB64, 'base64');
-            if (fileBuffer.length === 0 || fileBuffer.length > 2 * 1024 * 1024) {
-              reply.code(400);
-              return { error: 'Invalid PSNX file upload (empty or exceeds 2 MB)' };
-            }
-            const serverPsnxHash = createHash('sha256').update(fileBuffer).digest('hex');
-            if (clientPsnxHash && serverPsnxHash !== clientPsnxHash) {
-              reply.code(401);
-              return { error: 'PSNX file hash does not match uploaded content' };
-            }
-            // Store the server-computed hash; the file bytes are NOT persisted.
-            request.log.info({ vaultId: hintedVaultId }, 'PSNX hash derived from uploaded file (remote bridge)');
-            // Override clientPsnxHash with the server-computed one for storage below
-            (request.body as any).__serverPsnxHash = serverPsnxHash;
-          } catch (b64Error: any) {
-            reply.code(400);
-            return { error: 'Invalid PSNX file upload: base64 decode failed' };
+          // Shared with POST /auth/vault-link (utils/vaultLink.ts) so the two
+          // proofs cannot drift apart.
+          const upload = verifyPsnxUpload(psnxFileB64, clientPsnxHash);
+          if (!upload.ok) {
+            reply.code(upload.status);
+            return { error: upload.error };
           }
+          // Store the server-computed hash; the file bytes are NOT persisted.
+          request.log.info({ vaultId: hintedVaultId }, 'PSNX hash derived from uploaded file (remote bridge)');
+          // Override clientPsnxHash with the server-computed one for storage below
+          (request.body as any).__serverPsnxHash = upload.psnxHash;
         } else if (localPsnxPath && isLoopbackPeer(request)) {
           // Local bridge only: read the file from the SAME machine's disk.
           //
@@ -613,7 +600,8 @@ export async function authRoutes(fastify: FastifyInstance) {
               return { error: 'PSNX file hash mismatch — vault proof failed' };
             }
           } catch (fsError: any) {
-            request.log.warn({ error: fsError, psnxPath: localPsnxPath }, 'Cannot read PSNX file for desktop bridge');
+            // The path is not logged: it carries the OS account name (PII).
+            request.log.warn({ error: fsError, vaultId: hintedVaultId }, 'Cannot read PSNX file for desktop bridge');
             // Same message as the mismatch case on purpose: a distinct error
             // here would tell a caller whether an arbitrary server path exists.
             reply.code(401);
@@ -646,14 +634,20 @@ export async function authRoutes(fastify: FastifyInstance) {
       }
 
       const bridgeIdentity = buildEidolonBridgeIdentity(resolvedVaultId);
-      const displayUsername = await resolveEidolonBridgeUsername({
-        userId: bridgeIdentity.userId,
-        vaultId: bridgeIdentity.normalizedVaultId,
-        vaultName: resolvedVaultName,
-        fallbackUsername: bridgeIdentity.username,
-      });
+      const found = await findVaultAccount(bridgeIdentity.normalizedVaultId, bridgeIdentity.userId);
+      let user = found.user;
+      const linkedMnemonicAccount = found.linkedMnemonicAccount;
 
-      let user = await db.getUserById(bridgeIdentity.userId);
+      // A linked mnemonic account keeps its own username (D1); the vault name
+      // only drives the display name of deterministic vault-native accounts.
+      const displayUsername = linkedMnemonicAccount
+        ? (user.username as string)
+        : await resolveEidolonBridgeUsername({
+            userId: user?.id ?? bridgeIdentity.userId,
+            vaultId: bridgeIdentity.normalizedVaultId,
+            vaultName: resolvedVaultName,
+            fallbackUsername: bridgeIdentity.username,
+          });
 
       if (!user) {
         try {
@@ -673,7 +667,7 @@ export async function authRoutes(fastify: FastifyInstance) {
           reply.code(500);
           return { error: 'Unable to create Cipher vault bridge account' };
         }
-      } else if (resolvedVaultName && user.username !== displayUsername) {
+      } else if (!linkedMnemonicAccount && resolvedVaultName && user.username !== displayUsername) {
         // Update username to vault name if it changed or was previously a hash
         try {
           const oldUsername = user.username;
@@ -690,6 +684,10 @@ export async function authRoutes(fastify: FastifyInstance) {
         return { error: 'Unable to resolve Cipher vault bridge account' };
       }
 
+      // Tells the client which secret roots E2EE: the mnemonic for a linked
+      // account (D1), the vault only for deterministic vault-native accounts.
+      const e2eeRoot = resolveE2eeRoot(user);
+
       try {
         // Include the PSNX hash in bridge settings so return visits can verify
         // against it even when the bridge cannot read the local .psnx file.
@@ -697,17 +695,24 @@ export async function authRoutes(fastify: FastifyInstance) {
         const psnxHashToStore =
           (request.body as any).__serverPsnxHash ||
           (typeof request.body.psnxHash === 'string' ? request.body.psnxHash.trim() : '');
+        // A linked mnemonic account keeps the blob written by /auth/vault-link
+        // (source, linkedAt, proven psnxHash); a login only refreshes it.
+        const previousBridge: Record<string, unknown> = linkedMnemonicAccount
+          ? ((await db.getUserSettings(user.id))?.eidolonBridge ?? {})
+          : {};
         await db.updateUserSettings(user.id, {
           eidolonBridge: {
+            ...previousBridge,
             appId: normalizedAppId,
             vaultId: bridgeIdentity.normalizedVaultId,
             vaultNumber: typeof resolvedVaultNumber === 'number' ? resolvedVaultNumber : null,
             vaultName: resolvedVaultName || null,
-            source: resolvedSource || 'eidolon',
+            source: (previousBridge.source as string | undefined) || resolvedSource || 'eidolon',
             lastLinkedAt: new Date().toISOString(),
             bridgeCreatedAt: resolvedCreatedAt || null,
             authStrength: resolvedAuthStrength || 'eidolon_connect_session',
-            ...(psnxHashToStore ? { psnxHash: psnxHashToStore } : {}),
+            e2eeRoot,
+            ...(psnxHashToStore && !previousBridge.psnxHash ? { psnxHash: psnxHashToStore } : {}),
           },
         });
 
@@ -715,10 +720,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         // (services/cipherActivityReporter.ts) selects linked vaults from that
         // column, not from the settings JSON: until it is written, no user is
         // ever considered linked and nothing is reported to Eidolon.
-        await db.pool.query(
-          'UPDATE users SET linked_vault_id = $1 WHERE id = $2',
-          [bridgeIdentity.normalizedVaultId, user.id],
-        );
+        await db.updateUserLinkedVaultId(user.id, bridgeIdentity.normalizedVaultId);
 
         // Make sure the vault exists in the hosted Eidolon registry. Vaults
         // created by the local genesis ceremony or the desktop app only live
@@ -750,6 +752,7 @@ export async function authRoutes(fastify: FastifyInstance) {
           source: resolvedSource || 'eidolon',
           linkedAt: new Date().toISOString(),
           authStrength: resolvedAuthStrength || 'eidolon_connect_session',
+          e2eeRoot,
         },
       });
     }
@@ -774,7 +777,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       }
 
       // Decode the vault token (base64-encoded JSON from Eidolon QR)
-      let tokenData: { vault_id: string; vault_number?: number; vault_name?: string; issued_at?: string; hmac?: string };
+      let tokenData: { vault_id: string; vault_number?: number; vault_name?: string; issued_at?: string; hmac?: string; psnx_proof?: string };
       try {
         tokenData = JSON.parse(Buffer.from(vaultToken.trim(), 'base64').toString('utf8'));
       } catch {
@@ -791,7 +794,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         reply.code(503);
         return { error: 'Vault token login is not configured' };
       }
-      if (!verifyVaultTokenHmac(tokenData as unknown as Record<string, unknown>)) {
+      if (!verifyVaultTokenHmac(tokenData as unknown as Record<string, unknown>, EIDOLON_VAULT_TOKEN_SECRET)) {
         reply.code(401);
         return { error: 'Invalid vault token signature' };
       }
@@ -810,36 +813,35 @@ export async function authRoutes(fastify: FastifyInstance) {
 
       const resolvedVaultId = tokenData.vault_id.trim().toLowerCase();
       const bridgeIdentity = buildEidolonBridgeIdentity(resolvedVaultId);
-      const displayUsername = await resolveEidolonBridgeUsername({
-        userId: bridgeIdentity.userId,
-        vaultId: bridgeIdentity.normalizedVaultId,
-        vaultName: tokenData.vault_name,
-        fallbackUsername: bridgeIdentity.username,
-      });
+      // D1: an account that linked this vault wins over the deterministic id.
+      const found = await findVaultAccount(bridgeIdentity.normalizedVaultId, bridgeIdentity.userId);
+      const user = found.user;
 
-      let user = await db.getUserById(bridgeIdentity.userId);
+      // A code never creates an account: the shared-secret HMAC only proves
+      // that a launcher minted it, not that the caller holds THIS vault. The
+      // account must have registered its vault file first (desktop or mobile,
+      // /auth/eidolon-bridge/session or /auth/vault-link), which stored the
+      // file's SHA-256; psnx_proof is keyed by that hash.
       if (!user) {
-        try {
-          // Eidolon vault bridge users authenticate via PSNX/vault token,
-          // not SRP. They have no client-side mnemonic to lose — the vault
-          // file IS their key material. Server stores only the directory
-          // entry needed to route messages to them.
-          user = await db.createUser({
-            id: bridgeIdentity.userId,
-            username: displayUsername,
-            security_tier: 'standard',
-            srp_salt: null,
-            srp_verifier: null,
-          });
-        } catch (error: any) {
-          reply.code(500);
-          return { error: 'Unable to create vault bridge account' };
-        }
+        reply.code(401);
+        return {
+          error:
+            'This vault has no Cipher account yet — sign in once with the vault file (desktop or mobile) before using a code',
+        };
       }
 
-      if (!user) {
-        reply.code(500);
-        return { error: 'Unable to resolve vault bridge account' };
+      const storedPsnxHash: string | undefined = (await db.getUserSettings(user.id))?.eidolonBridge?.psnxHash;
+      if (!storedPsnxHash) {
+        reply.code(401);
+        return {
+          error:
+            'Vault possession proof unavailable — sign in once with the vault file (desktop or mobile) before using a code',
+        };
+      }
+      if (!verifyVaultTokenPsnxProof(tokenData as unknown as Record<string, unknown>, storedPsnxHash)) {
+        await logAuthAction(user.id, 'LOGIN_EIDOLON_BRIDGE_FAILED', request, 'WARNING');
+        reply.code(401);
+        return { error: 'Invalid vault possession proof' };
       }
 
       await logAuthAction(user.id, 'LOGIN_EIDOLON_BRIDGE_SUCCESS', request, 'INFO');
@@ -853,9 +855,249 @@ export async function authRoutes(fastify: FastifyInstance) {
           source: 'qr_scan',
           linkedAt: new Date().toISOString(),
           authStrength: 'vault_token',
+          e2eeRoot: resolveE2eeRoot(user),
         },
       });
     }
+  );
+
+  // ============================================================================
+  // VAULT LINK — decision D1 (cipher-mobile/docs/HANDOVER_PSNX_PARITE_DESKTOP.md §2)
+  //
+  // An Eidolon vault becomes an authentication factor of the EXISTING account:
+  // the account keeps its userId, username, conversations and its mnemonic
+  // E2EE root. Nothing changes in E2EE. The vault login routes above resolve
+  // users.linked_vault_id first and only then fall back to the deterministic
+  // eidolon_<hash> identity.
+  //
+  // Privacy: the .psnx bytes are hashed in memory and discarded; only the
+  // SHA-256 is stored (settings.eidolonBridge.psnxHash) and it is never
+  // logged. Absolute paths are never accepted nor logged on these routes.
+  // ============================================================================
+
+  interface VaultLinkBody {
+    vaultId?: string;
+    psnxHash?: string;
+    psnxFileBase64?: string;
+    vaultNumber?: number;
+    vaultName?: string;
+    /** Move this account's link to a different vault (default: 409). */
+    replace?: boolean;
+  }
+
+  const VAULT_LINK_ANOTHER_ACCOUNT_ERROR = 'This vault is already linked to another account';
+
+  fastify.post<{ Body: VaultLinkBody }>(
+    '/api/v2/auth/vault-link',
+    {
+      preHandler: fastify.authenticate as any,
+      config: { rateLimit: fastify.loginLimiter as any },
+      // Fastify's default bodyLimit is 1 MiB; a 2 MB .psnx is ~2.7 MB once
+      // base64-encoded, so honour the documented upload cap on this route.
+      bodyLimit: 3 * 1024 * 1024,
+    },
+    async (request, reply) => {
+      const meUserId = request.user.sub;
+      const me = await db.getUserById(meUserId);
+      if (!me) {
+        reply.code(401);
+        return { error: 'Authentication required' };
+      }
+
+      if (!hasSrpCredentials(me)) {
+        // A vault-native account is already bound to its own vault by
+        // construction and has no mnemonic root to protect: attaching another
+        // vault to it would make e2eeRoot ambiguous.
+        reply.code(409);
+        return { error: 'Vault linking requires an account with mnemonic (SRP) credentials' };
+      }
+
+      const vaultId = normalizeVaultId(request.body?.vaultId);
+      if (!vaultId) {
+        reply.code(400);
+        return { error: 'vaultId must be 64 hexadecimal characters' };
+      }
+
+      const clientPsnxHash =
+        typeof request.body.psnxHash === 'string' ? request.body.psnxHash.trim().toLowerCase() : '';
+      const psnxFileB64 = typeof request.body.psnxFileBase64 === 'string' ? request.body.psnxFileBase64 : '';
+
+      const currentBridge = (await db.getUserSettings(meUserId))?.eidolonBridge ?? {};
+      const storedPsnxHash: string | undefined =
+        currentBridge.vaultId === vaultId && typeof currentBridge.psnxHash === 'string'
+          ? currentBridge.psnxHash
+          : undefined;
+
+      // Proof of possession. The file is mandatory the first time a vault is
+      // linked to this account; re-linking the same vault may present the
+      // hash already proven (same rule as the session route's return visit).
+      let psnxHash: string;
+      if (psnxFileB64) {
+        const upload = verifyPsnxUpload(psnxFileB64, clientPsnxHash);
+        if (!upload.ok) {
+          if (upload.status === 401) {
+            await logAuthAction(meUserId, 'VAULT_LINK_FAILED', request, 'WARNING');
+          }
+          reply.code(upload.status);
+          return { error: upload.error };
+        }
+        psnxHash = upload.psnxHash;
+      } else if (storedPsnxHash) {
+        if (!clientPsnxHash || clientPsnxHash !== storedPsnxHash) {
+          await logAuthAction(meUserId, 'VAULT_LINK_FAILED', request, 'WARNING');
+          reply.code(401);
+          return { error: 'PSNX hash mismatch — vault proof failed' };
+        }
+        psnxHash = storedPsnxHash;
+      } else {
+        reply.code(400);
+        return { error: 'psnxFileBase64 is required to prove possession of the vault file' };
+      }
+
+      const holder = await db.getUserByLinkedVaultId(vaultId);
+      const conflict = decideVaultLinkConflict({
+        meUserId,
+        vaultId,
+        myCurrentVaultId: typeof me.linked_vault_id === 'string' ? me.linked_vault_id : null,
+        holderUserId: holder?.id ?? null,
+        replace: request.body.replace === true,
+      });
+
+      if (conflict.kind === 'already_linked') {
+        reply.code(409);
+        return {
+          error: 'This account is already linked to a different vault (send replace: true to move the link)',
+          code: 'already_linked',
+          linkedVaultId: conflict.currentVaultId,
+        };
+      }
+      if (conflict.kind === 'other_account') {
+        reply.code(409);
+        return { error: VAULT_LINK_ANOTHER_ACCOUNT_ERROR };
+      }
+
+      const linkedAt = new Date().toISOString();
+      const vaultNumber =
+        typeof request.body.vaultNumber === 'number' && Number.isFinite(request.body.vaultNumber)
+          ? request.body.vaultNumber
+          : null;
+      const vaultName =
+        typeof request.body.vaultName === 'string' && request.body.vaultName.trim()
+          ? request.body.vaultName.trim().slice(0, 128)
+          : null;
+
+      try {
+        // 'move': the holder is the vault's auto-created deterministic account
+        // (a previous vault login); it releases the link in the same
+        // transaction so the unique index never sees two rows.
+        await db.linkVaultToUser(meUserId, vaultId, {
+          releaseFromUserId: conflict.kind === 'move' ? conflict.fromUserId : null,
+        });
+      } catch (error: any) {
+        if (error?.code === '23505') {
+          // unique_violation: lost a race against a concurrent link.
+          reply.code(409);
+          return { error: VAULT_LINK_ANOTHER_ACCOUNT_ERROR };
+        }
+        request.log.error({ error, userId: meUserId }, 'Vault link write failed');
+        reply.code(500);
+        return { error: 'Unable to link the vault' };
+      }
+
+      if (conflict.kind === 'move') {
+        request.log.info(
+          { fromUserId: conflict.fromUserId, toUserId: meUserId },
+          'Vault link moved from its deterministic account to a mnemonic account',
+        );
+      }
+
+      await db.updateUserSettings(meUserId, {
+        eidolonBridge: {
+          appId: DEFAULT_EIDOLON_CONNECT_APP_ID,
+          vaultId,
+          vaultNumber,
+          vaultName,
+          source: 'vault_link',
+          linkedAt,
+          lastLinkedAt: linkedAt,
+          authStrength: 'psnx_upload_proof',
+          psnxHash,
+          e2eeRoot: 'mnemonic',
+        },
+      });
+
+      // Same non-fatal registry sync as the session route, so the economy
+      // sees vaults linked from a device that never ran the desktop ceremony.
+      void registerVaultWithEidolon(
+        { vaultId, vaultName, vaultNumber, createdAt: null, source: 'vault_link' },
+        request.log,
+      );
+
+      await logAuthAction(meUserId, 'VAULT_LINK_SUCCESS', request, 'INFO');
+
+      return { linked: true, vaultId, vaultNumber, vaultName, linkedAt, e2eeRoot: 'mnemonic' as const };
+    },
+  );
+
+  fastify.get(
+    '/api/v2/auth/vault-link',
+    {
+      preHandler: fastify.authenticate as any,
+    },
+    async (request, reply) => {
+      const meUserId = request.user.sub;
+      const me = await db.getUserById(meUserId);
+      if (!me) {
+        reply.code(401);
+        return { error: 'Authentication required' };
+      }
+
+      const e2eeRoot = resolveE2eeRoot(me);
+      const vaultId = typeof me.linked_vault_id === 'string' && me.linked_vault_id ? me.linked_vault_id : null;
+      if (!vaultId) {
+        return { linked: false, e2eeRoot };
+      }
+
+      const bridge = (await db.getUserSettings(meUserId))?.eidolonBridge ?? {};
+      const sameVault = !bridge.vaultId || bridge.vaultId === vaultId;
+      return {
+        linked: true,
+        vaultId,
+        vaultNumber: sameVault && typeof bridge.vaultNumber === 'number' ? bridge.vaultNumber : null,
+        vaultName: sameVault && typeof bridge.vaultName === 'string' ? bridge.vaultName : null,
+        linkedAt: sameVault ? bridge.linkedAt ?? bridge.lastLinkedAt ?? null : null,
+        e2eeRoot,
+      };
+    },
+  );
+
+  fastify.delete(
+    '/api/v2/auth/vault-link',
+    {
+      preHandler: fastify.authenticate as any,
+      config: { rateLimit: fastify.loginLimiter as any },
+    },
+    async (request, reply) => {
+      const meUserId = request.user.sub;
+      const me = await db.getUserById(meUserId);
+      if (!me) {
+        reply.code(401);
+        return { error: 'Authentication required' };
+      }
+
+      if (!hasSrpCredentials(me)) {
+        // The vault is this account's only way in: unlinking would lock it out.
+        reply.code(409);
+        return { error: 'Cannot unlink: this account has no mnemonic credentials and the vault is its only login method' };
+      }
+
+      await db.updateUserLinkedVaultId(meUserId, null);
+      await db.removeUserSettingKey(meUserId, 'eidolonBridge');
+
+      await logAuthAction(meUserId, 'VAULT_UNLINK_SUCCESS', request, 'INFO');
+
+      return { linked: false };
+    },
   );
 
   // ============================================================================

@@ -237,6 +237,63 @@ class DatabaseService {
         return await get(this.pool, 'SELECT * FROM users WHERE id = $1', [id]);
     }
 
+    /**
+     * Account that explicitly linked an Eidolon vault (users.linked_vault_id).
+     *
+     * Decision D1 (HANDOVER_PSNX_PARITE_DESKTOP.md): a vault is an auth factor
+     * attached to an existing account, so vault logins resolve through this
+     * column first and only fall back to the deterministic eidolon_<hash>
+     * identity when no row claims the vault. Until migration
+     * 007_linked_vault_id_unique.sql is applied the column is not unique, so
+     * prefer an account that owns mnemonic (SRP) credentials, then the oldest.
+     */
+    async getUserByLinkedVaultId(vaultId) {
+        return await get(this.pool, `
+            SELECT * FROM users
+            WHERE linked_vault_id = $1
+            ORDER BY (srp_verifier IS NOT NULL OR srp_seed_verifier IS NOT NULL) DESC,
+                     created_at ASC NULLS LAST
+            LIMIT 1
+        `, [vaultId]);
+    }
+
+    /**
+     * Links a vault to a user in one transaction. When `releaseFromUserId` is
+     * given, that account (the vault's auto-created deterministic identity)
+     * loses its linked_vault_id and its settings.eidolonBridge blob first, so
+     * the partial unique index on linked_vault_id never sees both rows. A
+     * unique violation (a concurrent link of the same vault) propagates as a
+     * pg error with code 23505 after the rollback.
+     */
+    async linkVaultToUser(userId, vaultId, options = {}) {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            if (options.releaseFromUserId && options.releaseFromUserId !== userId) {
+                await client.query(
+                    'UPDATE users SET linked_vault_id = NULL WHERE id = $1 AND linked_vault_id = $2',
+                    [options.releaseFromUserId, vaultId],
+                );
+                await client.query(
+                    'UPDATE user_settings SET settings = settings - $2, updated_at = NOW() WHERE user_id = $1',
+                    [options.releaseFromUserId, 'eidolonBridge'],
+                );
+            }
+            await client.query('UPDATE users SET linked_vault_id = $1 WHERE id = $2', [vaultId, userId]);
+            await client.query('COMMIT');
+        } catch (error) {
+            await client.query('ROLLBACK').catch(() => {});
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    /** Sets (or clears, with null) users.linked_vault_id. */
+    async updateUserLinkedVaultId(userId, vaultId) {
+        await run(this.pool, 'UPDATE users SET linked_vault_id = $1 WHERE id = $2', [vaultId, userId]);
+    }
+
     async getUserSettings(userId) {
         const row = await get(this.pool, 'SELECT settings FROM user_settings WHERE user_id = $1', [userId]);
         return row ? row.settings : {};
@@ -255,6 +312,19 @@ class DatabaseService {
         `, [userId, newSettings, newSettings]);
 
         return newSettings;
+    }
+
+    /**
+     * Removes one top-level key from user_settings.settings. updateUserSettings
+     * can only merge (a JSON null would linger), so unlinking a vault deletes
+     * the eidolonBridge blob through the JSONB "-" operator instead.
+     */
+    async removeUserSettingKey(userId, key) {
+        await run(this.pool, `
+            UPDATE user_settings
+            SET settings = settings - $2, updated_at = NOW()
+            WHERE user_id = $1
+        `, [userId, key]);
     }
 
     async getUserByUsername(username) {

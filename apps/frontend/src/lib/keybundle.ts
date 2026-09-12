@@ -8,6 +8,12 @@
  * Packaged Electron must not use relative `/api/...` URLs — they resolve to
  * `file:///C:/api/...`. When the bridge is remote (Fly), import/export run
  * locally via `window.electron` IPC + Eidolon's keybundle_cli.py.
+ *
+ * Export always prefers the IPC when it is exposed: the REST route is behind
+ * `fastify.authenticate`, and right after the ceremony there is no session
+ * yet, so gating the IPC on a non-localhost bridge (as v1.3.1 did) made the
+ * button 401 in every dev run. The IPC runs the same local CLI regardless of
+ * where the bridge lives, so nothing is lost for the packaged case.
  */
 
 import { API_BASE_URL, API_SUPPORTS_LOCAL_PSNX } from '../config';
@@ -88,9 +94,11 @@ type ElectronKeybundleExportResult =
  * Fetch the bundle, trigger a browser download, return metadata. The browser
  * save dialog is spawned synchronously in the click handler's event loop so
  * popup blockers don't kick in.
+ *
+ * Inside Electron the IPC is always used; REST is the browser-only fallback.
  */
 export async function exportVaultKeybundle(vaultId: string): Promise<ExportResult | KeybundleError> {
-  if (window.electron?.exportVaultKeybundle && !API_SUPPORTS_LOCAL_PSNX) {
+  if (window.electron?.exportVaultKeybundle) {
     const result = (await window.electron.exportVaultKeybundle(
       vaultId,
     )) as ElectronKeybundleExportResult;

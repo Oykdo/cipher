@@ -12,6 +12,10 @@ export interface DbInstance {
   // Users
   createUser(user: any): Promise<any>;
   getUserById(id: string): Promise<any | null>;
+  // Eidolon vault link (users.linked_vault_id) — see utils/vaultLink.ts
+  getUserByLinkedVaultId(vaultId: string): Promise<any | null>;
+  updateUserLinkedVaultId(userId: string, vaultId: string | null): Promise<void>;
+  linkVaultToUser(userId: string, vaultId: string, options?: { releaseFromUserId?: string | null }): Promise<void>;
   getUserByUsername(username: string): Promise<any | null>;
   searchUsers(query: string, currentUserId?: string | null, limit?: number): Promise<Array<{ id: string; username: string }>>;
   // verifyMasterKey removed in privacy-l1 — login uses SRP, not masterKey verification.
@@ -21,6 +25,7 @@ export interface DbInstance {
   getUserSettings(userId: string): Promise<any>;
   getUserSettings(userId: string): Promise<any>;
   updateUserSettings(userId: string, settings: any): Promise<any>;
+  removeUserSettingKey(userId: string, key: string): Promise<void>;
   updateUserAvatarHash(userId: string, hash: string): Promise<void>;
   getUserByAvatarHash(hash: string): Promise<any | null>;
 

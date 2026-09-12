@@ -17,6 +17,7 @@ import { saveKnownAccount, clearPasswordCache } from '../lib/localStorage';
 import { createEidolonConnectSession, ensureEidolonConnectRegistration } from '../lib/eidolonConnect';
 import { readVaultBridgeContext, type VaultBridgeContext } from '../lib/vaultBridge';
 import { importVaultKeybundle } from '../lib/keybundle';
+import { deriveVaultMasterKey, openVaultE2EE } from '../lib/vaultE2EE';
 import { getErrorMessage } from '../lib/errors';
 import {
   decryptStoredBundle,
@@ -43,6 +44,7 @@ export default function LoginNew() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const setSession = useAuthStore((state) => state.setSession);
+  const clearSession = useAuthStore((state) => state.clearSession);
 
   // While the Eidolon ecosystem is still pre-release, fall back to the
   // BIP-39 mnemonic login. Flipping VITE_EIDOLON_CONNECT_ENABLED=true at
@@ -56,6 +58,16 @@ export default function LoginNew() {
   const [vaultLoading, setVaultLoading] = useState(false);
   const [vaultContext, setVaultContext] = useState<VaultBridgeContext | null>(null);
   const [vaultLauncherState, setVaultLauncherState] = useState<EidolonDesktopResult | null>(null);
+
+  // Vault → E2EE root, settled after each vault login (see settleVaultE2EE).
+  // `e2eeWarning` outlives the per-attempt error reset: the session is open
+  // but messages cannot be encrypted on this device. `mnemonicRootNotice` is
+  // raised when the bridge reports the account is rooted on its recovery
+  // phrase (D1): the vault only authenticates, the mnemonic login is the way
+  // in, and `showMnemonicLogin` swaps this panel for it.
+  const [e2eeWarning, setE2eeWarning] = useState('');
+  const [mnemonicRootNotice, setMnemonicRootNotice] = useState(false);
+  const [showMnemonicLogin, setShowMnemonicLogin] = useState(false);
 
   // Error state
   const [error, setError] = useState('');
@@ -153,8 +165,61 @@ export default function LoginNew() {
     }
   };
 
+  type VaultSessionResponse = {
+    user: { username: string };
+    vaultBridge?: { vaultId?: string | null; e2eeRoot?: string | null } | null;
+  };
+
+  /**
+   * Vault → E2EE root. Runs in both vault success paths once the session is
+   * stored, and decides whether the app can be entered right away.
+   *
+   * `vaultBridge.e2eeRoot` tells which secret roots E2EE: 'vault' for a
+   * vault-native account (no mnemonic — the masterKeyHex is the seed the
+   * Eidolon runtime derives from the .psnx, contract v1), 'mnemonic' for an
+   * account that merely linked its vault as a sign-in factor (D1: the
+   * recovery phrase stays the only E2EE root). An older bridge without the
+   * field is treated as 'vault'.
+   *
+   * The .psnx is resolved main-side from the bridge context / registry — a
+   * QR / code token never carries the file, so on a device that has never
+   * seen this vault the derivation fails and the session opens without E2EE.
+   * That failure is surfaced as a persistent warning, never as a login error.
+   */
+  const settleVaultE2EE = async (
+    data: VaultSessionResponse,
+    requestedVaultId?: string | null,
+  ): Promise<boolean> => {
+    const e2eeRoot = data.vaultBridge?.e2eeRoot === 'mnemonic' ? 'mnemonic' : 'vault';
+    if (e2eeRoot === 'mnemonic') {
+      // The vault only proved identity: this account's E2EE root is its
+      // recovery phrase. Drop the vault session so a Back to '/' cannot land
+      // on /conversations without a key (same rule as Cipher mobile).
+      clearSession();
+      setMnemonicRootNotice(true);
+      return false;
+    }
+
+    const vaultId = data.vaultBridge?.vaultId || requestedVaultId || '';
+    const derived = await deriveVaultMasterKey(vaultId);
+    if (!derived.ok) {
+      console.warn('[login-vault] E2EE seed unavailable:', derived.errorCode ?? derived.error);
+      setE2eeWarning(t('auth.vault_e2ee_unavailable_warning'));
+      return false;
+    }
+
+    const opened = await openVaultE2EE(data.user.username, derived.masterKeyHex);
+    if (!opened.ok) {
+      setE2eeWarning(t('auth.vault_e2ee_init_warning'));
+      return false;
+    }
+    return true;
+  };
+
   const handleVaultSessionConnect = async () => {
     setVaultError('');
+    setE2eeWarning('');
+    setMnemonicRootNotice(false);
     setVaultLoading(true);
 
     try {
@@ -254,7 +319,9 @@ export default function LoginNew() {
 
       clearPasswordCache(data.user.username);
 
-      navigate('/conversations');
+      if (await settleVaultE2EE(data, vaultContext.vault_id)) {
+        navigate('/conversations');
+      }
     } catch (connectError) {
       setVaultError(getErrorMessage(connectError, t('auth.vault_bridge_connect_error')));
     } finally {
@@ -359,6 +426,8 @@ export default function LoginNew() {
       setQrError('Enter the code from Eidolon');
       return;
     }
+    setE2eeWarning('');
+    setMnemonicRootNotice(false);
     setQrLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v2/auth/vault-token/redeem`, {
@@ -393,13 +462,22 @@ export default function LoginNew() {
         securityTier: data.user.securityTier,
         quickUnlockEnabled: false,
       });
-      navigate('/conversations');
+      // The token only names the vault; the file must already be on this device.
+      if (await settleVaultE2EE(data)) {
+        navigate('/conversations');
+      }
     } catch (err) {
       setQrError(getErrorMessage(err, 'Invalid or expired token'));
     } finally {
       setQrLoading(false);
     }
   };
+
+  // Account rooted on its recovery phrase (D1): the vault session is stored,
+  // but only the mnemonic login can open E2EE. Rendered after every hook.
+  if (showMnemonicLogin) {
+    return <LoginMnemonic onBack={() => setShowMnemonicLogin(false)} />;
+  }
 
   return (
     <div className="cosmic-scene auth-login-scene min-h-screen">
@@ -463,8 +541,12 @@ export default function LoginNew() {
             onKeybundleImport={handleKeybundleImport}
             onQuickUnlock={handleQuickUnlock}
             onForgetStoredBundle={handleForgetStoredBundle}
+            onContinueWithoutE2EE={() => navigate('/conversations')}
+            onMnemonicLogin={() => setShowMnemonicLogin(true)}
             storedBundles={storedBundles}
             error={vaultError}
+            e2eeWarning={e2eeWarning}
+            mnemonicRootNotice={mnemonicRootNotice}
             loading={vaultLoading}
             keybundleLoading={keybundleLoading}
             context={vaultContext}
@@ -506,6 +588,7 @@ function AuthStage({
 
 
 function QrTokenInput({ onRedeem, loading, error }: { onRedeem: (token: string) => void; loading?: boolean; error?: string }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState('');
 
@@ -516,7 +599,7 @@ function QrTokenInput({ onRedeem, loading, error }: { onRedeem: (token: string) 
           onClick={() => setOpen(true)}
           className="w-full text-sm text-cyan-300/70 hover:text-cyan-200 transition-colors py-2"
         >
-          Enter Vault Code from Eidolon
+          {t('auth.vault_code_toggle')}
         </button>
       </div>
     );
@@ -524,13 +607,14 @@ function QrTokenInput({ onRedeem, loading, error }: { onRedeem: (token: string) 
 
   return (
     <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
+      {/* In the Eidolon launcher [Q] quits; the vault code is behind [C]. */}
       <p className="text-xs text-white/50">
-        Open Eidolon → press [Q] → copy the code and paste it below
+        {t('auth.vault_code_hint')}
       </p>
       <textarea
         value={token}
         onChange={(e) => setToken(e.target.value)}
-        placeholder="Paste vault token from Eidolon..."
+        placeholder={t('auth.vault_code_placeholder')}
         className="w-full bg-slate-800/60 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:border-cyan-500/50 focus:outline-none resize-none"
         rows={3}
       />
@@ -541,13 +625,13 @@ function QrTokenInput({ onRedeem, loading, error }: { onRedeem: (token: string) 
           disabled={loading || !token.trim()}
           className="flex-1 bg-cyan-600/80 hover:bg-cyan-500/80 disabled:opacity-40 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors"
         >
-          {loading ? 'Connecting...' : 'Connect with code'}
+          {loading ? t('auth.vault_code_connecting') : t('auth.vault_code_connect')}
         </button>
         <button
           onClick={() => { setOpen(false); setToken(''); }}
           className="text-white/40 hover:text-white/70 text-sm px-3"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </div>
@@ -563,8 +647,12 @@ function VaultBridgeForm({
   onKeybundleImport,
   onQuickUnlock,
   onForgetStoredBundle,
+  onContinueWithoutE2EE,
+  onMnemonicLogin,
   storedBundles,
   error,
+  e2eeWarning,
+  mnemonicRootNotice,
   loading,
   keybundleLoading,
   context,
@@ -580,8 +668,12 @@ function VaultBridgeForm({
   onKeybundleImport: (file: File, rememberPassword?: string) => void;
   onQuickUnlock: (vaultId: string, password: string) => void;
   onForgetStoredBundle: (vaultId: string) => void;
+  onContinueWithoutE2EE: () => void;
+  onMnemonicLogin: () => void;
   storedBundles: StoredBundleEntry[];
   error: string;
+  e2eeWarning: string;
+  mnemonicRootNotice: boolean;
   loading: boolean;
   keybundleLoading: boolean;
   context: VaultBridgeContext | null;
@@ -764,6 +856,52 @@ function VaultBridgeForm({
               aria-live="polite"
             >
               <p className="text-sm text-error-glow font-semibold">{error}</p>
+            </motion.div>
+          )}
+
+          {/* D1: the vault is a sign-in factor of a mnemonic account — only the
+              recovery phrase opens E2EE, so hand over to the mnemonic login. */}
+          {mnemonicRootNotice && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="cosmic-status-card mx-auto mt-6 w-full max-w-4xl px-8 py-6"
+              role="status"
+              aria-live="polite"
+            >
+              <p className="text-sm font-semibold mb-2" style={{ color: 'var(--cosmic-cyan)' }}>
+                {t('auth.vault_e2ee_mnemonic_title')}
+              </p>
+              <p className="text-sm leading-6 text-soft-grey mb-4">
+                {t('auth.vault_e2ee_mnemonic_desc')}
+              </p>
+              <div className="max-w-xs">
+                <CosmicActionButton onClick={onMnemonicLogin} disabled={loading}>
+                  {t('auth.vault_e2ee_mnemonic_button')}
+                </CosmicActionButton>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Session open, E2EE root unavailable on this device. Persistent:
+              cleared only by the next vault login attempt. */}
+          {e2eeWarning && !mnemonicRootNotice && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="cosmic-status-card mx-auto mt-6 w-full max-w-4xl px-8 py-6"
+              role="alert"
+              aria-live="polite"
+            >
+              <p className="text-sm font-semibold mb-2 text-amber-200">
+                {t('auth.vault_e2ee_warning_title')}
+              </p>
+              <p className="text-sm leading-6 text-soft-grey mb-4">{e2eeWarning}</p>
+              <div className="max-w-xs">
+                <CosmicGhostButton onClick={onContinueWithoutE2EE} disabled={loading}>
+                  {t('auth.vault_e2ee_continue_button')}
+                </CosmicGhostButton>
+              </div>
             </motion.div>
           )}
         </div>

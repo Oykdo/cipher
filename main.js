@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fork, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, statSync, constants as fsConstants } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import os from 'node:os';
 
@@ -48,15 +48,17 @@ function saveTrayPrefs() {
 // Tray menu strings — bundled here because the main process cannot reach
 // react-i18next. Keep these in sync with the 8 locale JSON files. EN is the
 // fallback; locales without a native string fall through to EN.
+// Also carries the titles of the native dialogs opened by the vault-files
+// handover (main-side strings; the renderer keeps main in sync via tray.setLocale).
 const TRAY_STRINGS = {
-  en: { tooltip: 'Cipher', show: 'Show Cipher', quit: 'Quit Cipher', balloonTitle: 'Cipher keeps running', balloonBody: 'Cipher is still running in the system tray. Right-click the icon to quit.' },
-  fr: { tooltip: 'Cipher', show: 'Afficher Cipher', quit: 'Quitter Cipher', balloonTitle: 'Cipher continue de tourner', balloonBody: 'Cipher reste actif dans la barre des tâches. Clic droit sur l’icône pour quitter.' },
-  de: { tooltip: 'Cipher', show: 'Cipher anzeigen', quit: 'Cipher beenden', balloonTitle: 'Cipher läuft weiter', balloonBody: 'Cipher läuft noch im Infobereich. Rechtsklick auf das Symbol zum Beenden.' },
-  es: { tooltip: 'Cipher', show: 'Mostrar Cipher', quit: 'Salir de Cipher', balloonTitle: 'Cipher sigue funcionando', balloonBody: 'Cipher sigue activo en la bandeja del sistema. Clic derecho en el icono para salir.' },
-  it: { tooltip: 'Cipher', show: 'Mostra Cipher', quit: 'Esci da Cipher', balloonTitle: 'Cipher è ancora attivo', balloonBody: 'Cipher è ancora in esecuzione nell’area di notifica. Clic destro sull’icona per uscire.' },
-  pt: { tooltip: 'Cipher', show: 'Mostrar Cipher', quit: 'Sair do Cipher', balloonTitle: 'Cipher continua em execução', balloonBody: 'O Cipher ainda está em execução na bandeja do sistema. Clique com o botão direito no ícone para sair.' },
-  ru: { tooltip: 'Cipher', show: 'Показать Cipher', quit: 'Выйти из Cipher', balloonTitle: 'Cipher продолжает работу', balloonBody: 'Cipher всё ещё работает в системном трее. Щёлкните по значку правой кнопкой, чтобы выйти.' },
-  'zh-CN': { tooltip: 'Cipher', show: '显示 Cipher', quit: '退出 Cipher', balloonTitle: 'Cipher 仍在运行', balloonBody: 'Cipher 仍在系统托盘中运行。右键单击图标以退出。' },
+  en: { tooltip: 'Cipher', show: 'Show Cipher', quit: 'Quit Cipher', balloonTitle: 'Cipher keeps running', balloonBody: 'Cipher is still running in the system tray. Right-click the icon to quit.', vaultFilesDirTitle: 'Choose a folder for your vault files', vaultFilesDirButton: 'Save here', vaultKeybundleTitle: 'Save your identity (keybundle)' },
+  fr: { tooltip: 'Cipher', show: 'Afficher Cipher', quit: 'Quitter Cipher', balloonTitle: 'Cipher continue de tourner', balloonBody: 'Cipher reste actif dans la barre des tâches. Clic droit sur l’icône pour quitter.', vaultFilesDirTitle: 'Choisissez un dossier pour vos fichiers de vault', vaultFilesDirButton: 'Enregistrer ici', vaultKeybundleTitle: 'Enregistrer votre identité (keybundle)' },
+  de: { tooltip: 'Cipher', show: 'Cipher anzeigen', quit: 'Cipher beenden', balloonTitle: 'Cipher läuft weiter', balloonBody: 'Cipher läuft noch im Infobereich. Rechtsklick auf das Symbol zum Beenden.', vaultFilesDirTitle: 'Ordner für Ihre Vault-Dateien wählen', vaultFilesDirButton: 'Hier speichern', vaultKeybundleTitle: 'Ihre Identität speichern (Keybundle)' },
+  es: { tooltip: 'Cipher', show: 'Mostrar Cipher', quit: 'Salir de Cipher', balloonTitle: 'Cipher sigue funcionando', balloonBody: 'Cipher sigue activo en la bandeja del sistema. Clic derecho en el icono para salir.', vaultFilesDirTitle: 'Elija una carpeta para sus archivos de vault', vaultFilesDirButton: 'Guardar aquí', vaultKeybundleTitle: 'Guardar su identidad (keybundle)' },
+  it: { tooltip: 'Cipher', show: 'Mostra Cipher', quit: 'Esci da Cipher', balloonTitle: 'Cipher è ancora attivo', balloonBody: 'Cipher è ancora in esecuzione nell’area di notifica. Clic destro sull’icona per uscire.', vaultFilesDirTitle: 'Scegli una cartella per i file del tuo vault', vaultFilesDirButton: 'Salva qui', vaultKeybundleTitle: 'Salva la tua identità (keybundle)' },
+  pt: { tooltip: 'Cipher', show: 'Mostrar Cipher', quit: 'Sair do Cipher', balloonTitle: 'Cipher continua em execução', balloonBody: 'O Cipher ainda está em execução na bandeja do sistema. Clique com o botão direito no ícone para sair.', vaultFilesDirTitle: 'Escolha uma pasta para os arquivos do seu vault', vaultFilesDirButton: 'Salvar aqui', vaultKeybundleTitle: 'Salvar sua identidade (keybundle)' },
+  ru: { tooltip: 'Cipher', show: 'Показать Cipher', quit: 'Выйти из Cipher', balloonTitle: 'Cipher продолжает работу', balloonBody: 'Cipher всё ещё работает в системном трее. Щёлкните по значку правой кнопкой, чтобы выйти.', vaultFilesDirTitle: 'Выберите папку для файлов хранилища', vaultFilesDirButton: 'Сохранить здесь', vaultKeybundleTitle: 'Сохранить вашу личность (keybundle)' },
+  'zh-CN': { tooltip: 'Cipher', show: '显示 Cipher', quit: '退出 Cipher', balloonTitle: 'Cipher 仍在运行', balloonBody: 'Cipher 仍在系统托盘中运行。右键单击图标以退出。', vaultFilesDirTitle: '选择保存保险库文件的文件夹', vaultFilesDirButton: '保存到此处', vaultKeybundleTitle: '保存您的身份（keybundle）' },
 };
 
 function getTrayStrings() {
@@ -1097,10 +1099,15 @@ function resolveEidolonPython() {
   return 'python.exe';
 }
 
-async function resolveKeybundleCliScript() {
+/**
+ * Absolute path of one of the public Eidolon CLI scripts (`scriptRel` is
+ * relative to the Eidolon root), or null when no source tree is available.
+ * Only consulted when the frozen `cipher-runtime` binary is absent.
+ */
+async function resolveEidolonScript(scriptRel) {
   const eidolonRoot = await resolveEidolonRoot();
   if (!eidolonRoot) return null;
-  const script = path.join(eidolonRoot, KEYBUNDLE_CLI_REL);
+  const script = path.join(eidolonRoot, scriptRel);
   return existsSync(script) ? script : null;
 }
 
@@ -1137,23 +1144,33 @@ function parseKeybundleCliJson(stdout) {
   return null;
 }
 
-function runKeybundleCli(args) {
+/**
+ * Spawn one subcommand of the Eidolon runtime and collect its output.
+ * Same preference order as the ceremony: the frozen `cipher-runtime`
+ * binary (`cipher-runtime <subcommand> ...args`), else the public Python
+ * script `scriptRel` run from the Eidolon source tree.
+ *
+ * Resolves `{ stdout: Buffer, stderr: string, code }`. stdout stays a Buffer
+ * so a caller receiving a secret on it (`e2ee-seed`) can zero it; the read
+ * chunks are zeroed here as soon as they are concatenated. stdout is never
+ * logged by this function.
+ */
+function runCipherRuntimeCli(subcommand, scriptRel, args) {
   return new Promise((resolve, reject) => {
     (async () => {
-      // Same preference order as the ceremony: frozen binary, then source.
       const runtime = resolveCipherRuntime();
       let command;
       let commandArgs;
 
       if (runtime) {
         command = runtime;
-        commandArgs = ['keybundle', ...args];
+        commandArgs = [subcommand, ...args];
       } else {
-        const script = await resolveKeybundleCliScript();
+        const script = await resolveEidolonScript(scriptRel);
         if (!script) {
           reject(
             new Error(
-              'Eidolon introuvable (ni cipher-runtime, ni keybundle_cli.py). ' +
+              `Eidolon introuvable (ni cipher-runtime, ni ${path.basename(scriptRel)}). ` +
                 'Rebuild Cipher depuis Chimera (Eidolon à côté de Cipher), ou définissez EIDOLON_ROOT ' +
                 'vers un checkout Eidolon complet, avec Python 3 et eidolon_crypto installés.',
             ),
@@ -1176,16 +1193,27 @@ function runKeybundleCli(args) {
         },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
-        let stdout = '';
-        let stderr = '';
-        child.stdout.setEncoding('utf8');
-        child.stderr.setEncoding('utf8');
-        child.stdout.on('data', (d) => { stdout += d; });
-        child.stderr.on('data', (d) => { stderr += d; });
-        child.on('error', (err) => reject(err));
-        child.on('close', (code) => resolve({ stdout, stderr, code: code ?? -1 }));
+      const stdoutChunks = [];
+      let stderr = '';
+      child.stderr.setEncoding('utf8');
+      child.stdout.on('data', (d) => { stdoutChunks.push(d); });
+      child.stderr.on('data', (d) => { stderr += d; });
+      child.on('error', (err) => reject(err));
+      child.on('close', (code) => {
+        const stdout = Buffer.concat(stdoutChunks);
+        for (const chunk of stdoutChunks) {
+          if (chunk !== stdout) chunk.fill(0);
+        }
+        stdoutChunks.length = 0;
+        resolve({ stdout, stderr, code: code ?? -1 });
+      });
     })().catch(reject);
   });
+}
+
+async function runKeybundleCli(args) {
+  const result = await runCipherRuntimeCli('keybundle', KEYBUNDLE_CLI_REL, args);
+  return { ...result, stdout: result.stdout.toString('utf8') };
 }
 
 async function mirrorBridgeContextToUserData(bridgePath) {
@@ -1266,9 +1294,13 @@ async function exportVaultKeybundleLocal(vaultId) {
     }
     const bytes = await fs.readFile(bundlePath);
     try { unlinkSync(bundlePath); } catch { /* ignore */ }
+    // Hand out a copy and scrub the Buffer we read from disk: the bundle is
+    // the vault in clear (.psnx + companion), it must not linger in the pool.
+    const copy = new Uint8Array(bytes);
+    bytes.fill(0);
     return {
       ok: true,
-      bytes: new Uint8Array(bytes),
+      bytes: copy,
       filename: `vault_${String(payload.vault_name ?? id).replace(/[^A-Za-z0-9_-]/g, '_')}.eidolon_keybundle`,
       vaultId: String(payload.vault_id ?? id),
       vaultName: String(payload.vault_name ?? ''),
@@ -1337,20 +1369,130 @@ async function readVaultBridgeContext() {
   return { ok: false, error: 'Vault bridge context not found.' };
 }
 
-function getAllowedPsnxPaths() {
-  const allowed = new Set();
-  if (lastSelectedPsnxPath) allowed.add(path.resolve(lastSelectedPsnxPath));
+// --- Vault file sources (allowlist) -------------------------------------------
+// The renderer never names a path. It asks for a file *kind* and the source is
+// resolved here from three local origins, in priority order:
+//   1. the Eidolon vault registry (`vault_registry.json`) — authoritative, and
+//      robust to a stale bridge JSON, which readVaultBridgeContext already
+//      knows how to detect;
+//   2. the bridge JSON written at the end of the ceremony (`psnx_path` and
+//      `blend_path`);
+//   3. the .psnx the user last picked in the native file dialog.
+// The companion is `.blend` when Blender is present, `.blend_data` otherwise.
+
+const VAULT_FILE_EXTENSIONS = {
+  psnx: new Set(['.psnx']),
+  blend: new Set(['.blend', '.blend_data']),
+};
+
+function isVaultFileOfKind(kind, absPath) {
+  const allowed = VAULT_FILE_EXTENSIONS[kind];
+  return Boolean(allowed && allowed.has(path.extname(absPath).toLowerCase()));
+}
+
+function addVaultFileCandidate(candidates, kind, value) {
+  if (typeof value !== 'string' || !value.trim()) return;
+  const resolved = path.resolve(value.trim());
+  if (!isVaultFileOfKind(kind, resolved)) return;
+  if (!candidates[kind].includes(resolved)) candidates[kind].push(resolved);
+}
+
+// Synchronous origins only (bridge JSON files + last user-picked .psnx).
+function collectBridgeVaultFileCandidates() {
+  const candidates = { psnx: [], blend: [], vaultIds: [] };
+  if (lastSelectedPsnxPath) addVaultFileCandidate(candidates, 'psnx', lastSelectedPsnxPath);
   for (const candidate of getVaultBridgeCandidates()) {
     try {
       const context = JSON.parse(readFileSync(candidate, 'utf8'));
-      if (typeof context.psnx_path === 'string') {
-        allowed.add(path.resolve(context.psnx_path));
+      if (!context || typeof context !== 'object') continue;
+      addVaultFileCandidate(candidates, 'psnx', context.psnx_path);
+      addVaultFileCandidate(candidates, 'blend', context.blend_path);
+      if (typeof context.vault_id === 'string' && context.vault_id.trim()) {
+        candidates.vaultIds.push(context.vault_id.trim());
       }
     } catch {
       // ignore missing or malformed context
     }
   }
-  return allowed;
+  return candidates;
+}
+
+function pickRegistryVaultEntry(vaults, vaultRef) {
+  const entries = Object.entries(vaults).filter(([, entry]) => entry && typeof entry === 'object');
+  if (entries.length === 0) return null;
+  for (const id of vaultRef.vaultIds ?? []) {
+    if (vaults[id] && typeof vaults[id] === 'object') return vaults[id];
+  }
+  if (vaultRef.vaultNumber !== undefined && vaultRef.vaultNumber !== null) {
+    const byNumber = entries.find(([, entry]) => entry.vault_number === vaultRef.vaultNumber);
+    if (byNumber) return byNumber[1];
+  }
+  if (entries.length === 1) return entries[0][1];
+  // Several vaults and no usable hint: the most recently created one.
+  entries.sort(([, a], [, b]) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
+  return entries[0][1];
+}
+
+async function readVaultRegistryEntry(vaultRef = {}) {
+  const registryPaths = new Set();
+  const eidolonRoot = await resolveEidolonRoot();
+  if (eidolonRoot) {
+    registryPaths.add(path.join(eidolonRoot, 'data', 'vaults', 'identities', 'vault_registry.json'));
+  }
+  const dataDir = getEidolonDataDir();
+  if (dataDir) {
+    registryPaths.add(path.join(dataDir, 'data', 'vaults', 'identities', 'vault_registry.json'));
+  }
+  for (const registryPath of registryPaths) {
+    try {
+      const registry = JSON.parse(await fs.readFile(registryPath, 'utf8'));
+      const vaults = registry?.vaults && typeof registry.vaults === 'object' ? registry.vaults : {};
+      const entry = pickRegistryVaultEntry(vaults, vaultRef);
+      if (entry) return entry;
+    } catch {
+      // missing or unreadable registry: try the next location
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve the on-disk sources of the vault files for this device.
+ * Returns `{ psnx?: absPath, blend?: absPath }` — main-process use only, the
+ * paths carry the OS account name and must never reach the renderer or a log.
+ */
+async function resolveVaultFileSources(vaultRef = {}) {
+  const bridge = collectBridgeVaultFileCandidates();
+  const ordered = { psnx: [], blend: [] };
+
+  const ids = [];
+  if (typeof vaultRef.vaultId === 'string' && vaultRef.vaultId.trim()) ids.push(vaultRef.vaultId.trim());
+  ids.push(...bridge.vaultIds);
+  const entry = await readVaultRegistryEntry({ ...vaultRef, vaultIds: ids });
+  if (entry) {
+    addVaultFileCandidate(ordered, 'psnx', entry.psnx_path);
+    addVaultFileCandidate(ordered, 'blend', entry.blend_path);
+  }
+  for (const kind of ['psnx', 'blend']) {
+    for (const candidate of bridge[kind]) addVaultFileCandidate(ordered, kind, candidate);
+  }
+
+  const sources = {};
+  for (const kind of ['psnx', 'blend']) {
+    const found = ordered[kind].find((candidate) => {
+      try {
+        return statSync(candidate).isFile();
+      } catch {
+        return false;
+      }
+    });
+    if (found) sources[kind] = found;
+  }
+  return sources;
+}
+
+function getAllowedPsnxPaths() {
+  return new Set(collectBridgeVaultFileCandidates().psnx);
 }
 
 // --- Genesis ceremony (local Eidolon Python CLI) -----------------------------
@@ -1564,6 +1706,269 @@ ipcMain.handle('vault-bridge:read-psnx', async (event, psnxPath) => {
   } catch (err) {
     return { ok: false, error: 'Cannot read PSNX file at the specified path' };
   }
+});
+
+// --- Vault file handover (end of ceremony) -----------------------------------
+// Four channels behind the GenesisHandover screen. Non-negotiable rules:
+//   - the renderer sends a file *kind*, never a path (a `saveFile(src, dst)`
+//     channel would be an arbitrary copy primitive for any renderer XSS);
+//   - the destination comes exclusively from a native dialog;
+//   - copies never overwrite (COPYFILE_EXCL / 'wx'), an existing file is
+//     reported as skipped, not treated as an error that aborts the rest;
+//   - the keybundle bytes are written here and scrubbed, they never cross IPC;
+//   - no reply carries an absolute path (it contains the OS account name) or
+//     file contents — only filename, size and sha256.
+
+function stripAbsolutePaths(message) {
+  return String(message ?? '')
+    .replace(/[A-Za-z]:[\\/](?:[^\\/\s'"<>|]+[\\/])*[^\\/\s'"<>|]*/g, '<path>')
+    .replace(/\/(?:[^/\s'"<>|]+\/)+[^/\s'"<>|]*/g, '<path>');
+}
+
+async function digestVaultFile(absPath) {
+  const buf = await fs.readFile(absPath);
+  try {
+    return { size: buf.length, sha256: createHash('sha256').update(buf).digest('hex') };
+  } finally {
+    buf.fill(0);
+  }
+}
+
+async function showVaultFilesDialog(method, options) {
+  const { dialog } = electron;
+  const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  return parent ? dialog[method](parent, options) : dialog[method](options);
+}
+
+ipcMain.handle('vault-files:list', async (event) => {
+  requireTrustedRenderer(event);
+  try {
+    const sources = await resolveVaultFileSources();
+    const files = [];
+    for (const kind of ['psnx', 'blend']) {
+      const src = sources[kind];
+      if (!src) continue;
+      try {
+        const { size, sha256 } = await digestVaultFile(src);
+        files.push({ kind, filename: path.basename(src), size, sha256 });
+      } catch {
+        // Unreadable file: leave it out rather than fail the whole list.
+      }
+    }
+    return { ok: true, files };
+  } catch (err) {
+    return { ok: false, files: [], error: stripAbsolutePaths(err?.message ?? 'list_failed') };
+  }
+});
+
+ipcMain.handle('vault-files:save-copies', async (event, payload) => {
+  requireTrustedRenderer(event);
+  const requested = Array.isArray(payload?.kinds) ? payload.kinds : [];
+  const kinds = [...new Set(requested.filter((kind) => kind === 'psnx' || kind === 'blend'))];
+  if (kinds.length === 0) {
+    return { ok: false, saved: [], error: 'invalid_kinds' };
+  }
+
+  let sources;
+  try {
+    sources = await resolveVaultFileSources();
+  } catch (err) {
+    return { ok: false, saved: [], error: stripAbsolutePaths(err?.message ?? 'resolve_failed') };
+  }
+
+  const skipped = [];
+  const plan = [];
+  for (const kind of kinds) {
+    if (sources[kind]) plan.push({ kind, src: sources[kind] });
+    else skipped.push({ kind, filename: '', reason: 'missing' });
+  }
+  if (plan.length === 0) {
+    return { ok: false, saved: [], skipped, error: 'no_sources' };
+  }
+
+  const strings = getTrayStrings();
+  const picked = await showVaultFilesDialog('showOpenDialog', {
+    title: strings.vaultFilesDirTitle,
+    buttonLabel: strings.vaultFilesDirButton,
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (picked.canceled || !picked.filePaths?.[0]) {
+    return { ok: false, saved: [], skipped: skipped.length ? skipped : undefined, error: 'canceled' };
+  }
+  const destDir = picked.filePaths[0];
+
+  const saved = [];
+  for (const { kind, src } of plan) {
+    const filename = path.basename(src);
+    const dst = path.join(destDir, filename);
+    try {
+      await fs.copyFile(src, dst, fsConstants.COPYFILE_EXCL);
+      const { size, sha256 } = await digestVaultFile(dst);
+      saved.push({ kind, filename, size, sha256 });
+    } catch (err) {
+      skipped.push({ kind, filename, reason: err?.code === 'EEXIST' ? 'exists' : 'copy_failed' });
+    }
+  }
+  return { ok: true, saved, skipped: skipped.length ? skipped : undefined };
+});
+
+ipcMain.handle('vault-files:save-keybundle', async (event, vaultId) => {
+  requireTrustedRenderer(event);
+  const exported = await exportVaultKeybundleLocal(vaultId);
+  if (!exported.ok) {
+    return { ok: false, error: stripAbsolutePaths(exported.error) };
+  }
+  const buf = exported.bytes;
+  try {
+    const picked = await showVaultFilesDialog('showSaveDialog', {
+      title: getTrayStrings().vaultKeybundleTitle,
+      defaultPath: exported.filename,
+      filters: [{ name: 'Eidolon keybundle', extensions: ['eidolon_keybundle'] }],
+      properties: ['createDirectory', 'showOverwriteConfirmation'],
+    });
+    if (picked.canceled || !picked.filePath) {
+      return { ok: false, error: 'canceled' };
+    }
+    const dst = picked.filePath;
+    try {
+      // 'wx': exclusive create. Overwriting could destroy another vault's identity.
+      await fs.writeFile(dst, buf, { flag: 'wx' });
+    } catch (err) {
+      return { ok: false, error: err?.code === 'EEXIST' ? 'exists' : 'write_failed' };
+    }
+    return {
+      ok: true,
+      filename: path.basename(dst),
+      size: buf.length,
+      sha256: createHash('sha256').update(buf).digest('hex'),
+    };
+  } finally {
+    buf.fill(0);
+  }
+});
+
+ipcMain.handle('vault-files:reveal', async (event) => {
+  requireTrustedRenderer(event);
+  try {
+    const sources = await resolveVaultFileSources();
+    const target = sources.psnx ?? sources.blend;
+    if (!target) return { ok: false, error: 'no_sources' };
+    shell.showItemInFolder(target);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: stripAbsolutePaths(err?.message ?? 'reveal_failed') };
+  }
+});
+
+// --- Vault → E2EE seed (contract v1) -----------------------------------------
+// A vault-native Cipher account has no mnemonic: its masterKeyHex is the seed
+// the Eidolon runtime derives from the .psnx (`cipher-runtime e2ee-seed
+// derive --psnx <path>`, spec: cipher-e2ee/SPEC_VAULT_E2EE_SEED_V1.md). The
+// runtime prints one JSON line:
+//   {"ok":true,"version":"v1","key_id":"…","vault_id":"<64 hex>","e2ee_seed_hex":"<64 hex>"}
+//   {"ok":false,"error":"…","error_code":"…"}
+// Rules, on top of the vault-files ones above:
+//   - the renderer names a vault id, never a path: the .psnx is resolved here
+//     from the bridge context / Eidolon registry (resolveVaultFileSources);
+//   - the seed is a secret: it crosses IPC once, is never logged and never
+//     written to disk here, and every Buffer that held it is zeroed;
+//   - the vault id the runtime recomputes from the file must be the one the
+//     renderer asked for, otherwise the wrong vault would root the account.
+const E2EE_SEED_CLI_REL = path.join('scripts', 'public', 'e2ee_seed_cli.py');
+const VAULT_ID_REGEX = /^[a-f0-9]{4,64}$/;
+const HEX64_REGEX = /^[0-9a-f]{64}$/;
+
+/**
+ * Parse the last JSON line of a stdout Buffer without keeping a string copy
+ * of the whole output around. Returns null when no line parses.
+ */
+function parseLastJsonLineFromBuffer(buf) {
+  let end = buf.length;
+  while (end > 0) {
+    const start = buf.lastIndexOf(0x0a, end - 1);
+    const line = buf.subarray(start + 1, end).toString('utf8').trim();
+    if (line) {
+      try {
+        return JSON.parse(line);
+      } catch {
+        // non-JSON line (Python warning, progress), keep scanning upwards
+      }
+    }
+    if (start < 0) break;
+    end = start;
+  }
+  return null;
+}
+
+async function deriveVaultE2eeSeedLocal(vaultId) {
+  const requestedId = String(vaultId ?? '').trim().toLowerCase();
+  if (!VAULT_ID_REGEX.test(requestedId)) {
+    return { ok: false, error: 'invalid vaultId', errorCode: 'invalid_vault_id' };
+  }
+
+  let sources;
+  try {
+    sources = await resolveVaultFileSources({ vaultId: requestedId });
+  } catch (err) {
+    return {
+      ok: false,
+      error: stripAbsolutePaths(err?.message ?? 'resolve_failed'),
+      errorCode: 'resolve_failed',
+    };
+  }
+  if (!sources.psnx) {
+    return { ok: false, error: 'PSNX file not found on this device', errorCode: 'psnx_not_found' };
+  }
+
+  let result;
+  try {
+    result = await runCipherRuntimeCli('e2ee-seed', E2EE_SEED_CLI_REL, ['derive', '--psnx', sources.psnx]);
+  } catch (err) {
+    return {
+      ok: false,
+      error: stripAbsolutePaths(err?.message ?? 'runtime_unavailable'),
+      errorCode: 'runtime_unavailable',
+    };
+  }
+
+  const stdout = result.stdout;
+  let payload;
+  try {
+    payload = parseLastJsonLineFromBuffer(stdout);
+  } finally {
+    // The only copy of the seed outside the parsed object.
+    stdout.fill(0);
+  }
+
+  if (result.code !== 0 || !payload || payload.ok !== true) {
+    const detail = payload?.error || result.stderr.slice(-500) || `exit ${result.code}`;
+    return {
+      ok: false,
+      error: stripAbsolutePaths(`e2ee seed derivation failed: ${detail}`),
+      errorCode: typeof payload?.error_code === 'string' ? payload.error_code : 'derivation_failed',
+    };
+  }
+
+  const resolvedId = String(payload.vault_id ?? '').trim().toLowerCase();
+  const masterKeyHex = String(payload.e2ee_seed_hex ?? '').trim().toLowerCase();
+  if (payload.version !== 'v1' || !HEX64_REGEX.test(resolvedId) || !HEX64_REGEX.test(masterKeyHex)) {
+    return { ok: false, error: 'malformed runtime reply', errorCode: 'malformed_reply' };
+  }
+  if (resolvedId !== requestedId) {
+    return { ok: false, error: 'vault_mismatch', errorCode: 'vault_mismatch' };
+  }
+
+  return {
+    ok: true,
+    keyId: String(payload.key_id ?? ''),
+    vaultId: resolvedId,
+    masterKeyHex,
+  };
+}
+
+ipcMain.handle('vault-e2ee:derive-seed', async (event, payload) => {
+  requireTrustedRenderer(event);
+  return deriveVaultE2eeSeedLocal(payload?.vaultId);
 });
 
 ipcMain.handle('eidolon:open-launcher', async () => launchEidolonLauncher());

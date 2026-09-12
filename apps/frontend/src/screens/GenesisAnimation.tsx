@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import GenesisScene from './genesis/GenesisScene';
-import { exportVaultKeybundle } from '../lib/keybundle';
+import GenesisHandover from './genesis/GenesisHandover';
+import { button, buttonGhost, exportErr } from './genesis/genesisStyles';
 
 type PhaseEvent = {
   phase: number;
@@ -81,8 +82,6 @@ export default function GenesisAnimation() {
   const [currentPhase, setCurrentPhase] = useState<PhaseEvent | null>(null);
   const [finalPayload, setFinalPayload] = useState<Record<string, unknown> | null>(null);
   const [awakeningPayload, setAwakeningPayload] = useState<AwakeningPayload | null>(null);
-  const [exportState, setExportState] = useState<'idle' | 'downloading' | 'ok' | 'error'>('idle');
-  const [exportMessage, setExportMessage] = useState('');
   /**
    * Tear-down for whichever transport is currently driving the ceremony
    * (IPC subscription in Electron, EventSource in the browser).
@@ -277,81 +276,55 @@ export default function GenesisAnimation() {
             ) : (
               <div style={welcome}>{t('genesis.welcome')}</div>
             )}
-            <div style={backupNotice}>{t('genesis.backup_notice')}</div>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button
-                onClick={async () => {
-                  const vaultId = String(finalPayload?.vault_id ?? finalPayload?.key_id ?? '');
-                  if (!vaultId) { setExportState('error'); setExportMessage(t('genesis.vault_id_missing')); return; }
-                  setExportState('downloading');
-                  setExportMessage('');
-                  const r = await exportVaultKeybundle(vaultId);
-                  if (r.ok) {
-                    setExportState('ok');
-                    setExportMessage(`${r.filename} (${Math.round(r.size / 1024)} KB)`);
-                  } else {
-                    setExportState('error');
-                    setExportMessage(r.error);
-                  }
-                }}
-                disabled={exportState === 'downloading'}
-                style={buttonPrimary}
-              >
-                {exportState === 'downloading' ? t('genesis.downloading') : t('genesis.download')}
-              </button>
-              {typeof finalPayload?.viewer_url === 'string' && (
-                <a
-                  href={finalPayload.viewer_url as string}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={buttonGhost}
-                >
-                  {t('genesis.view_hologram')}
-                </a>
-              )}
-              {awakeningPayload && (
-                <button
-                  onClick={() => {
-                    // The claim flow lives in Esoptron — open the council
-                    // page with the seal as query parameter. The anchor URL
-                    // is published by the Eidolon emitter when the production
-                    // anchor service answers; otherwise (demo mode) fall back
-                    // to the default Esoptron host.
-                    const base = awakeningPayload.anchor_url
-                      ?? 'https://esoptron.logos-project.xyz';
-                    const seq = awakeningPayload.sequence ?? '';
-                    const arch = awakeningPayload.archetype_id ?? '';
-                    const fp = awakeningPayload.vault_fp_hex ?? '';
-                    window.open(
-                      `${base}/genesis/claim?sequence=${seq}&archetype_id=${arch}&vault_fp=${fp}`,
-                      '_blank',
-                      'noopener',
-                    );
-                  }}
-                  style={buttonClaim(awakeningPayload.color_hue ?? 45)}
-                >
-                  {t('genesis.claim_seat')}
-                </button>
-              )}
-              {fromSignup ? (
-                <button
-                  onClick={() => navigate('/signup?step=vault-bridge&auto=connect')}
-                  style={buttonGhost}
-                >
-                  {t('genesis.enter_cipher')}
-                </button>
-              ) : (
-                <button onClick={() => navigate('/conversations')} style={buttonGhost}>
-                  {t('genesis.continue')}
-                </button>
-              )}
-            </div>
-            {exportState === 'ok' && (
-              <div style={exportOk}>{t('genesis.downloaded', { label: exportMessage })}</div>
-            )}
-            {exportState === 'error' && (
-              <div style={exportErr}>{t('genesis.export_failed', { message: exportMessage })}</div>
-            )}
+            {/*
+              Handover with a save gate: the vault files were just written on
+              this machine and nothing else holds them. "Enter Cipher" stays
+              disabled until at least one save succeeded (or the user
+              explicitly acknowledges having no backup).
+            */}
+            <GenesisHandover
+              vaultId={String(finalPayload?.vault_id ?? finalPayload?.key_id ?? '')}
+              continueLabel={fromSignup ? t('genesis.enter_cipher') : t('genesis.continue')}
+              onContinue={() => navigate(fromSignup ? '/signup?step=vault-bridge&auto=connect' : '/conversations')}
+              extraActions={
+                <>
+                  {typeof finalPayload?.viewer_url === 'string' && (
+                    <a
+                      href={finalPayload.viewer_url as string}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={buttonGhost}
+                    >
+                      {t('genesis.view_hologram')}
+                    </a>
+                  )}
+                  {awakeningPayload && (
+                    <button
+                      onClick={() => {
+                        // The claim flow lives in Esoptron — open the council
+                        // page with the seal as query parameter. The anchor URL
+                        // is published by the Eidolon emitter when the production
+                        // anchor service answers; otherwise (demo mode) fall back
+                        // to the default Esoptron host.
+                        const base = awakeningPayload.anchor_url
+                          ?? 'https://esoptron.logos-project.xyz';
+                        const seq = awakeningPayload.sequence ?? '';
+                        const arch = awakeningPayload.archetype_id ?? '';
+                        const fp = awakeningPayload.vault_fp_hex ?? '';
+                        window.open(
+                          `${base}/genesis/claim?sequence=${seq}&archetype_id=${arch}&vault_fp=${fp}`,
+                          '_blank',
+                          'noopener',
+                        );
+                      }}
+                      style={buttonClaim(awakeningPayload.color_hue ?? 45)}
+                    >
+                      {t('genesis.claim_seat')}
+                    </button>
+                  )}
+                </>
+              }
+            />
             {typeof finalPayload?.viewer_error === 'string' && (
               <div style={exportErr}>{t('genesis.hologram_unavailable', { error: String(finalPayload.viewer_error) })}</div>
             )}
@@ -447,40 +420,10 @@ const input: React.CSSProperties = {
   outline: 'none',
   pointerEvents: 'auto',
 };
-const button: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.06)',
-  color: '#eef1ff',
-  border: '1px solid rgba(255,255,255,0.18)',
-  borderRadius: 999,
-  padding: '9px 28px',
-  fontFamily: 'inherit',
-  fontSize: 14,
-  cursor: 'pointer',
-  letterSpacing: 1,
-  pointerEvents: 'auto',
-};
-const buttonPrimary: React.CSSProperties = {
-  ...button,
-  background: 'linear-gradient(180deg, rgba(246,236,208,0.14), rgba(246,236,208,0.04))',
-  borderColor: 'rgba(246,236,208,0.42)',
-  color: '#f6ecd0',
-};
-const buttonGhost: React.CSSProperties = {
-  ...button,
-  textDecoration: 'none',
-  display: 'inline-block',
-};
+// Button / status styles live in ./genesis/genesisStyles.ts, shared with the
+// handover panel.
 const errorText: React.CSSProperties = { fontSize: 16, color: '#f0a0a0' };
 const errorDetail: React.CSSProperties = { fontSize: 12, opacity: 0.55, maxWidth: 420 };
-const backupNotice: React.CSSProperties = {
-  fontSize: 12,
-  opacity: 0.65,
-  maxWidth: 440,
-  lineHeight: 1.5,
-  marginTop: -4,
-};
-const exportOk: React.CSSProperties = { fontSize: 12, color: '#a0e0a0', opacity: 0.8 };
-const exportErr: React.CSSProperties = { fontSize: 12, color: '#f0a0a0', opacity: 0.85, maxWidth: 420 };
 
 /* -------------------------------------------------------------------------- */
 /*  Genesis Awakening — banner shown for the 88 vaults of the Council         */
