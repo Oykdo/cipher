@@ -137,16 +137,24 @@ const PBS_CACHE_DIR = path.join(cipherRoot, 'assets', '.python-cache');
 //
 // Release and SHA-256 are pinned; the digest is re-verified on every build, so
 // a swapped asset fails the build instead of shipping.
-const RUNTIME_RELEASE = 'cipher-runtime-20260909';
+//
+// cipher-runtime-20260909 was built BEFORE the commit that closes the three
+// machine-lock holes (fail-open offline, key generated before the check,
+// client-chosen vault number), so v1.4.0 and v1.4.1 shipped a runtime without
+// them. 20260912 is built from the private core at 8a51d13, after that fix,
+// and was verified under confinement on both platforms: refused with no
+// .psnx when the lock server is unreachable, one vault when it answers,
+// refused again on the second ceremony.
+const RUNTIME_RELEASE = 'cipher-runtime-20260912';
 const RUNTIME_TARGETS = {
   win32: {
     asset: 'cipher-runtime.exe',
-    sha256: '9e40a039a0f73857fb568404e82eeff885f12d0f4fddde460933f2acb40b7f7e',
+    sha256: '62b1b7232e23c801871491fb09ed0fe27735fa36065b8709cc55eb04b4f03fdd',
     localDirs: ['dist-cipher-runtime'],
   },
   linux: {
     asset: 'cipher-runtime',
-    sha256: 'a2a3529ece0fe5ebadf383ed9c51ba15ab161f4b8514ca5f1dd0a7aa0fd05146',
+    sha256: 'b54cfd522f2b1df6027412d31eabe4689be16e6c6396d8aac6c99d3f5315a83d',
     localDirs: ['dist-cipher-runtime-linux', 'dist-cipher-runtime'],
   },
 };
