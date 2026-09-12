@@ -20,7 +20,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          # Pinned on purpose. The frozen cipher-runtime carries a measured
+          # glibc floor of 2.35, and the smoke test below EXECUTES it: an
+          # unpinned ubuntu-latest would move to 26.04 one day and change
+          # what that execution proves without anyone editing this file.
+          - os: ubuntu-24.04
             builder_flag: --linux
             artifact_name: cipher-linux
             artifact_glob: |
@@ -103,6 +107,13 @@ jobs:
             exit 1
           fi
           echo "Ceremony runtime staged at $CEREMONY"
+          # Presence is not enough: a truncated download or a runtime built
+          # against a newer glibc than this runner leaves a file that exists
+          # and cannot run. Execute it the way main.js does.
+          chmod +x "$CEREMONY"
+          RUNTIME_VERSION="$("$CEREMONY" --version)"
+          [ -n "$RUNTIME_VERSION" ] || { echo "::error::cipher-runtime --version printed nothing"; exit 1; }
+          echo "cipher-runtime --version -> ${RUNTIME_VERSION}"
 
       # Always build with --publish never. The release upload is done in
       # the separate "Publish to GitHub Release" step below so the Windows
@@ -136,7 +147,7 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Smoke test Linux artifacts
-        if: matrix.os == 'ubuntu-latest'
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           set -euo pipefail
@@ -174,6 +185,23 @@ jobs:
             exit 1
           fi
           echo "✓ Genesis ceremony runtime present in bundle"
+          # Until v1.4.1 this stopped at "the file exists". It could not tell a
+          # runtime that runs from one that dies in the dynamic loader, which
+          # is exactly how a glibc floor violation presents. Run it from the
+          # extracted image, as the installed app would.
+          chmod +x "$CEREMONY"
+          RUNTIME_VERSION="$("$CEREMONY" --version)"
+          [ -n "$RUNTIME_VERSION" ] || { echo "::error::cipher-runtime --version printed nothing"; exit 1; }
+          echo "✓ cipher-runtime executes from the AppImage (--version -> ${RUNTIME_VERSION})"
+          # The .deb must carry the floor the runtime was measured at, so apt
+          # refuses cleanly on an older glibc instead of the ceremony dying in
+          # an opaque loader error at signup.
+          DEB_DEPENDS="$(dpkg-deb -f "$DEB" Depends)"
+          echo "deb Depends: ${DEB_DEPENDS}"
+          case "$DEB_DEPENDS" in
+            *"libc6 (>= 2.35)"*) echo "✓ deb declares libc6 (>= 2.35)" ;;
+            *) echo "::error::deb does not declare libc6 (>= 2.35)"; exit 1 ;;
+          esac
 
       # Generate a per-platform SHA256SUMS.txt next to the binaries so a
       # tester can verify their download with `sha256sum -c SHA256SUMS.txt`
