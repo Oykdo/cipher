@@ -80,22 +80,22 @@ If you've ever wondered *"how do I know my messenger isn't lying about end-to-en
 >    [virustotal.com](https://www.virustotal.com) — most engines show
 >    clean. False positives on Electron apps are common (heuristics flag
 >    the embedded Chromium / Node), and you can compare across releases.
-> 3. **Verify the SHA256** against `SHA256SUMS.txt` published next to
+> 3. **Verify the SHA256** against `SHA256SUMS-windows.txt` or `SHA256SUMS-linux.txt` published next to
 >    the binaries on the [release page](../../releases/latest). Open
 >    that file in your browser, then compare the line for your
 >    download:
 >
 >    ```bash
 >    # Linux — one-shot verification of every artifact in the file
->    sha256sum -c SHA256SUMS.txt
+>    sha256sum -c SHA256SUMS-linux.txt
 >    ```
 >
 >    ```powershell
->    # Windows — print the local hash, eyeball-match the line in SHA256SUMS.txt
+>    # Windows — print the local hash, eyeball-match the line in SHA256SUMS-windows.txt
 >    Get-FileHash .\Cipher-Setup-1.4.3.exe -Algorithm SHA256
 >    ```
 >
->    `SHA256SUMS.txt` is generated inside the GitHub Actions runner from
+>    The checksum files are generated inside the GitHub Actions runner from
 >    the binaries it just built and published in the same job — there is
 >    no human in the loop between the build and the upload.
 >

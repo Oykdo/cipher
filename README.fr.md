@@ -134,22 +134,22 @@ Téléchargez `Cipher-Setup-1.2.7.exe` (Windows) ou `Cipher-1.2.7.AppImage` /
 >    La plupart des moteurs sont verts. Les faux positifs sur les apps
 >    Electron sont fréquents (les heuristiques flag le Chromium / Node
 >    embarqué).
-> 3. **Vérifie le SHA256** contre le fichier `SHA256SUMS.txt` publié à
+> 3. **Vérifie le SHA256** contre le fichier `SHA256SUMS-windows.txt` ou `SHA256SUMS-linux.txt` publié à
 >    côté des binaires sur la [page release](../../releases/latest).
 >    Ouvre-le dans le navigateur, puis compare la ligne correspondant à
 >    ton téléchargement :
 >
 >    ```bash
 >    # Linux — vérifie tous les artifacts d'un coup
->    sha256sum -c SHA256SUMS.txt
+>    sha256sum -c SHA256SUMS-linux.txt
 >    ```
 >
 >    ```powershell
->    # Windows — affiche le hash local, compare visuellement avec la ligne dans SHA256SUMS.txt
+>    # Windows — affiche le hash local, compare visuellement avec la ligne dans SHA256SUMS-windows.txt
 >    Get-FileHash .\Cipher-Setup-1.2.7.exe -Algorithm SHA256
 >    ```
 >
->    `SHA256SUMS.txt` est généré dans le runner GitHub Actions à partir
+>    Les fichiers de sommes sont générés dans le runner GitHub Actions à partir
 >    des binaires qu'il vient de builder et de publier dans le même job
 >    — aucun humain n'intervient entre le build et l'upload.
 >

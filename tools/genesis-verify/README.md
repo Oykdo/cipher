@@ -58,6 +58,47 @@ Résultat de référence, v1.4.2 sur Ubuntu 22.04 (glibc 2.35), le 2026-09-12 :
 `.machine_lock.enc` sous `~/.local/share/Eidolon/data/vaults/`, deux requêtes
 `status` et une `register` signées reçues par le faux serveur.
 
+## 3. Depuis le paquet `.deb` installé — `deb-test.sh`, `deb-hold.sh`
+
+Même bac à sable, pour `/opt/Cipher/cipher` après `apt-get install ./Cipher-<v>-amd64.deb`
+sur WSL Ubuntu 22.04 (glibc 2.35, le plancher). Port DevTools 9223 par défaut.
+
+```bash
+MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-22.04 -u root -- bash /mnt/c/.../deb-hold.sh /mnt/c/.../tools/genesis-verify 9223 900
+node appimage-genesis-driver.mjs 9223 DebVerify 480
+MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-22.04 -u root -- bash -c "touch /tmp/cipher-appimage-test/stop; bash /mnt/c/.../appimage-report.sh"
+```
+
+Résultat de référence, v1.4.3 le 2026-09-12 : `Depends` résolu (`libc6 (>= 2.35)`
+compris), `done {"code":0}`, un `.psnx` et un `.machine_lock.enc` sous
+`~/.local/share/Eidolon`, deux `status` et un `register` signés. Puis
+`apt-get remove -y cipher`.
+
+## 4. Depuis l'application Windows empaquetée — `win-hold.sh`
+
+Depuis Git Bash, sur `release/win-unpacked/Cipher.exe` (même contenu que
+l'installeur, produit par `electron-builder --win dir`) ou sur une
+installation. Ce poste porte le vrai vault dans `%LOCALAPPDATA%\Eidolon` :
+le script détourne `USERPROFILE`, `LOCALAPPDATA`, `APPDATA`, `TEMP` et
+`EIDOLON_DATA_DIR`, et pointe `EIDOLON_SERVER_URL` sur le faux serveur.
+
+```bash
+bash win-hold.sh /c/logos_clean/Cipher/release/win-unpacked/Cipher.exe "$TEMP/win-verify" \
+     fake_lock_server.py /c/Logos/Eidolon/.venv/Scripts/python.exe 9225 18083 1200   # en tache de fond
+node appimage-genesis-driver.mjs 9225 WinUnpackedVerify 560
+touch "$TEMP/win-verify/stop"    # le script tue l'arbre de processus et imprime le bilan
+```
+
+Résultat de référence, v1.4.3 le 2026-09-12 : `done {"code":0}`, 768 bits,
+post-quantique actif, 228 s, un `.psnx` et un `.machine_lock.enc` sous
+`EIDOLON_DATA_DIR`, deux `status` et un `register` signés.
+
+Deux leçons payées : l'app **meurt en silence** avec un environnement vide
+(`env -i`), donc l'environnement est hérité et seules les variables du bac à
+sable sont remplacées ; et sans `--disable-gpu` le processus GPU de Chromium
+plante puis tourne à 100 % avec le renderer, et la cérémonie affamée n'avance
+plus.
+
 ## Pièges
 
 - `MSYS_NO_PATHCONV=1` devant tout `wsl.exe` appelé depuis Git Bash, sinon les
