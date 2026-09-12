@@ -49,7 +49,9 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const SEVERITY = { ERROR: 'error', WARN: 'warn', OK: 'ok' };
+// `info` ne fait jamais echouer, meme en --strict : c'est un etat attendu
+// qu'on tient a voir ecrit, pas une derive.
+export const SEVERITY = { ERROR: 'error', WARN: 'warn', INFO: 'info', OK: 'ok' };
 
 const DEFAULT_REPORT_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const RESONANCE_BASELINE = 50;
@@ -84,6 +86,23 @@ export function evaluate(snapshot) {
 
   const add = (id, severity, title, detail, fix) =>
     findings.push({ id, severity, title, detail, ...(fix ? { fix } : {}) });
+
+  // Un lien sans le moindre message dans la base du bridge n'a rien a
+  // rapporter : le reporter ne POSTe que sur un signal (messages,
+  // conversations, verifications de cle), en miroir de is_active() cote
+  // Eidolon. Dans cet etat, « jamais alimente » et « resonance sous la ligne
+  // de base » sont la consequence attendue d'un ecosysteme a un seul
+  // utilisateur, pas une derive -- et une alerte qui sonne chaque jour pour
+  // rien cesse d'etre lue. Verifie en production : 0 message, 0 conversation,
+  // et deux avertissements par jour depuis le 10 septembre.
+  //   true       au moins un compte lie a du signal dans la base
+  //   false      des comptes lies, aucun signal
+  //   undefined  compteurs absents (instantane ancien) : on garde l'alerte
+  const bridgeSignalFor = (vaultId) => {
+    const holders = linkedUsers.filter((u) => u.linked_vault_id === vaultId);
+    if (!holders.length || holders.some((u) => u.messages_sent === undefined)) return undefined;
+    return holders.some((u) => (u.messages_sent || 0) > 0 || (u.conversations || 0) > 0);
+  };
 
   for (const [name, src] of Object.entries({
     'registre local': local, 'registre serveur': server,
@@ -160,7 +179,13 @@ export function evaluate(snapshot) {
 
     const recorded = entry.activity_recorded_at
       ? Date.parse(entry.activity_recorded_at) : null;
-    if (!recorded) {
+    if (!recorded && bridgeSignalFor(id) === false) {
+      add('LINK_NEVER_FED', SEVERITY.INFO,
+        `${entry.vault_name || id.slice(0, 12)} : lie a Cipher, en attente d'activite`,
+        `Aucun message ni conversation dans la base du bridge pour les comptes `
+        + `lies : le reporter n'a rien a envoyer, et activity_recorded_at reste `
+        + `vide a juste titre. Le lien sera juge au premier message.`);
+    } else if (!recorded) {
       add('LINK_NEVER_FED', SEVERITY.WARN,
         `${entry.vault_name || id.slice(0, 12)} : lie a Cipher, jamais alimente`,
         `Des comptes Cipher pointent sur ce vault mais activity_recorded_at `
@@ -180,10 +205,18 @@ export function evaluate(snapshot) {
     const linkedHere = linkedUsers.some((u) => u.linked_vault_id === id);
     if (linkedHere && typeof entry.resonance === 'number'
         && entry.resonance < RESONANCE_BASELINE) {
-      add('RESONANCE_DECAYING', SEVERITY.WARN,
-        `${entry.vault_name || id.slice(0, 12)} : resonance ${entry.resonance} sous la ligne de base`,
-        `Un vault lie a des comptes actifs devrait remonter vers ${RESONANCE_BASELINE}. `
-        + `Une decroissance signifie que le tick ne voit aucune activite.`);
+      if (bridgeSignalFor(id) === false) {
+        add('RESONANCE_DECAYING', SEVERITY.INFO,
+          `${entry.vault_name || id.slice(0, 12)} : resonance ${entry.resonance}, sans activite a rapporter`,
+          `Sous la ligne de base (${RESONANCE_BASELINE}) parce qu'aucun message ne `
+          + `transite par le bridge : elle decroit par construction a chaque epoque `
+          + `inactive et remontera avec les premiers echanges.`);
+      } else {
+        add('RESONANCE_DECAYING', SEVERITY.WARN,
+          `${entry.vault_name || id.slice(0, 12)} : resonance ${entry.resonance} sous la ligne de base`,
+          `Un vault lie a des comptes actifs devrait remonter vers ${RESONANCE_BASELINE}. `
+          + `Une decroissance signifie que le tick ne voit aucune activite.`);
+      }
     }
   }
 
@@ -212,7 +245,9 @@ export function evaluate(snapshot) {
       + `en soit informee, et plus aucune activite ne peut remonter.`);
   }
 
-  if (!findings.length) {
+  // Des informations ne sont pas des constats : elles n'empechent pas de
+  // conclure que les registres concordent.
+  if (!findings.some((f) => f.severity !== SEVERITY.INFO)) {
     add('CONSISTENT', SEVERITY.OK, 'Les quatre registres concordent',
       `${localVaults.length} vault(s) local(aux), ${Object.keys(serverById).length} `
       + `au serveur, ${linkedUsers.length} lien(s) Cipher.`);
@@ -306,9 +341,19 @@ async function collectCipher(dsn) {
     const client = new pg.Client({ connectionString: dsn });
     await client.connect();
     try {
+      // Les deux compteurs disent si le bridge a quelque chose a rapporter
+      // pour ce compte, toutes periodes confondues : les memes tables que
+      // cipherActivityReporter, sans borne de temps. Un compte a zero des
+      // deux cotes n'a rien a envoyer, et les invariants de vivacite le
+      // liront comme une attente, pas comme une panne.
       const { rows } = await client.query(
-        `SELECT id, username, linked_vault_id, last_known_resonance
-           FROM users ORDER BY username`);
+        `SELECT u.id, u.username, u.linked_vault_id, u.last_known_resonance,
+                (SELECT COUNT(*)::int FROM messages m WHERE m.sender_id = u.id) AS messages_sent,
+                (SELECT COUNT(DISTINCT m.conversation_id)::int
+                   FROM messages m
+                   JOIN conversation_members cm ON cm.conversation_id = m.conversation_id
+                  WHERE cm.user_id = u.id) AS conversations
+           FROM users u ORDER BY u.username`);
       return { users: rows };
     } finally {
       await client.end();
@@ -339,7 +384,7 @@ async function collectEsoptron(vaultIds, base) {
 // ===========================================================================
 
 const COLOURS = {
-  error: '\x1b[31m', warn: '\x1b[33m', ok: '\x1b[32m',
+  error: '\x1b[31m', warn: '\x1b[33m', info: '\x1b[36m', ok: '\x1b[32m',
   dim: '\x1b[2m', bold: '\x1b[1m', reset: '\x1b[0m',
 };
 

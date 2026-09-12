@@ -222,3 +222,52 @@ test('8bis. un lien existant fait taire l alerte', () => {
   const found = ids(evaluate(healthy()));
   assert.ok(!found.includes('NO_LINK_AT_ALL'));
 });
+
+// Une attente n'est pas une panne. Verifie en production : un seul
+// utilisateur, zero message dans le bridge, et deux avertissements par jour
+// qui ne pouvaient rien vouloir dire d'autre que « personne n'a encore ecrit ».
+test('5ter. un lien sans aucun message dans le bridge est une attente, pas une alerte', () => {
+  const snapshot = healthy();
+  snapshot.server.byId[VAULT].activity_recorded_at = null;
+  snapshot.server.byId[VAULT].resonance = 29.87;
+  snapshot.cipher.users[0].messages_sent = 0;
+  snapshot.cipher.users[0].conversations = 0;
+  const findings = evaluate(snapshot);
+  const byId = Object.fromEntries(findings.map((f) => [f.id, f]));
+  assert.equal(byId.LINK_NEVER_FED.severity, SEVERITY.INFO);
+  assert.equal(byId.RESONANCE_DECAYING.severity, SEVERITY.INFO);
+  assert.ok(ids(findings).includes('CONSISTENT'), 'une attente ne contredit pas la concordance');
+  assert.equal(exitCodeFor(findings, { strict: true }), 0);
+});
+
+test('5quater. des messages dans le bridge et rien au registre restent une alerte', () => {
+  const snapshot = healthy();
+  snapshot.server.byId[VAULT].activity_recorded_at = null;
+  snapshot.server.byId[VAULT].resonance = 29.87;
+  snapshot.cipher.users[0].messages_sent = 3;
+  snapshot.cipher.users[0].conversations = 1;
+  const findings = evaluate(snapshot);
+  const byId = Object.fromEntries(findings.map((f) => [f.id, f]));
+  assert.equal(byId.LINK_NEVER_FED.severity, SEVERITY.WARN);
+  assert.equal(byId.RESONANCE_DECAYING.severity, SEVERITY.WARN);
+  assert.ok(!ids(findings).includes('CONSISTENT'));
+  assert.equal(exitCodeFor(findings, { strict: true }), 1);
+});
+
+test('5quinquies. des compteurs absents ne font pas taire l alerte', () => {
+  // healthy() ne porte pas les compteurs : un instantane ancien, ou une
+  // requete qui ne les a pas ramenes. Dans le doute, l'alerte reste.
+  const snapshot = healthy();
+  snapshot.server.byId[VAULT].activity_recorded_at = null;
+  const findings = evaluate(snapshot);
+  assert.equal(findings.find((f) => f.id === 'LINK_NEVER_FED').severity, SEVERITY.WARN);
+});
+
+test('5sexies. une conversation sans message envoye compte comme un signal', () => {
+  const snapshot = healthy();
+  snapshot.server.byId[VAULT].activity_recorded_at = null;
+  snapshot.cipher.users[0].messages_sent = 0;
+  snapshot.cipher.users[0].conversations = 2;
+  const findings = evaluate(snapshot);
+  assert.equal(findings.find((f) => f.id === 'LINK_NEVER_FED').severity, SEVERITY.WARN);
+});
