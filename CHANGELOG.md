@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.4.3 — the packaged app no longer dies on an expired session
+
+### Fixed
+
+- **A failed token refresh left the packaged app on a dead page.** When the
+  refresh token is rejected, the API interceptor cleared the session and then
+  navigated to the root-relative `/login`. The packaged app is loaded from
+  `file://`, where that resolves to `file:///C:/login`, which Chromium blocks
+  with "Not allowed to load local resource". Since the proactive refresh runs
+  at startup, an expired refresh token meant Cipher did not start at all. The
+  redirect now sets the hash fragment, which is what the HashRouter reads,
+  under `file://` and `http://` alike. Two other root-relative links, in the
+  P2P chat placeholder and the monitoring dashboard, are fixed the same way.
+
 ## v1.4.2 — the shipped ceremony runtime gets the machine-lock fix
 
 ### Fixed
