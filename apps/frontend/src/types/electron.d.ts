@@ -111,6 +111,94 @@ type VaultE2EESeedResult =
   | { ok: true; keyId: string; vaultId: string; masterKeyHex: string }
   | { ok: false; error: string; errorCode?: string };
 
+/**
+ * Sphere custody client (`sphere:*`, Eidolon I4). Replies are the JSON lines
+ * of `cipher-runtime sphere …` (Eidolon: docs/HANDOVER_SPHERE_CLIENT §3),
+ * paths stripped. `state` is the user-facing verdict of a sphere.
+ */
+type SphereState = 'finale' | 'en attente' | 'brûlée' | 'invalide';
+
+type SphereStatus = {
+  sphere_id: string;
+  rarity: string;
+  name?: string | null;
+  owner?: string | null;
+  seq: number;
+  head_hash: string;
+  ok: boolean;
+  final: boolean;
+  final_by?: 'receipt' | 'checkpoint' | null;
+  revealed: boolean;
+  burned: boolean;
+  pending: boolean;
+  controllable: boolean;
+  errors: string[];
+  state: SphereState;
+};
+
+type SphereFailure = { ok: false; error: string; errorCode?: string; sphereId?: string };
+
+type SphereListResult =
+  | { ok: true; vault_id: string; count: number; spheres: SphereStatus[]; trusted_issuer: boolean; genesis_cached: boolean }
+  | SphereFailure;
+
+type SphereSyncResult =
+  | {
+      ok: true;
+      vault_id: string;
+      resubmitted: string[];
+      updated: string[];
+      received: string[];
+      transferred_away: string[];
+      mismatches: string[];
+      final: number;
+      waiting: number;
+      errors: Record<string, string>;
+      spheres: SphereStatus[];
+    }
+  | SphereFailure;
+
+type SphereClaimResult =
+  | {
+      ok: true;
+      vault_id: string;
+      vault_number?: number | null;
+      claimed: SphereStatus[];
+      already: SphereStatus[];
+      deferred: string[];
+      errors: Record<string, string>;
+    }
+  | SphereFailure;
+
+type SphereMailboxResult =
+  | { ok: true; vault_id: string; deposited: number; pending?: number | null; first_index: number; next_index: number }
+  | SphereFailure;
+
+type SphereTransferResult =
+  | { ok: true; vault_id: string; sphere_id: string; to: string; seq: number; head_hash: string; final: boolean; state: SphereState }
+  | SphereFailure;
+
+type SphereImportResult =
+  | {
+      ok: true;
+      vault_id: string;
+      sphere_id: string;
+      state: SphereState;
+      final: boolean;
+      final_by?: 'receipt' | 'checkpoint' | null;
+      revealed: boolean;
+      seq: number;
+      head_hash: string;
+      submitted: number[];
+      status: SphereStatus;
+      filename: string;
+    }
+  | SphereFailure;
+
+type SphereExportResult =
+  | { ok: true; sphereId: string; state: SphereState; filename: string; size: number }
+  | SphereFailure;
+
 declare global {
   interface Window {
     electron?: {
@@ -185,6 +273,15 @@ declare global {
         reveal: () => Promise<VaultFilesRevealResult>;
       };
       deriveVaultE2EESeed?: (vaultId: string) => Promise<VaultE2EESeedResult>;
+      sphere?: {
+        list: (vaultId: string) => Promise<SphereListResult>;
+        sync: (vaultId: string, apiUrl?: string) => Promise<SphereSyncResult>;
+        claim: (vaultId: string, apiUrl?: string) => Promise<SphereClaimResult>;
+        mailbox: (vaultId: string, count?: number, apiUrl?: string) => Promise<SphereMailboxResult>;
+        transfer: (vaultId: string, sphereId: string, to: string, apiUrl?: string) => Promise<SphereTransferResult>;
+        importFile: (vaultId: string, apiUrl?: string) => Promise<SphereImportResult>;
+        exportFile: (vaultId: string, sphereId: string) => Promise<SphereExportResult>;
+      };
       backupPassword?: {
         has: (username: string) => Promise<boolean>;
         get: (username: string) => Promise<{ exists: boolean; password?: string; error?: string }>;

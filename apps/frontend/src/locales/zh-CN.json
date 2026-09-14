@@ -734,7 +734,8 @@
         "label": "关闭时在后台继续运行",
         "description": "Cipher 保持活动状态，以免错过消息。点击时钟旁边的图标即可重新打开窗口。"
       }
-    }
+    },
+    "spheres": "球体"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1516,5 +1517,87 @@
     "handover_gate_hint": "请至少保存一份备份后再继续。",
     "handover_skip_link": "不保存并继续",
     "handover_skip_confirm": "我明白我没有任何备份，丢失此设备意味着丢失此保险库。"
+  },
+  "spheres": {
+    "title": "球体",
+    "description": "托管账本记录的此保险库所持有的内容。锚点为球体的头部排序后，球体即为“最终”；在此之前为“等待中”。文件不含任何秘密：密钥保存在您的保险库中。",
+    "desktop_only": "球体客户端在桌面应用中随 Eidolon 运行时一起运行。",
+    "no_vault": "关联一个 Eidolon 保险库以查看其球体。",
+    "summary": {
+      "final": "{{count}} 个最终",
+      "waiting": "{{count}} 个等待中",
+      "untrusted_issuer": "此版本未固定发行者密钥：创世在首次读取时被信任。"
+    },
+    "actions": {
+      "sync": "与锚点同步",
+      "syncing": "同步中…",
+      "claim": "认领创世球体",
+      "claiming": "认领中…",
+      "mailbox": "发布接收密钥",
+      "import": "导入球体文件",
+      "export": "导出",
+      "transfer": "转移",
+      "working": "处理中…"
+    },
+    "sync": {
+      "done": "已同步：{{final}} 个最终，{{waiting}} 个等待中，{{received}} 个已接收，{{away}} 个已转移至他处。",
+      "issues": "同步完成，有 {{count}} 个问题：{{detail}}"
+    },
+    "claim": {
+      "done": "已认领 {{claimed}} 个球体，{{deferred}} 个延后，{{failed}} 个被拒绝。",
+      "nothing": "没有新的可认领内容（{{already}} 个已属于您）。"
+    },
+    "mailbox": {
+      "done": "已发布 {{deposited}} 个接收密钥（锚点上尚有 {{pending}} 个未使用）。"
+    },
+    "import": {
+      "done": "{{id}} 已导入 — {{state}}（已向锚点提交 {{submitted}} 条记录）。"
+    },
+    "export": {
+      "done": "球体文件已写入：{{filename}}"
+    },
+    "transfer": {
+      "title": "转移球体",
+      "description": "将 {{id}} 交给另一个保险库。转移使用一次性密钥签名一次并由锚点排序；不可撤销。",
+      "recipient_placeholder": "接收方保险库 ID（64 个十六进制字符）",
+      "hint": "接收方必须已发布接收密钥（在其应用中点击“发布接收密钥”）。",
+      "invalid_recipient": "保险库 ID 为 64 个十六进制字符。",
+      "self": "转移必须更换保险库。",
+      "confirm": "签名并转移",
+      "done": "{{id}} 已转移给 {{to}} — {{state}}。"
+    },
+    "inventory": {
+      "title": "库存",
+      "empty": "这里还没有球体。认领您的创世球体，或与锚点同步。",
+      "seq": "第 {{seq}} 跳",
+      "pending": "一笔已签名的转移正在等待锚点 — 同步以重新发送。",
+      "uncontrolled": "此保险库没有任何密钥控制该球体。"
+    },
+    "state": {
+      "final": "最终",
+      "waiting": "等待中",
+      "burned": "已销毁",
+      "invalid": "无效",
+      "by_checkpoint": "检查点"
+    },
+    "rarity": {
+      "primordial": "太初",
+      "genesis": "创世",
+      "mythic": "神话",
+      "legendary": "传奇",
+      "epic": "史诗",
+      "rare": "稀有",
+      "uncommon": "罕见",
+      "common": "普通"
+    },
+    "errors": {
+      "list": "无法读取本地球体：{{detail}}",
+      "sync": "同步失败：{{detail}}",
+      "claim": "认领被拒绝：{{detail}}",
+      "mailbox": "无法发布密钥：{{detail}}",
+      "import": "导入被拒绝：{{detail}}",
+      "export": "导出失败：{{detail}}",
+      "transfer": "转移被拒绝：{{detail}}"
+    }
   }
 }

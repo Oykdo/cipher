@@ -1971,6 +1971,166 @@ ipcMain.handle('vault-e2ee:derive-seed', async (event, payload) => {
   return deriveVaultE2eeSeedLocal(payload?.vaultId);
 });
 
+// --- Sphere custody client (Eidolon I4) ---------------------------------------
+// The vault's spheres live in a custody ledger anchored on the Eidolon VPS.
+// The client is `cipher-runtime sphere …` (scripts/public/sphere_cli.py):
+// one JSON line per call, {"ok":true,…} or {"ok":false,"error","error_code"}.
+// Rules, on top of the e2ee-seed ones above:
+//   - the renderer names a vault id, never a path: the .psnx is resolved here
+//     and handed to the runtime with --psnx; a sphere file carries no secret,
+//     but the .psnx path never crosses IPC;
+//   - import/export destinations come from native dialogs; replies carry
+//     filename / size only;
+//   - the runtime already refuses what must be refused (a file that is not
+//     the vault's, an uncontrolled key, a fork, a second signature for one
+//     head): main only transports its verdict.
+const SPHERE_CLI_REL = path.join('scripts', 'public', 'sphere_cli.py');
+const SPHERE_ID_REGEX = /^[A-Za-z0-9_\-]{1,80}$/;
+const SPHERE_SUBCOMMANDS = new Set(['list', 'claim', 'transfer', 'import', 'export', 'sync', 'mailbox']);
+
+/**
+ * Run one `sphere` subcommand for `vaultId` and return its JSON reply with
+ * every absolute path stripped. `extraArgs` are appended after the
+ * subcommand; `--psnx` and, when known, `--api` are added here.
+ */
+async function runSphereCli(vaultId, subcommand, extraArgs = [], { apiUrl } = {}) {
+  if (!SPHERE_SUBCOMMANDS.has(subcommand)) {
+    return { ok: false, error: 'unknown sphere subcommand', errorCode: 'invalid_input' };
+  }
+  const requestedId = String(vaultId ?? '').trim().toLowerCase();
+  if (!VAULT_ID_REGEX.test(requestedId)) {
+    return { ok: false, error: 'invalid vaultId', errorCode: 'invalid_vault_id' };
+  }
+  let sources;
+  try {
+    sources = await resolveVaultFileSources({ vaultId: requestedId });
+  } catch (err) {
+    return { ok: false, error: stripAbsolutePaths(err?.message ?? 'resolve_failed'), errorCode: 'resolve_failed' };
+  }
+  if (!sources.psnx) {
+    return { ok: false, error: 'PSNX file not found on this device', errorCode: 'psnx_not_found' };
+  }
+  const args = [subcommand, ...extraArgs, '--psnx', sources.psnx];
+  const online = !['list', 'export'].includes(subcommand);
+  const api = typeof apiUrl === 'string' && /^https?:\/\//.test(apiUrl) ? apiUrl.replace(/\/+$/, '') : null;
+  if (online && api) args.push('--api', api);
+
+  let result;
+  try {
+    result = await runCipherRuntimeCli('sphere', SPHERE_CLI_REL, args);
+  } catch (err) {
+    return { ok: false, error: stripAbsolutePaths(err?.message ?? 'runtime_unavailable'), errorCode: 'runtime_unavailable' };
+  }
+  const payload = parseLastJsonLineFromBuffer(result.stdout);
+  if (!payload || typeof payload !== 'object') {
+    const detail = result.stderr.slice(-500) || `exit ${result.code}`;
+    return { ok: false, error: stripAbsolutePaths(`sphere ${subcommand} failed: ${detail}`), errorCode: 'runtime_failed' };
+  }
+  if (payload.ok !== true) {
+    return {
+      ok: false,
+      error: stripAbsolutePaths(String(payload.error ?? `exit ${result.code}`)),
+      errorCode: typeof payload.error_code === 'string' ? payload.error_code : 'sphere_failed',
+      sphereId: typeof payload.sphere_id === 'string' ? payload.sphere_id : undefined,
+    };
+  }
+  if (typeof payload.out === 'string') payload.out = path.basename(payload.out);
+  const resolvedId = String(payload.vault_id ?? '').trim().toLowerCase();
+  if (resolvedId && resolvedId !== requestedId) {
+    return { ok: false, error: 'vault_mismatch', errorCode: 'vault_mismatch' };
+  }
+  return payload;
+}
+
+ipcMain.handle('sphere:list', async (event, payload) => {
+  requireTrustedRenderer(event);
+  return runSphereCli(payload?.vaultId, 'list');
+});
+
+ipcMain.handle('sphere:sync', async (event, payload) => {
+  requireTrustedRenderer(event);
+  return runSphereCli(payload?.vaultId, 'sync', [], { apiUrl: payload?.apiUrl });
+});
+
+ipcMain.handle('sphere:claim', async (event, payload) => {
+  requireTrustedRenderer(event);
+  return runSphereCli(payload?.vaultId, 'claim', [], { apiUrl: payload?.apiUrl });
+});
+
+ipcMain.handle('sphere:mailbox', async (event, payload) => {
+  requireTrustedRenderer(event);
+  const count = Number.isInteger(payload?.count) && payload.count > 0 && payload.count <= 16 ? payload.count : 8;
+  return runSphereCli(payload?.vaultId, 'mailbox', ['--count', String(count)], { apiUrl: payload?.apiUrl });
+});
+
+ipcMain.handle('sphere:transfer', async (event, payload) => {
+  requireTrustedRenderer(event);
+  const sphereId = String(payload?.sphereId ?? '').trim();
+  const to = String(payload?.to ?? '').trim().toLowerCase();
+  if (!SPHERE_ID_REGEX.test(sphereId)) {
+    return { ok: false, error: 'invalid sphereId', errorCode: 'invalid_input' };
+  }
+  if (!HEX64_REGEX.test(to)) {
+    return { ok: false, error: 'recipient must be a 64-hex vault id', errorCode: 'invalid_input' };
+  }
+  return runSphereCli(payload?.vaultId, 'transfer', ['--sphere', sphereId, '--to', to], { apiUrl: payload?.apiUrl });
+});
+
+// Import: the user picks a *.sphere.json; the runtime verifies it offline,
+// checks it is this vault's and that a key of this vault controls the head,
+// then confronts the anchor. The reply carries the verdict, never the path.
+ipcMain.handle('sphere:import', async (event, payload) => {
+  requireTrustedRenderer(event);
+  const picked = await showVaultFilesDialog('showOpenDialog', {
+    title: 'Eidolon sphere',
+    filters: [{ name: 'Eidolon sphere', extensions: ['json'] }],
+    properties: ['openFile'],
+  });
+  if (picked.canceled || !picked.filePaths?.length) {
+    return { ok: false, error: 'canceled', errorCode: 'canceled' };
+  }
+  const src = picked.filePaths[0];
+  let stat;
+  try {
+    stat = statSync(src);
+  } catch {
+    return { ok: false, error: 'file not found', errorCode: 'not_found' };
+  }
+  if (!stat.isFile() || stat.size > 4 * 1024 * 1024) {
+    return { ok: false, error: 'not a sphere file', errorCode: 'invalid_input' };
+  }
+  const result = await runSphereCli(payload?.vaultId, 'import', ['--file', src], { apiUrl: payload?.apiUrl });
+  return result.ok ? { ...result, filename: path.basename(src) } : result;
+});
+
+// Export: the runtime writes the sphere file (with a pending signed transfer
+// if there is one) where the user chose. Reply: filename and size only.
+ipcMain.handle('sphere:export', async (event, payload) => {
+  requireTrustedRenderer(event);
+  const sphereId = String(payload?.sphereId ?? '').trim();
+  if (!SPHERE_ID_REGEX.test(sphereId)) {
+    return { ok: false, error: 'invalid sphereId', errorCode: 'invalid_input' };
+  }
+  const picked = await showVaultFilesDialog('showSaveDialog', {
+    title: 'Eidolon sphere',
+    defaultPath: `${sphereId}.sphere.json`,
+    filters: [{ name: 'Eidolon sphere', extensions: ['json'] }],
+    properties: ['createDirectory', 'showOverwriteConfirmation'],
+  });
+  if (picked.canceled || !picked.filePath) {
+    return { ok: false, error: 'canceled', errorCode: 'canceled' };
+  }
+  const result = await runSphereCli(payload?.vaultId, 'export', ['--sphere', sphereId, '--out', picked.filePath]);
+  if (!result.ok) return result;
+  let size = 0;
+  try {
+    size = statSync(picked.filePath).size;
+  } catch {
+    // the runtime reported success; size is informative only
+  }
+  return { ok: true, sphereId, state: result.state, filename: path.basename(picked.filePath), size };
+});
+
 ipcMain.handle('eidolon:open-launcher', async () => launchEidolonLauncher());
 ipcMain.handle('eidolon:open-installer', async () => openEidolonInstaller());
 ipcMain.handle('eidolon:get-vault-metrics', async (_event, vaultRef) => readEidolonVaultMetrics(vaultRef));

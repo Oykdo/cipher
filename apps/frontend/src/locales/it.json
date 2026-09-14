@@ -734,7 +734,8 @@
         "label": "Continua in background alla chiusura",
         "description": "Cipher resta attivo per non farti perdere messaggi. Riaprilo dall'icona vicino all'orologio."
       }
-    }
+    },
+    "spheres": "Sfere"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1516,5 +1517,87 @@
     "handover_gate_hint": "Salva almeno un backup per continuare.",
     "handover_skip_link": "Continua senza salvare",
     "handover_skip_confirm": "Capisco di non avere alcun backup e che perdere questo dispositivo significa perdere questo vault."
+  },
+  "spheres": {
+    "title": "Sfere",
+    "description": "Ciò che il registro di custodia attribuisce a questo vault. Una sfera è «finale» quando l'ancora ne ha ordinato la testa; «in attesa» fino ad allora. I file non contengono alcun segreto: le chiavi vivono nel tuo vault.",
+    "desktop_only": "Il client delle sfere funziona nell'app desktop, con il runtime Eidolon.",
+    "no_vault": "Collega un vault Eidolon per vedere le sue sfere.",
+    "summary": {
+      "final": "{{count}} finale/i",
+      "waiting": "{{count}} in attesa",
+      "untrusted_issuer": "Chiave dell'emittente non fissata in questa build: la genesi è accettata alla prima lettura."
+    },
+    "actions": {
+      "sync": "Sincronizza con l'ancora",
+      "syncing": "Sincronizzazione…",
+      "claim": "Rivendica le sfere della genesi",
+      "claiming": "Rivendicazione…",
+      "mailbox": "Pubblica chiavi di ricezione",
+      "import": "Importa un file di sfera",
+      "export": "Esporta",
+      "transfer": "Trasferisci",
+      "working": "In corso…"
+    },
+    "sync": {
+      "done": "Sincronizzato: {{final}} finale/i, {{waiting}} in attesa, {{received}} ricevuta/e, {{away}} trasferita/e altrove.",
+      "issues": "Sincronizzato con {{count}} anomalia/e: {{detail}}"
+    },
+    "claim": {
+      "done": "{{claimed}} sfera/e rivendicata/e, {{deferred}} rinviata/e, {{failed}} rifiutata/e.",
+      "nothing": "Niente di nuovo da rivendicare ({{already}} già tue)."
+    },
+    "mailbox": {
+      "done": "{{deposited}} chiave/i di ricezione pubblicata/e ({{pending}} non usata/e all'ancora)."
+    },
+    "import": {
+      "done": "{{id}} importata — {{state}} ({{submitted}} record consegnato/i all'ancora)."
+    },
+    "export": {
+      "done": "File di sfera scritto: {{filename}}"
+    },
+    "transfer": {
+      "title": "Trasferisci una sfera",
+      "description": "Cedi {{id}} a un altro vault. Il trasferimento viene firmato una volta con una chiave monouso e ordinato dall'ancora; non si può annullare.",
+      "recipient_placeholder": "Id del vault destinatario (64 caratteri esadecimali)",
+      "hint": "Il destinatario deve aver pubblicato chiavi di ricezione («Pubblica chiavi di ricezione» nella sua app).",
+      "invalid_recipient": "Un id di vault è composto da 64 caratteri esadecimali.",
+      "self": "Un trasferimento cambia vault.",
+      "confirm": "Firma e trasferisci",
+      "done": "{{id}} trasferita a {{to}} — {{state}}."
+    },
+    "inventory": {
+      "title": "Inventario",
+      "empty": "Nessuna sfera qui per ora. Rivendica le tue sfere della genesi o sincronizza con l'ancora.",
+      "seq": "passo {{seq}}",
+      "pending": "Un trasferimento firmato attende l'ancora — sincronizza per rinviarlo.",
+      "uncontrolled": "Nessuna chiave di questo vault controlla questa sfera."
+    },
+    "state": {
+      "final": "finale",
+      "waiting": "in attesa",
+      "burned": "bruciata",
+      "invalid": "non valida",
+      "by_checkpoint": "punto di controllo"
+    },
+    "rarity": {
+      "primordial": "Primordiale",
+      "genesis": "Genesi",
+      "mythic": "Mitica",
+      "legendary": "Leggendaria",
+      "epic": "Epica",
+      "rare": "Rara",
+      "uncommon": "Non comune",
+      "common": "Comune"
+    },
+    "errors": {
+      "list": "Impossibile leggere le sfere locali: {{detail}}",
+      "sync": "Sincronizzazione non riuscita: {{detail}}",
+      "claim": "Rivendicazione rifiutata: {{detail}}",
+      "mailbox": "Impossibile pubblicare le chiavi: {{detail}}",
+      "import": "Importazione rifiutata: {{detail}}",
+      "export": "Esportazione non riuscita: {{detail}}",
+      "transfer": "Trasferimento rifiutato: {{detail}}"
+    }
   }
 }

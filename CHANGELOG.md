@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Spheres tab in Settings (desktop).** The vault's spheres, as the Eidolon
+  custody ledger holds them, each shown as *final* (the anchor has ordered its
+  head — by receipt or by signed checkpoint) or *waiting*. Sync with the
+  anchor, claim the genesis spheres, publish receiving keys, transfer a sphere
+  to another vault (signed once with a one-time key, written before it is
+  submitted, never re-signed for the same head), import a received
+  `*.sphere.json` (verified offline, then confronted with the anchor) and
+  export one. Everything runs through `cipher-runtime sphere …` (runtime
+  1.2.0): the renderer names a vault id and a sphere id, never a path; the
+  `.psnx` and the keys never cross IPC; import/export go through native
+  dialogs. Shown only in Electron with `VITE_EIDOLON_CONNECT_ENABLED=true` and
+  a linked vault; texts in the eight locales.
+
 ## v1.4.3 — the packaged app no longer dies on an expired session
 
 ### Fixed

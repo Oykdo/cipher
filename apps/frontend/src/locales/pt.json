@@ -770,7 +770,8 @@
         "label": "Continuar em segundo plano ao fechar",
         "description": "O Cipher permanece ativo para que você não perca mensagens. Reabra-o pelo ícone perto do relógio."
       }
-    }
+    },
+    "spheres": "Esferas"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1511,5 +1512,87 @@
     "handover_gate_hint": "Salve pelo menos um backup para continuar.",
     "handover_skip_link": "Continuar sem salvar",
     "handover_skip_confirm": "Entendo que não tenho nenhum backup e que perder este dispositivo significa perder este vault."
+  },
+  "spheres": {
+    "title": "Esferas",
+    "description": "O que o registro de custódia diz que este cofre possui. Uma esfera é «final» quando a âncora ordenou sua cabeça; «pendente» até lá. Os arquivos não contêm nenhum segredo: as chaves vivem no seu cofre.",
+    "desktop_only": "O cliente de esferas roda no aplicativo desktop, com o runtime Eidolon.",
+    "no_vault": "Vincule um cofre Eidolon para ver suas esferas.",
+    "summary": {
+      "final": "{{count}} final(is)",
+      "waiting": "{{count}} pendente(s)",
+      "untrusted_issuer": "Chave do emissor não fixada nesta versão: a gênese é aceita na primeira leitura."
+    },
+    "actions": {
+      "sync": "Sincronizar com a âncora",
+      "syncing": "Sincronizando…",
+      "claim": "Reivindicar as esferas da gênese",
+      "claiming": "Reivindicando…",
+      "mailbox": "Publicar chaves de recepção",
+      "import": "Importar um arquivo de esfera",
+      "export": "Exportar",
+      "transfer": "Transferir",
+      "working": "Em andamento…"
+    },
+    "sync": {
+      "done": "Sincronizado: {{final}} final(is), {{waiting}} pendente(s), {{received}} recebida(s), {{away}} transferida(s) para outro lugar.",
+      "issues": "Sincronizado com {{count}} problema(s): {{detail}}"
+    },
+    "claim": {
+      "done": "{{claimed}} esfera(s) reivindicada(s), {{deferred}} adiada(s), {{failed}} recusada(s).",
+      "nothing": "Nada de novo a reivindicar ({{already}} já são suas)."
+    },
+    "mailbox": {
+      "done": "{{deposited}} chave(s) de recepção publicada(s) ({{pending}} não usada(s) na âncora)."
+    },
+    "import": {
+      "done": "{{id}} importada — {{state}} ({{submitted}} registro(s) entregue(s) à âncora)."
+    },
+    "export": {
+      "done": "Arquivo de esfera gravado: {{filename}}"
+    },
+    "transfer": {
+      "title": "Transferir uma esfera",
+      "description": "Ceder {{id}} a outro cofre. A transferência é assinada uma vez com uma chave de uso único e ordenada pela âncora; não pode ser desfeita.",
+      "recipient_placeholder": "Id do cofre destinatário (64 caracteres hexadecimais)",
+      "hint": "O destinatário precisa ter publicado chaves de recepção («Publicar chaves de recepção» no aplicativo dele).",
+      "invalid_recipient": "Um id de cofre tem 64 caracteres hexadecimais.",
+      "self": "Uma transferência muda de cofre.",
+      "confirm": "Assinar e transferir",
+      "done": "{{id}} transferida para {{to}} — {{state}}."
+    },
+    "inventory": {
+      "title": "Inventário",
+      "empty": "Nenhuma esfera aqui ainda. Reivindique suas esferas da gênese ou sincronize com a âncora.",
+      "seq": "salto {{seq}}",
+      "pending": "Uma transferência assinada aguarda a âncora — sincronize para reenviá-la.",
+      "uncontrolled": "Nenhuma chave deste cofre controla esta esfera."
+    },
+    "state": {
+      "final": "final",
+      "waiting": "pendente",
+      "burned": "queimada",
+      "invalid": "inválida",
+      "by_checkpoint": "ponto de controle"
+    },
+    "rarity": {
+      "primordial": "Primordial",
+      "genesis": "Gênese",
+      "mythic": "Mítica",
+      "legendary": "Lendária",
+      "epic": "Épica",
+      "rare": "Rara",
+      "uncommon": "Incomum",
+      "common": "Comum"
+    },
+    "errors": {
+      "list": "Não foi possível ler as esferas locais: {{detail}}",
+      "sync": "Falha na sincronização: {{detail}}",
+      "claim": "Reivindicação recusada: {{detail}}",
+      "mailbox": "Não foi possível publicar as chaves: {{detail}}",
+      "import": "Importação recusada: {{detail}}",
+      "export": "Falha na exportação: {{detail}}",
+      "transfer": "Transferência recusada: {{detail}}"
+    }
   }
 }

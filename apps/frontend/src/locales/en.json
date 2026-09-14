@@ -770,7 +770,8 @@
         "label": "Keep running in background when window is closed",
         "description": "Cipher stays active so you don't miss messages. Reopen it from the icon near the clock."
       }
-    }
+    },
+    "spheres": "Spheres"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1511,5 +1512,87 @@
     "handover_gate_hint": "Save at least one backup to continue.",
     "handover_skip_link": "Continue without saving",
     "handover_skip_confirm": "I understand that I have no backup and that losing this device means losing this vault."
+  },
+  "spheres": {
+    "title": "Spheres",
+    "description": "What the custody ledger says this vault holds. A sphere is \"final\" once the anchor has ordered its head; \"waiting\" until then. Files carry no secret: the keys live in your vault.",
+    "desktop_only": "The sphere client runs in the desktop app, with the Eidolon runtime.",
+    "no_vault": "Link an Eidolon vault to see its spheres.",
+    "summary": {
+      "final": "{{count}} final",
+      "waiting": "{{count}} waiting",
+      "untrusted_issuer": "Issuer key not pinned in this build: genesis is trusted on first use."
+    },
+    "actions": {
+      "sync": "Sync with the anchor",
+      "syncing": "Syncing…",
+      "claim": "Claim genesis spheres",
+      "claiming": "Claiming…",
+      "mailbox": "Publish receiving keys",
+      "import": "Import a sphere file",
+      "export": "Export",
+      "transfer": "Transfer",
+      "working": "Working…"
+    },
+    "sync": {
+      "done": "Synced: {{final}} final, {{waiting}} waiting, {{received}} received, {{away}} transferred away.",
+      "issues": "Synced with {{count}} issue(s): {{detail}}"
+    },
+    "claim": {
+      "done": "{{claimed}} sphere(s) claimed, {{deferred}} deferred, {{failed}} refused.",
+      "nothing": "Nothing new to claim ({{already}} already yours)."
+    },
+    "mailbox": {
+      "done": "{{deposited}} receiving key(s) published ({{pending}} unused at the anchor)."
+    },
+    "import": {
+      "done": "{{id}} imported — {{state}} ({{submitted}} record(s) handed to the anchor)."
+    },
+    "export": {
+      "done": "Sphere file written: {{filename}}"
+    },
+    "transfer": {
+      "title": "Transfer a sphere",
+      "description": "Give {{id}} to another vault. The transfer is signed once with a one-time key and ordered by the anchor; it cannot be undone.",
+      "recipient_placeholder": "Recipient vault id (64 hex characters)",
+      "hint": "The recipient must have published receiving keys (\"Publish receiving keys\" in their app).",
+      "invalid_recipient": "A vault id is 64 hexadecimal characters.",
+      "self": "A transfer changes vault.",
+      "confirm": "Sign and transfer",
+      "done": "{{id}} transferred to {{to}} — {{state}}."
+    },
+    "inventory": {
+      "title": "Inventory",
+      "empty": "No sphere here yet. Claim your genesis spheres, or sync with the anchor.",
+      "seq": "hop {{seq}}",
+      "pending": "A signed transfer is waiting for the anchor — sync to resend it.",
+      "uncontrolled": "No key of this vault controls this sphere."
+    },
+    "state": {
+      "final": "final",
+      "waiting": "waiting",
+      "burned": "burned",
+      "invalid": "invalid",
+      "by_checkpoint": "checkpoint"
+    },
+    "rarity": {
+      "primordial": "Primordial",
+      "genesis": "Genesis",
+      "mythic": "Mythical",
+      "legendary": "Legendary",
+      "epic": "Epic",
+      "rare": "Rare",
+      "uncommon": "Uncommon",
+      "common": "Common"
+    },
+    "errors": {
+      "list": "Could not read the local spheres: {{detail}}",
+      "sync": "Sync failed: {{detail}}",
+      "claim": "Claim refused: {{detail}}",
+      "mailbox": "Could not publish keys: {{detail}}",
+      "import": "Import refused: {{detail}}",
+      "export": "Export failed: {{detail}}",
+      "transfer": "Transfer refused: {{detail}}"
+    }
   }
 }

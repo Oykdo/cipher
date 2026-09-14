@@ -734,7 +734,8 @@
         "label": "Seguir en segundo plano al cerrar",
         "description": "Cipher permanece activo para que no te pierdas mensajes. Vuelve a abrirlo desde el icono junto al reloj."
       }
-    }
+    },
+    "spheres": "Esferas"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1516,5 +1517,87 @@
     "handover_gate_hint": "Guarda al menos una copia de seguridad para continuar.",
     "handover_skip_link": "Continuar sin guardar",
     "handover_skip_confirm": "Entiendo que no tengo ninguna copia de seguridad y que perder este dispositivo significa perder este vault."
+  },
+  "spheres": {
+    "title": "Esferas",
+    "description": "Lo que el registro de custodia dice que posee esta bóveda. Una esfera es «final» cuando el ancla ha ordenado su cabeza; «pendiente» hasta entonces. Los archivos no contienen ningún secreto: las claves viven en tu bóveda.",
+    "desktop_only": "El cliente de esferas funciona en la aplicación de escritorio, con el runtime de Eidolon.",
+    "no_vault": "Vincula una bóveda Eidolon para ver sus esferas.",
+    "summary": {
+      "final": "{{count}} final(es)",
+      "waiting": "{{count}} pendiente(s)",
+      "untrusted_issuer": "Clave del emisor no fijada en esta versión: el génesis se acepta en la primera lectura."
+    },
+    "actions": {
+      "sync": "Sincronizar con el ancla",
+      "syncing": "Sincronizando…",
+      "claim": "Reclamar las esferas del génesis",
+      "claiming": "Reclamando…",
+      "mailbox": "Publicar claves de recepción",
+      "import": "Importar un archivo de esfera",
+      "export": "Exportar",
+      "transfer": "Transferir",
+      "working": "En curso…"
+    },
+    "sync": {
+      "done": "Sincronizado: {{final}} final(es), {{waiting}} pendiente(s), {{received}} recibida(s), {{away}} transferida(s) a otra parte.",
+      "issues": "Sincronizado con {{count}} incidencia(s): {{detail}}"
+    },
+    "claim": {
+      "done": "{{claimed}} esfera(s) reclamada(s), {{deferred}} aplazada(s), {{failed}} rechazada(s).",
+      "nothing": "Nada nuevo que reclamar ({{already}} ya tuyas)."
+    },
+    "mailbox": {
+      "done": "{{deposited}} clave(s) de recepción publicada(s) ({{pending}} sin usar en el ancla)."
+    },
+    "import": {
+      "done": "{{id}} importada — {{state}} ({{submitted}} registro(s) entregado(s) al ancla)."
+    },
+    "export": {
+      "done": "Archivo de esfera escrito: {{filename}}"
+    },
+    "transfer": {
+      "title": "Transferir una esfera",
+      "description": "Entregar {{id}} a otra bóveda. La transferencia se firma una vez con una clave de un solo uso y la ordena el ancla; no se puede deshacer.",
+      "recipient_placeholder": "Id de la bóveda destinataria (64 caracteres hexadecimales)",
+      "hint": "El destinatario debe haber publicado claves de recepción («Publicar claves de recepción» en su aplicación).",
+      "invalid_recipient": "Un id de bóveda tiene 64 caracteres hexadecimales.",
+      "self": "Una transferencia cambia de bóveda.",
+      "confirm": "Firmar y transferir",
+      "done": "{{id}} transferida a {{to}} — {{state}}."
+    },
+    "inventory": {
+      "title": "Inventario",
+      "empty": "Aún no hay esferas aquí. Reclama tus esferas del génesis o sincroniza con el ancla.",
+      "seq": "salto {{seq}}",
+      "pending": "Una transferencia firmada espera al ancla — sincroniza para reenviarla.",
+      "uncontrolled": "Ninguna clave de esta bóveda controla esta esfera."
+    },
+    "state": {
+      "final": "final",
+      "waiting": "pendiente",
+      "burned": "quemada",
+      "invalid": "inválida",
+      "by_checkpoint": "punto de control"
+    },
+    "rarity": {
+      "primordial": "Primordial",
+      "genesis": "Génesis",
+      "mythic": "Mítica",
+      "legendary": "Legendaria",
+      "epic": "Épica",
+      "rare": "Rara",
+      "uncommon": "Poco común",
+      "common": "Común"
+    },
+    "errors": {
+      "list": "No se pudieron leer las esferas locales: {{detail}}",
+      "sync": "Sincronización fallida: {{detail}}",
+      "claim": "Reclamación rechazada: {{detail}}",
+      "mailbox": "No se pudieron publicar las claves: {{detail}}",
+      "import": "Importación rechazada: {{detail}}",
+      "export": "Exportación fallida: {{detail}}",
+      "transfer": "Transferencia rechazada: {{detail}}"
+    }
   }
 }

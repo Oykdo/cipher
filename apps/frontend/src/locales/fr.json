@@ -769,7 +769,8 @@
         "label": "Continuer en arrière-plan à la fermeture",
         "description": "Cipher reste actif pour ne pas manquer de messages. Rouvrez-le via l'icône près de l'horloge."
       }
-    }
+    },
+    "spheres": "Sphères"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1512,5 +1513,87 @@
     "handover_gate_hint": "Enregistrez au moins une sauvegarde pour continuer.",
     "handover_skip_link": "Continuer sans sauvegarder",
     "handover_skip_confirm": "Je comprends que je n'ai aucune sauvegarde et que perdre cet appareil signifie perdre ce vault."
+  },
+  "spheres": {
+    "title": "Sphères",
+    "description": "Ce que le registre de garde dit que cette voûte détient. Une sphère est « finale » quand l'ancre a ordonné sa tête ; « en attente » jusque-là. Les fichiers ne portent aucun secret : les clés vivent dans votre voûte.",
+    "desktop_only": "Le client des sphères tourne dans l'application de bureau, avec le runtime Eidolon.",
+    "no_vault": "Liez une voûte Eidolon pour voir ses sphères.",
+    "summary": {
+      "final": "{{count}} finale(s)",
+      "waiting": "{{count}} en attente",
+      "untrusted_issuer": "Clé d'émetteur non épinglée dans cette version : la genèse est crue à la première lecture."
+    },
+    "actions": {
+      "sync": "Synchroniser avec l'ancre",
+      "syncing": "Synchronisation…",
+      "claim": "Réclamer les sphères de genèse",
+      "claiming": "Réclamation…",
+      "mailbox": "Publier des clés de réception",
+      "import": "Importer un fichier de sphère",
+      "export": "Exporter",
+      "transfer": "Céder",
+      "working": "En cours…"
+    },
+    "sync": {
+      "done": "Synchronisé : {{final}} finale(s), {{waiting}} en attente, {{received}} reçue(s), {{away}} cédée(s) ailleurs.",
+      "issues": "Synchronisé avec {{count}} anomalie(s) : {{detail}}"
+    },
+    "claim": {
+      "done": "{{claimed}} sphère(s) réclamée(s), {{deferred}} différée(s), {{failed}} refusée(s).",
+      "nothing": "Rien de neuf à réclamer ({{already}} déjà à vous)."
+    },
+    "mailbox": {
+      "done": "{{deposited}} clé(s) de réception publiée(s) ({{pending}} non consommée(s) à l'ancre)."
+    },
+    "import": {
+      "done": "{{id}} importée — {{state}} ({{submitted}} enregistrement(s) remis à l'ancre)."
+    },
+    "export": {
+      "done": "Fichier de sphère écrit : {{filename}}"
+    },
+    "transfer": {
+      "title": "Céder une sphère",
+      "description": "Donner {{id}} à une autre voûte. La cession est signée une fois avec une clé à usage unique et ordonnée par l'ancre ; elle ne se défait pas.",
+      "recipient_placeholder": "Identifiant de la voûte destinataire (64 caractères hexadécimaux)",
+      "hint": "Le destinataire doit avoir publié des clés de réception (« Publier des clés de réception » dans son application).",
+      "invalid_recipient": "Un identifiant de voûte fait 64 caractères hexadécimaux.",
+      "self": "Une cession change de voûte.",
+      "confirm": "Signer et céder",
+      "done": "{{id}} cédée à {{to}} — {{state}}."
+    },
+    "inventory": {
+      "title": "Inventaire",
+      "empty": "Aucune sphère ici pour l'instant. Réclamez vos sphères de genèse, ou synchronisez avec l'ancre.",
+      "seq": "saut {{seq}}",
+      "pending": "Une cession signée attend l'ancre — synchronisez pour la renvoyer.",
+      "uncontrolled": "Aucune clé de cette voûte ne contrôle cette sphère."
+    },
+    "state": {
+      "final": "finale",
+      "waiting": "en attente",
+      "burned": "brûlée",
+      "invalid": "invalide",
+      "by_checkpoint": "point de contrôle"
+    },
+    "rarity": {
+      "primordial": "Primordiale",
+      "genesis": "Genèse",
+      "mythic": "Mythique",
+      "legendary": "Légendaire",
+      "epic": "Épique",
+      "rare": "Rare",
+      "uncommon": "Peu commune",
+      "common": "Commune"
+    },
+    "errors": {
+      "list": "Lecture des sphères locales impossible : {{detail}}",
+      "sync": "Synchronisation en échec : {{detail}}",
+      "claim": "Réclamation refusée : {{detail}}",
+      "mailbox": "Publication des clés impossible : {{detail}}",
+      "import": "Import refusé : {{detail}}",
+      "export": "Export en échec : {{detail}}",
+      "transfer": "Cession refusée : {{detail}}"
+    }
   }
 }

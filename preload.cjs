@@ -35,6 +35,22 @@ contextBridge.exposeInMainWorld('electron', {
   // runtime; the reply carries the seed once and nothing else secret.
   deriveVaultE2EESeed: (vaultId) => ipcRenderer.invoke('vault-e2ee:derive-seed', { vaultId }),
 
+  // Sphere custody client (Eidolon I4). The renderer names a vault id and a
+  // sphere id, never a path; the Eidolon runtime (`cipher-runtime sphere …`)
+  // verifies, signs and talks to the anchor; import/export go through native
+  // dialogs. A sphere file carries no secret. Replies are the runtime's own
+  // JSON verdicts, paths stripped.
+  sphere: {
+    list: (vaultId) => ipcRenderer.invoke('sphere:list', { vaultId }),
+    sync: (vaultId, apiUrl) => ipcRenderer.invoke('sphere:sync', { vaultId, apiUrl }),
+    claim: (vaultId, apiUrl) => ipcRenderer.invoke('sphere:claim', { vaultId, apiUrl }),
+    mailbox: (vaultId, count, apiUrl) => ipcRenderer.invoke('sphere:mailbox', { vaultId, count, apiUrl }),
+    transfer: (vaultId, sphereId, to, apiUrl) =>
+      ipcRenderer.invoke('sphere:transfer', { vaultId, sphereId, to, apiUrl }),
+    importFile: (vaultId, apiUrl) => ipcRenderer.invoke('sphere:import', { vaultId, apiUrl }),
+    exportFile: (vaultId, sphereId) => ipcRenderer.invoke('sphere:export', { vaultId, sphereId }),
+  },
+
   // Genesis ceremony. Runs the Eidolon CLI locally and streams its phase
   // events back — the master seed and vault files are minted on this machine
   // and never touch a server. `start` resolves with { ok, runId } once the

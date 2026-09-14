@@ -734,7 +734,8 @@
         "label": "Beim Schließen im Hintergrund weiterlaufen",
         "description": "Cipher bleibt aktiv, damit Sie keine Nachrichten verpassen. Über das Symbol neben der Uhr wieder öffnen."
       }
-    }
+    },
+    "spheres": "Sphären"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1516,5 +1517,87 @@
     "handover_gate_hint": "Speichern Sie mindestens eine Sicherung, um fortzufahren.",
     "handover_skip_link": "Ohne Sicherung fortfahren",
     "handover_skip_confirm": "Ich verstehe, dass ich keine Sicherung habe und dass der Verlust dieses Geräts den Verlust dieses Vaults bedeutet."
+  },
+  "spheres": {
+    "title": "Sphären",
+    "description": "Was das Verwahrungsregister dieser Vault zuschreibt. Eine Sphäre ist „final“, sobald der Anker ihren Kopf geordnet hat; bis dahin „ausstehend“. Dateien enthalten kein Geheimnis: die Schlüssel leben in Ihrer Vault.",
+    "desktop_only": "Der Sphären-Client läuft in der Desktop-App, mit der Eidolon-Laufzeit.",
+    "no_vault": "Verknüpfen Sie eine Eidolon-Vault, um ihre Sphären zu sehen.",
+    "summary": {
+      "final": "{{count}} final",
+      "waiting": "{{count}} ausstehend",
+      "untrusted_issuer": "Herausgeberschlüssel in diesem Build nicht verankert: der Genesis wird beim ersten Lesen vertraut."
+    },
+    "actions": {
+      "sync": "Mit dem Anker abgleichen",
+      "syncing": "Abgleich…",
+      "claim": "Genesis-Sphären beanspruchen",
+      "claiming": "Beanspruchen…",
+      "mailbox": "Empfangsschlüssel veröffentlichen",
+      "import": "Sphärendatei importieren",
+      "export": "Exportieren",
+      "transfer": "Übertragen",
+      "working": "Läuft…"
+    },
+    "sync": {
+      "done": "Abgeglichen: {{final}} final, {{waiting}} ausstehend, {{received}} empfangen, {{away}} anderswohin übertragen.",
+      "issues": "Abgeglichen mit {{count}} Problem(en): {{detail}}"
+    },
+    "claim": {
+      "done": "{{claimed}} Sphäre(n) beansprucht, {{deferred}} zurückgestellt, {{failed}} abgelehnt.",
+      "nothing": "Nichts Neues zu beanspruchen ({{already}} bereits Ihre)."
+    },
+    "mailbox": {
+      "done": "{{deposited}} Empfangsschlüssel veröffentlicht ({{pending}} am Anker unbenutzt)."
+    },
+    "import": {
+      "done": "{{id}} importiert — {{state}} ({{submitted}} Eintrag/Einträge an den Anker übergeben)."
+    },
+    "export": {
+      "done": "Sphärendatei geschrieben: {{filename}}"
+    },
+    "transfer": {
+      "title": "Eine Sphäre übertragen",
+      "description": "{{id}} an eine andere Vault geben. Die Übertragung wird einmal mit einem Einmalschlüssel signiert und vom Anker geordnet; sie lässt sich nicht rückgängig machen.",
+      "recipient_placeholder": "Vault-ID des Empfängers (64 Hex-Zeichen)",
+      "hint": "Der Empfänger muss Empfangsschlüssel veröffentlicht haben („Empfangsschlüssel veröffentlichen“ in seiner App).",
+      "invalid_recipient": "Eine Vault-ID besteht aus 64 hexadezimalen Zeichen.",
+      "self": "Eine Übertragung wechselt die Vault.",
+      "confirm": "Signieren und übertragen",
+      "done": "{{id}} an {{to}} übertragen — {{state}}."
+    },
+    "inventory": {
+      "title": "Bestand",
+      "empty": "Noch keine Sphäre hier. Beanspruchen Sie Ihre Genesis-Sphären oder gleichen Sie mit dem Anker ab.",
+      "seq": "Schritt {{seq}}",
+      "pending": "Eine signierte Übertragung wartet auf den Anker — abgleichen, um sie erneut zu senden.",
+      "uncontrolled": "Kein Schlüssel dieser Vault kontrolliert diese Sphäre."
+    },
+    "state": {
+      "final": "final",
+      "waiting": "ausstehend",
+      "burned": "verbrannt",
+      "invalid": "ungültig",
+      "by_checkpoint": "Prüfpunkt"
+    },
+    "rarity": {
+      "primordial": "Primordial",
+      "genesis": "Genesis",
+      "mythic": "Mythisch",
+      "legendary": "Legendär",
+      "epic": "Episch",
+      "rare": "Selten",
+      "uncommon": "Ungewöhnlich",
+      "common": "Gewöhnlich"
+    },
+    "errors": {
+      "list": "Lokale Sphären konnten nicht gelesen werden: {{detail}}",
+      "sync": "Abgleich fehlgeschlagen: {{detail}}",
+      "claim": "Anspruch abgelehnt: {{detail}}",
+      "mailbox": "Schlüssel konnten nicht veröffentlicht werden: {{detail}}",
+      "import": "Import abgelehnt: {{detail}}",
+      "export": "Export fehlgeschlagen: {{detail}}",
+      "transfer": "Übertragung abgelehnt: {{detail}}"
+    }
   }
 }
