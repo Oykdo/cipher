@@ -1992,6 +1992,10 @@ const SPHERE_SUBCOMMANDS = new Set(['list', 'claim', 'transfer', 'import', 'expo
  * Run one `sphere` subcommand for `vaultId` and return its JSON reply with
  * every absolute path stripped. `extraArgs` are appended after the
  * subcommand; `--psnx` and, when known, `--api` are added here.
+ * @param {unknown} vaultId
+ * @param {string} subcommand
+ * @param {string[]} [extraArgs]
+ * @param {{ apiUrl?: unknown }} [options]
  */
 async function runSphereCli(vaultId, subcommand, extraArgs = [], { apiUrl } = {}) {
   if (!SPHERE_SUBCOMMANDS.has(subcommand)) {
