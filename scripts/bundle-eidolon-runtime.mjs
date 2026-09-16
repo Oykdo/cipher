@@ -158,16 +158,23 @@ const PBS_CACHE_DIR = path.join(cipherRoot, 'assets', '.python-cache');
 // memory says (with 1.3.0 the badge never appears and the old rules apply).
 // Built from the private core at 75c42eb; verified against the production
 // anchor on the owner's vault (final 8, claimable []).
-const RUNTIME_RELEASE = 'cipher-runtime-20260916b';
+// 20260916c (`--version` 1.3.2) differs by one thing: every sphere status
+// (`sphere list` / `sync` / `claim`) carries `visual` — theme, manifestation,
+// essence and cosmic signature of the revealed template — which the Spheres
+// tab (Cipher >= 7e28006) turns into a WebGL orb per sphere. With 1.3.1 the
+// tab still works but every orb falls back to the void theme. Built from the
+// private core at d96fb3a; verified on both platforms against a throwaway
+// data dir (--version, sphere trust, sphere list, escrow list).
+const RUNTIME_RELEASE = 'cipher-runtime-20260916c';
 const RUNTIME_TARGETS = {
   win32: {
     asset: 'cipher-runtime.exe',
-    sha256: 'ac5ad809712b503754f42dd5d04ca212bafe7f1c7243bd7c90d9ca5f2243b309',
+    sha256: 'b960b35fd61599efb8dca4109776f4caf6af602ead20d56929eca5c51078d13c',
     localDirs: ['dist-cipher-runtime'],
   },
   linux: {
     asset: 'cipher-runtime',
-    sha256: '541ea3d2c98b8b32a4700b2ac40937b4add10fff199b8d55efb7666e270adf69',
+    sha256: 'a3ce57e1e2998df500a32fcfa88efb24a24f64d4a1d5de621c161cec9465e876',
     localDirs: ['dist-cipher-runtime-linux', 'dist-cipher-runtime'],
   },
 };

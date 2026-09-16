@@ -22,7 +22,8 @@
   Motion stops under `prefers-reduced-motion`; without WebGL, or if the
   canvas throws, the CSS orb stands in. Needs `cipher-runtime` ≥ 1.3.2 for
   the `visual` field (`sphere list` / `sync` / `claim`); older runtimes get
-  the void theme for every sphere.
+  the void theme for every sphere. `scripts/bundle-eidolon-runtime.mjs` now
+  pins `cipher-runtime-20260916c` (1.3.2) with both SHA-256.
 
 - **The Spheres and Escrow tabs get one visual language.** A hero band per
   ledger (emblem, kicker, stat tiles — final / waiting / to claim / total,
