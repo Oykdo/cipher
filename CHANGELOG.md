@@ -4,6 +4,25 @@
 
 ### Added
 
+- **Escrow tab in Settings (desktop) — Escrow Nexus.** Documents sealed
+  under the vault's key and kept on this device: seal a file (native open
+  dialog) with a label and an optional "locked until" date, see each escrow
+  as *ready* / *locked until …* / *tampered* / *unreadable*, retrieve it to a
+  place of your choosing (native save dialog), verify every envelope's
+  integrity, delete with confirmation. Everything runs through
+  `cipher-runtime escrow …` (runtime **1.3.0**, `cipher-runtime-20260916`,
+  now pinned by `scripts/bundle-eidolon-runtime.mjs` with both SHA-256): the
+  renderer names a vault id and an escrow id, never a path; the document and
+  the `.psnx` never cross IPC; what the tab shows is what the protocol
+  stores in cleartext (label, conditions, deposit time, size) plus the
+  runtime's verdict. The store is the one the Eidolon launcher's own escrow
+  menu uses, so both sides see the same envelopes. Stated in the tab, as
+  the protocol states it: the time lock is enforced by this machine's clock,
+  not by a third party; whoever holds the vault holds the documents. A
+  volatile store (`store/escrow.ts`) serialises the runtime calls per vault
+  and keeps the inventory for the session; `main.js` `escrow:*` handlers,
+  `lib/escrow.ts`, `EscrowSettings.tsx`, texts in the eight locales, tests
+  in `store/__tests__/escrow.test.ts`.
 - **Spheres tab in Settings (desktop).** The vault's spheres, as the Eidolon
   custody ledger holds them, each shown as *final* (the anchor has ordered its
   head — by receipt or by signed checkpoint) or *waiting*. Sync with the

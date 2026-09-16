@@ -51,6 +51,26 @@ contextBridge.exposeInMainWorld('electron', {
     exportFile: (vaultId, sphereId) => ipcRenderer.invoke('sphere:export', { vaultId, sphereId }),
   },
 
+  // Escrow Nexus (Eidolon escrow_7d). Sealed, time-locked documents bound to
+  // the vault key, on this device. The renderer names a vault id and an
+  // escrow id, never a path; the document enters and leaves through native
+  // dialogs in main (`cipher-runtime escrow …`, runtime >= 1.3.0). The
+  // renderer only ever sees metadata and the runtime's verdicts.
+  escrow: {
+    list: (vaultId) => ipcRenderer.invoke('escrow:list', { vaultId }),
+    deposit: (vaultId, options) =>
+      ipcRenderer.invoke('escrow:deposit', {
+        vaultId,
+        label: options?.label,
+        releaseAfter: options?.releaseAfter,
+        ownerOnly: options?.ownerOnly === true,
+      }),
+    retrieve: (vaultId, escrowId, suggestedName) =>
+      ipcRenderer.invoke('escrow:retrieve', { vaultId, escrowId, suggestedName }),
+    verify: (vaultId, escrowId) => ipcRenderer.invoke('escrow:verify', { vaultId, escrowId }),
+    remove: (vaultId, escrowId) => ipcRenderer.invoke('escrow:delete', { vaultId, escrowId, confirm: true }),
+  },
+
   // Genesis ceremony. Runs the Eidolon CLI locally and streams its phase
   // events back — the master seed and vault files are minted on this machine
   // and never touch a server. `start` resolves with { ok, runId } once the

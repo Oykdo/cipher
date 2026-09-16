@@ -735,7 +735,8 @@
         "description": "Cipher resta attivo per non farti perdere messaggi. Riaprilo dall'icona vicino all'orologio."
       }
     },
-    "spheres": "Sfere"
+    "spheres": "Sfere",
+    "escrow": "Deposito"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1598,6 +1599,92 @@
       "import": "Importazione rifiutata: {{detail}}",
       "export": "Esportazione non riuscita: {{detail}}",
       "transfer": "Trasferimento rifiutato: {{detail}}"
+    }
+  },
+  "escrow": {
+    "title": "Escrow Nexus",
+    "description": "Documenti sigillati con la chiave di questa cassaforte e conservati su questo dispositivo, ciascuno recuperabile subito o bloccato fino a una data scelta da te. Il documento non lascia mai questa macchina; solo tu, con questa cassaforte, puoi aprirlo.",
+    "plain": "Detto chiaramente: il blocco temporale è applicato dall'orologio di questa macchina, non da un terzo; etichetta, data di rilascio, data di deposito e dimensione sono in chiaro — solo il documento è cifrato; chi possiede la cassaforte possiede i documenti.",
+    "desktop_only": "Il deposito funziona nell'app desktop, con il runtime Eidolon.",
+    "no_vault": "Collega una cassaforte Eidolon per sigillare documenti.",
+    "summary": {
+      "ready": "{{count}} pronto/i",
+      "locked": "{{count}} bloccato/i",
+      "bad": "{{count}} danneggiato/i"
+    },
+    "status": {
+      "working_deposit": "sigillatura del documento…",
+      "working_retrieve": "apertura della busta…",
+      "working_verify": "controllo delle buste…",
+      "working_delete": "eliminazione…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Ogni azione avvia prima il runtime Eidolon — circa 30 secondi."
+    },
+    "actions": {
+      "deposit": "Sigilla un documento",
+      "retrieve": "Recupera",
+      "verify": "Verifica tutto",
+      "refresh": "Aggiorna",
+      "delete": "Elimina",
+      "working": "In corso…"
+    },
+    "deposit": {
+      "title": "Sigilla un documento",
+      "description": "Scegli un'etichetta e, se vuoi, una data prima della quale il documento non potrà essere recuperato. Poi scegli il file: viene cifrato qui e conservato su questo dispositivo.",
+      "label": "Etichetta (in chiaro)",
+      "label_placeholder": "Per impostazione predefinita, il nome del file",
+      "release_after": "Bloccato fino a (facoltativo)",
+      "release_after_hint": "Applicato dall'orologio di questa macchina. Lascia vuoto per mantenere il documento recuperabile in qualsiasi momento.",
+      "owner_only": "Registra anche che solo questa cassaforte può aprirlo (firma del proprietario)",
+      "choose_file": "Scegli il file",
+      "invalid_date": "Questa data non è valida.",
+      "date_in_past": "La data di rilascio deve essere nel futuro.",
+      "done": "{{label}} sigillato.",
+      "done_locked": "{{label}} sigillato — bloccato fino a {{until}}."
+    },
+    "retrieve": {
+      "done": "Documento scritto: {{filename}} ({{size}})."
+    },
+    "verify": {
+      "done": "{{checked}} busta/e controllata/e, tutte integre.",
+      "failed": "{{checked}} busta/e controllata/e, {{failed}} danneggiata/e."
+    },
+    "delete": {
+      "title": "Eliminare questo deposito?",
+      "description": "{{label}} sarà rimosso da questo dispositivo. Non si può annullare: il documento è perso se non hai più l'originale.",
+      "confirm": "Elimina",
+      "done": "Deposito eliminato.",
+      "nothing": "Niente da eliminare."
+    },
+    "inventory": {
+      "title": "Documenti sigillati",
+      "empty": "Nessun documento sigillato per ora. Sigillane uno per conservarlo sotto la chiave di questa cassaforte.",
+      "deposited": "sigillato il {{when}}",
+      "owner_only": "Firma del proprietario richiesta: solo questa cassaforte può aprirlo.",
+      "integrity_ok": "Integro.",
+      "integrity_failed": "Danneggiato: {{reason}}",
+      "unreadable": "Illeggibile: {{detail}}"
+    },
+    "state": {
+      "ready": "pronto",
+      "locked": "bloccato fino a {{until}}",
+      "tampered": "alterato",
+      "invalid": "non valido",
+      "unreadable": "illeggibile"
+    },
+    "errors": {
+      "canceled": "Annullato.",
+      "locked": "Ancora bloccato fino a {{until}}.",
+      "integrity": "Questa busta non si verifica con la chiave di questa cassaforte: cassaforte sbagliata, o file alterato.",
+      "not_found": "Questo deposito non esiste più.",
+      "unreadable": "Questo file non può essere letto (corrotto, o scritto da una versione più recente).",
+      "runtime": "Impossibile eseguire il runtime Eidolon: {{detail}}",
+      "no_psnx": "Il file della cassaforte (.psnx) non è su questo dispositivo.",
+      "list": "Impossibile leggere l'elenco: {{detail}}",
+      "deposit": "Sigillatura fallita: {{detail}}",
+      "retrieve": "Recupero fallito: {{detail}}",
+      "verify": "Verifica fallita: {{detail}}",
+      "delete": "Eliminazione fallita: {{detail}}"
     }
   }
 }

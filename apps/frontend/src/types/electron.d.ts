@@ -199,6 +199,48 @@ type SphereExportResult =
   | { ok: true; sphereId: string; state: SphereState; filename: string; size: number }
   | SphereFailure;
 
+/**
+ * Escrow Nexus (`escrow:*`, Eidolon escrow_7d). Replies are the JSON lines of
+ * `cipher-runtime escrow …` (Eidolon: docs/HANDOVER_ESCROW_7D §7), paths
+ * stripped. `conditions` are the cleartext release conditions of the
+ * envelope; `releasable` / `reason` is what `check_release` said.
+ */
+type EscrowCondition =
+  | { type: 'time_lock'; release_after: string }
+  | { type: 'owner_signature'; expected_vault_id: string }
+  | { type: 'combined_all' | 'combined_any'; children: EscrowCondition[] }
+  | { type: string; [key: string]: unknown };
+
+type EscrowEntry = {
+  escrow_id: string;
+  label: string;
+  deposited_at: string;
+  payload_size: number;
+  conditions: EscrowCondition[];
+  release_after: string | null;
+  releasable: boolean;
+  reason: string;
+  depositor_vault_id_prefix: string;
+  schema_version: number;
+  crypto_suite: string;
+};
+
+type EscrowFailure = { ok: false; error: string; errorCode?: string; releaseAfter?: string };
+
+type EscrowListResult =
+  | { ok: true; vault_id: string; count: number; escrows: EscrowEntry[]; unreadable: { escrow_id: string; error: string }[] }
+  | EscrowFailure;
+
+type EscrowDepositResult = ({ ok: true; filename: string } & EscrowEntry) | EscrowFailure;
+
+type EscrowRetrieveResult = { ok: true; escrowId: string; filename: string; size: number } | EscrowFailure;
+
+type EscrowVerifyResult =
+  | { ok: true; checked: number; failed: number; results: { escrow_id: string; integrity_ok: boolean; reason: string }[] }
+  | EscrowFailure;
+
+type EscrowDeleteResult = { ok: true; escrow_id: string; deleted: boolean } | EscrowFailure;
+
 declare global {
   interface Window {
     electron?: {
@@ -281,6 +323,16 @@ declare global {
         transfer: (vaultId: string, sphereId: string, to: string, apiUrl?: string) => Promise<SphereTransferResult>;
         importFile: (vaultId: string, apiUrl?: string) => Promise<SphereImportResult>;
         exportFile: (vaultId: string, sphereId: string) => Promise<SphereExportResult>;
+      };
+      escrow?: {
+        list: (vaultId: string) => Promise<EscrowListResult>;
+        deposit: (
+          vaultId: string,
+          options?: { label?: string; releaseAfter?: string; ownerOnly?: boolean }
+        ) => Promise<EscrowDepositResult>;
+        retrieve: (vaultId: string, escrowId: string, suggestedName?: string) => Promise<EscrowRetrieveResult>;
+        verify: (vaultId: string, escrowId?: string) => Promise<EscrowVerifyResult>;
+        remove: (vaultId: string, escrowId: string) => Promise<EscrowDeleteResult>;
       };
       backupPassword?: {
         has: (username: string) => Promise<boolean>;

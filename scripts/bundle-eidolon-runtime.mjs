@@ -145,16 +145,23 @@ const PBS_CACHE_DIR = path.join(cipherRoot, 'assets', '.python-cache');
 // and was verified under confinement on both platforms: refused with no
 // .psnx when the lock server is unreachable, one vault when it answers,
 // refused again on the second ceremony.
-const RUNTIME_RELEASE = 'cipher-runtime-20260912';
+// 20260916 (`--version` 1.3.0) adds the sphere custody client, Escrow Nexus
+// (`escrow …`, the Settings › Escrow tab) and compiles in the genesis trust
+// root of 2026-09-16 (issuer 6dad3cb1…, root 89fb26b1…). Built from the
+// private core after the ceremony (public tree Eidolon v1.3.0); exercised on
+// both platforms against a throwaway data dir (sphere trust, escrow deposit /
+// list / retrieve / verify / delete, keybundle and ceremony --help). The
+// Settings › Spheres and › Escrow tabs need this runtime or newer.
+const RUNTIME_RELEASE = 'cipher-runtime-20260916';
 const RUNTIME_TARGETS = {
   win32: {
     asset: 'cipher-runtime.exe',
-    sha256: '62b1b7232e23c801871491fb09ed0fe27735fa36065b8709cc55eb04b4f03fdd',
+    sha256: '648b748c35d619e8f22ccdcb85fb85b1dfacbf602127d9ce86139d19c4cf00ca',
     localDirs: ['dist-cipher-runtime'],
   },
   linux: {
     asset: 'cipher-runtime',
-    sha256: 'b54cfd522f2b1df6027412d31eabe4689be16e6c6396d8aac6c99d3f5315a83d',
+    sha256: '09740ff57befb8c6a075ce78a0a71e596ebcada1f22e074386fbe5e6337d5879',
     localDirs: ['dist-cipher-runtime-linux', 'dist-cipher-runtime'],
   },
 };

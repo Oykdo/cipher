@@ -735,7 +735,8 @@
         "description": "Cipher bleibt aktiv, damit Sie keine Nachrichten verpassen. Über das Symbol neben der Uhr wieder öffnen."
       }
     },
-    "spheres": "Sphären"
+    "spheres": "Sphären",
+    "escrow": "Treuhand"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1598,6 +1599,92 @@
       "import": "Import abgelehnt: {{detail}}",
       "export": "Export fehlgeschlagen: {{detail}}",
       "transfer": "Übertragung abgelehnt: {{detail}}"
+    }
+  },
+  "escrow": {
+    "title": "Escrow Nexus",
+    "description": "Dokumente, die unter dem Schlüssel dieses Tresors versiegelt und auf diesem Gerät aufbewahrt werden — jedes sofort abrufbar oder bis zu einem von Ihnen gewählten Datum gesperrt. Das Dokument verlässt diesen Rechner nie; nur Sie, mit diesem Tresor, können es öffnen.",
+    "plain": "Klar gesagt: Die Zeitsperre wird von der Uhr dieses Rechners durchgesetzt, nicht von einem Dritten; Bezeichnung, Freigabedatum, Hinterlegungszeit und Größe sind im Klartext gespeichert — nur das Dokument ist verschlüsselt; wer den Tresor hat, hat die Dokumente.",
+    "desktop_only": "Die Treuhand läuft in der Desktop-App, mit der Eidolon-Laufzeit.",
+    "no_vault": "Verknüpfen Sie einen Eidolon-Tresor, um Dokumente zu versiegeln.",
+    "summary": {
+      "ready": "{{count}} bereit",
+      "locked": "{{count}} gesperrt",
+      "bad": "{{count}} beschädigt"
+    },
+    "status": {
+      "working_deposit": "Dokument wird versiegelt…",
+      "working_retrieve": "Umschlag wird geöffnet…",
+      "working_verify": "Umschläge werden geprüft…",
+      "working_delete": "wird gelöscht…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Jede Aktion startet zuerst die Eidolon-Laufzeit — etwa 30 Sekunden."
+    },
+    "actions": {
+      "deposit": "Dokument versiegeln",
+      "retrieve": "Abrufen",
+      "verify": "Alle prüfen",
+      "refresh": "Aktualisieren",
+      "delete": "Löschen",
+      "working": "Läuft…"
+    },
+    "deposit": {
+      "title": "Dokument versiegeln",
+      "description": "Wählen Sie eine Bezeichnung und, wenn Sie möchten, ein Datum, vor dem das Dokument nicht abgerufen werden kann. Wählen Sie dann die Datei: Sie wird hier verschlüsselt und auf diesem Gerät aufbewahrt.",
+      "label": "Bezeichnung (im Klartext)",
+      "label_placeholder": "Standard: der Dateiname",
+      "release_after": "Gesperrt bis (optional)",
+      "release_after_hint": "Von der Uhr dieses Rechners durchgesetzt. Leer lassen, damit das Dokument jederzeit abrufbar bleibt.",
+      "owner_only": "Zusätzlich festhalten, dass nur dieser Tresor es öffnen darf (Eigentümersignatur)",
+      "choose_file": "Datei wählen",
+      "invalid_date": "Dieses Datum ist ungültig.",
+      "date_in_past": "Das Freigabedatum muss in der Zukunft liegen.",
+      "done": "{{label}} versiegelt.",
+      "done_locked": "{{label}} versiegelt — gesperrt bis {{until}}."
+    },
+    "retrieve": {
+      "done": "Dokument geschrieben: {{filename}} ({{size}})."
+    },
+    "verify": {
+      "done": "{{checked}} Umschlag/Umschläge geprüft, alle unversehrt.",
+      "failed": "{{checked}} Umschlag/Umschläge geprüft, {{failed}} beschädigt."
+    },
+    "delete": {
+      "title": "Diese Treuhand löschen?",
+      "description": "{{label}} wird von diesem Gerät entfernt. Das lässt sich nicht rückgängig machen: Das Dokument ist verloren, wenn Sie das Original nicht mehr haben.",
+      "confirm": "Löschen",
+      "done": "Treuhand gelöscht.",
+      "nothing": "Nichts zu löschen."
+    },
+    "inventory": {
+      "title": "Versiegelte Dokumente",
+      "empty": "Noch kein versiegeltes Dokument. Versiegeln Sie eines, um es unter dem Schlüssel dieses Tresors zu bewahren.",
+      "deposited": "versiegelt am {{when}}",
+      "owner_only": "Eigentümersignatur erforderlich: Nur dieser Tresor kann es öffnen.",
+      "integrity_ok": "Unversehrt.",
+      "integrity_failed": "Beschädigt: {{reason}}",
+      "unreadable": "Unlesbar: {{detail}}"
+    },
+    "state": {
+      "ready": "bereit",
+      "locked": "gesperrt bis {{until}}",
+      "tampered": "manipuliert",
+      "invalid": "ungültig",
+      "unreadable": "unlesbar"
+    },
+    "errors": {
+      "canceled": "Abgebrochen.",
+      "locked": "Noch gesperrt bis {{until}}.",
+      "integrity": "Dieser Umschlag lässt sich mit dem Schlüssel dieses Tresors nicht verifizieren: falscher Tresor oder veränderte Datei.",
+      "not_found": "Diese Treuhand existiert nicht mehr.",
+      "unreadable": "Diese Datei kann nicht gelesen werden (beschädigt oder von einer neueren Version geschrieben).",
+      "runtime": "Die Eidolon-Laufzeit konnte nicht ausgeführt werden: {{detail}}",
+      "no_psnx": "Die Tresordatei (.psnx) ist nicht auf diesem Gerät.",
+      "list": "Die Liste konnte nicht gelesen werden: {{detail}}",
+      "deposit": "Versiegeln fehlgeschlagen: {{detail}}",
+      "retrieve": "Abruf fehlgeschlagen: {{detail}}",
+      "verify": "Prüfung fehlgeschlagen: {{detail}}",
+      "delete": "Löschen fehlgeschlagen: {{detail}}"
     }
   }
 }

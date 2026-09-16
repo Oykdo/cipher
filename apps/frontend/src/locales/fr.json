@@ -770,7 +770,8 @@
         "description": "Cipher reste actif pour ne pas manquer de messages. Rouvrez-le via l'icône près de l'horloge."
       }
     },
-    "spheres": "Sphères"
+    "spheres": "Sphères",
+    "escrow": "Séquestre"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1594,6 +1595,92 @@
       "import": "Import refusé : {{detail}}",
       "export": "Export en échec : {{detail}}",
       "transfer": "Cession refusée : {{detail}}"
+    }
+  },
+  "escrow": {
+    "title": "Escrow Nexus",
+    "description": "Des documents scellés sous la clé de ce coffre et gardés sur cet appareil, chacun récupérable maintenant ou verrouillé jusqu'à une date que vous avez choisie. Le document ne quitte jamais cette machine ; vous seul, avec ce coffre, pouvez l'ouvrir.",
+    "plain": "Dit simplement : le verrou temporel est tenu par l'horloge de cette machine, pas par un tiers ; le libellé, la date de libération, la date de dépôt et la taille sont en clair — seul le document est chiffré ; qui détient le coffre détient les documents.",
+    "desktop_only": "Le séquestre fonctionne dans l'application de bureau, avec le runtime Eidolon.",
+    "no_vault": "Liez un coffre Eidolon pour sceller des documents.",
+    "summary": {
+      "ready": "{{count}} prêt(s)",
+      "locked": "{{count}} verrouillé(s)",
+      "bad": "{{count}} abîmé(s)"
+    },
+    "status": {
+      "working_deposit": "scellement du document…",
+      "working_retrieve": "ouverture de l'enveloppe…",
+      "working_verify": "contrôle des enveloppes…",
+      "working_delete": "suppression…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Chaque action démarre d'abord le runtime Eidolon — environ 30 secondes."
+    },
+    "actions": {
+      "deposit": "Sceller un document",
+      "retrieve": "Récupérer",
+      "verify": "Tout vérifier",
+      "refresh": "Actualiser",
+      "delete": "Supprimer",
+      "working": "En cours…"
+    },
+    "deposit": {
+      "title": "Sceller un document",
+      "description": "Choisissez un libellé et, si vous voulez, une date avant laquelle le document ne pourra pas être récupéré. Puis choisissez le fichier : il est chiffré ici et conservé sur cet appareil.",
+      "label": "Libellé (en clair)",
+      "label_placeholder": "Par défaut, le nom du fichier",
+      "release_after": "Verrouillé jusqu'au (facultatif)",
+      "release_after_hint": "Tenu par l'horloge de cette machine. Laissez vide pour garder le document récupérable à tout moment.",
+      "owner_only": "Noter aussi que seul ce coffre peut l'ouvrir (signature du propriétaire)",
+      "choose_file": "Choisir le fichier",
+      "invalid_date": "Cette date n'est pas valide.",
+      "date_in_past": "La date de libération doit être dans le futur.",
+      "done": "{{label}} scellé.",
+      "done_locked": "{{label}} scellé — verrouillé jusqu'au {{until}}."
+    },
+    "retrieve": {
+      "done": "Document écrit : {{filename}} ({{size}})."
+    },
+    "verify": {
+      "done": "{{checked}} enveloppe(s) contrôlée(s), toutes intactes.",
+      "failed": "{{checked}} enveloppe(s) contrôlée(s), {{failed}} abîmée(s)."
+    },
+    "delete": {
+      "title": "Supprimer ce séquestre ?",
+      "description": "{{label}} sera retiré de cet appareil. C'est irréversible : le document est perdu si vous n'avez plus l'original.",
+      "confirm": "Supprimer",
+      "done": "Séquestre supprimé.",
+      "nothing": "Rien à supprimer."
+    },
+    "inventory": {
+      "title": "Documents scellés",
+      "empty": "Aucun document scellé pour l'instant. Scellez-en un pour le garder sous la clé de ce coffre.",
+      "deposited": "scellé le {{when}}",
+      "owner_only": "Signature du propriétaire requise : seul ce coffre peut l'ouvrir.",
+      "integrity_ok": "Intact.",
+      "integrity_failed": "Abîmé : {{reason}}",
+      "unreadable": "Illisible : {{detail}}"
+    },
+    "state": {
+      "ready": "prêt",
+      "locked": "verrouillé jusqu'au {{until}}",
+      "tampered": "altéré",
+      "invalid": "invalide",
+      "unreadable": "illisible"
+    },
+    "errors": {
+      "canceled": "Annulé.",
+      "locked": "Encore verrouillé jusqu'au {{until}}.",
+      "integrity": "Cette enveloppe ne se vérifie pas avec la clé de ce coffre : mauvais coffre, ou fichier altéré.",
+      "not_found": "Ce séquestre n'existe plus.",
+      "unreadable": "Ce fichier ne peut pas être lu (corrompu, ou écrit par une version plus récente).",
+      "runtime": "Le runtime Eidolon n'a pas pu s'exécuter : {{detail}}",
+      "no_psnx": "Le fichier du coffre (.psnx) n'est pas sur cet appareil.",
+      "list": "La liste n'a pas pu être lue : {{detail}}",
+      "deposit": "Scellement échoué : {{detail}}",
+      "retrieve": "Récupération échouée : {{detail}}",
+      "verify": "Vérification échouée : {{detail}}",
+      "delete": "Suppression échouée : {{detail}}"
     }
   }
 }

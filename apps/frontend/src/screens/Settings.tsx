@@ -6,8 +6,10 @@ import { BackupSettings } from "../components/settings/BackupSettings";
 import { SecuritySettings } from "../components/settings/SecuritySettings";
 import { ContributionSettings } from "../components/settings/ContributionSettings";
 import { SphereSettings } from "../components/settings/SphereSettings";
+import { EscrowSettings } from "../components/settings/EscrowSettings";
 import { EIDOLON_CONNECT_ENABLED } from "../config";
 import { isSphereClientAvailable } from "../lib/spheres";
+import { isEscrowClientAvailable } from "../lib/escrow";
 
 export function Settings() {
   const { t } = useTranslation();
@@ -15,7 +17,9 @@ export function Settings() {
   const location = useLocation();
   // The spheres tab needs the desktop runtime (Electron) and the Eidolon flag.
   const spheresEnabled = EIDOLON_CONNECT_ENABLED && isSphereClientAvailable();
-  const [activeTab, setActiveTab] = useState<"general" | "backup" | "security" | "contribution" | "spheres">(() => {
+  // The escrow tab too: sealed documents live on this device, sealed by the runtime.
+  const escrowEnabled = EIDOLON_CONNECT_ENABLED && isEscrowClientAvailable();
+  const [activeTab, setActiveTab] = useState<"general" | "backup" | "security" | "contribution" | "spheres" | "escrow">(() => {
     try {
       const params = new URLSearchParams(location.search);
       const tab = params.get('tab');
@@ -23,6 +27,9 @@ export function Settings() {
         return tab;
       }
       if (tab === 'spheres' && spheresEnabled) {
+        return tab;
+      }
+      if (tab === 'escrow' && escrowEnabled) {
         return tab;
       }
     } catch {
@@ -109,6 +116,17 @@ export function Settings() {
               {t('settings.spheres')}
             </button>
           )}
+          {escrowEnabled && (
+            <button
+              onClick={() => setActiveTab("escrow")}
+              className={`px-4 py-2 font-medium transition-colors ${activeTab === "escrow"
+                  ? "text-brand-400 border-b-2 border-brand-400"
+                  : "text-slate-400 hover:text-slate-300"
+                }`}
+            >
+              {t('settings.escrow')}
+            </button>
+          )}
         </div>
 
         {/* Content */}
@@ -118,6 +136,7 @@ export function Settings() {
           {activeTab === "security" && <SecuritySettings />}
           {activeTab === "contribution" && <ContributionSettings />}
           {activeTab === "spheres" && spheresEnabled && <SphereSettings />}
+          {activeTab === "escrow" && escrowEnabled && <EscrowSettings />}
         </div>
       </div>
     </div>

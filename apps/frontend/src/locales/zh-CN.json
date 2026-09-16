@@ -735,7 +735,8 @@
         "description": "Cipher 保持活动状态，以免错过消息。点击时钟旁边的图标即可重新打开窗口。"
       }
     },
-    "spheres": "球体"
+    "spheres": "球体",
+    "escrow": "托管"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1598,6 +1599,92 @@
       "import": "导入被拒绝：{{detail}}",
       "export": "导出失败：{{detail}}",
       "transfer": "转移被拒绝：{{detail}}"
+    }
+  },
+  "escrow": {
+    "title": "Escrow Nexus",
+    "description": "用此保险库的密钥封存并保存在本设备上的文件，每份都可以立即取回，或锁定到您选择的日期。文件从不离开这台机器；只有您，凭此保险库，才能打开它。",
+    "plain": "说明白些：时间锁由这台机器的时钟执行，而非第三方；标签、解锁日期、存入时间和大小以明文保存——只有文件本身被加密；谁持有保险库，谁就持有文件。",
+    "desktop_only": "托管在桌面应用中运行，需要 Eidolon 运行时。",
+    "no_vault": "关联一个 Eidolon 保险库以封存文件。",
+    "summary": {
+      "ready": "{{count}} 份可取回",
+      "locked": "{{count}} 份已锁定",
+      "bad": "{{count}} 份已损坏"
+    },
+    "status": {
+      "working_deposit": "正在封存文件…",
+      "working_retrieve": "正在打开信封…",
+      "working_verify": "正在检查信封…",
+      "working_delete": "正在删除…",
+      "elapsed": "{{seconds}} 秒",
+      "runtime_hint": "每个操作都会先启动 Eidolon 运行时——约 30 秒。"
+    },
+    "actions": {
+      "deposit": "封存文件",
+      "retrieve": "取回",
+      "verify": "全部验证",
+      "refresh": "刷新",
+      "delete": "删除",
+      "working": "处理中…"
+    },
+    "deposit": {
+      "title": "封存文件",
+      "description": "选择一个标签，并可选择一个日期，在此之前文件无法取回。然后选择文件：它将在本机加密并保存在本设备上。",
+      "label": "标签（明文保存）",
+      "label_placeholder": "默认为文件名",
+      "release_after": "锁定至（可选）",
+      "release_after_hint": "由这台机器的时钟执行。留空则文件随时可取回。",
+      "owner_only": "同时记录只有此保险库可以打开它（所有者签名）",
+      "choose_file": "选择文件",
+      "invalid_date": "该日期无效。",
+      "date_in_past": "解锁日期必须在未来。",
+      "done": "{{label}} 已封存。",
+      "done_locked": "{{label}} 已封存——锁定至 {{until}}。"
+    },
+    "retrieve": {
+      "done": "文件已写入：{{filename}}（{{size}}）。"
+    },
+    "verify": {
+      "done": "已检查 {{checked}} 个信封，全部完好。",
+      "failed": "已检查 {{checked}} 个信封，{{failed}} 个已损坏。"
+    },
+    "delete": {
+      "title": "删除此托管？",
+      "description": "{{label}} 将从本设备移除。此操作不可撤销：如果您没有原件，文件将丢失。",
+      "confirm": "删除",
+      "done": "托管已删除。",
+      "nothing": "没有可删除的内容。"
+    },
+    "inventory": {
+      "title": "已封存的文件",
+      "empty": "尚无已封存的文件。封存一份，以将其保存在此保险库的密钥之下。",
+      "deposited": "封存于 {{when}}",
+      "owner_only": "需要所有者签名：只有此保险库可以打开它。",
+      "integrity_ok": "完好。",
+      "integrity_failed": "已损坏：{{reason}}",
+      "unreadable": "无法读取：{{detail}}"
+    },
+    "state": {
+      "ready": "可取回",
+      "locked": "锁定至 {{until}}",
+      "tampered": "已篡改",
+      "invalid": "无效",
+      "unreadable": "无法读取"
+    },
+    "errors": {
+      "canceled": "已取消。",
+      "locked": "仍锁定至 {{until}}。",
+      "integrity": "此信封无法用此保险库的密钥验证：保险库不对，或文件已被更改。",
+      "not_found": "此托管已不存在。",
+      "unreadable": "无法读取此文件（已损坏，或由更新版本写入）。",
+      "runtime": "无法运行 Eidolon 运行时：{{detail}}",
+      "no_psnx": "保险库文件（.psnx）不在本设备上。",
+      "list": "无法读取列表：{{detail}}",
+      "deposit": "封存失败：{{detail}}",
+      "retrieve": "取回失败：{{detail}}",
+      "verify": "验证失败：{{detail}}",
+      "delete": "删除失败：{{detail}}"
     }
   }
 }

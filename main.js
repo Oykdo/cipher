@@ -2135,6 +2135,212 @@ ipcMain.handle('sphere:export', async (event, payload) => {
   return { ok: true, sphereId, state: result.state, filename: path.basename(picked.filePath), size };
 });
 
+// --- Escrow Nexus (Eidolon escrow_7d) ---------------------------------------
+// Sealed, time-locked documents bound to the vault key, kept on this device
+// in the same store as the Eidolon launcher's own escrow menu. The client is
+// `cipher-runtime escrow …` (scripts/public/escrow_cli.py, runtime ≥ 1.3.0):
+// one JSON line per call, {"ok":true,…} or {"ok":false,"error","error_code"}.
+// Same rules as `sphere` above, plus one: the document never crosses IPC —
+// it enters the runtime as a file the user picked (native open dialog) and
+// comes back as a file the user chose (native save dialog); the renderer
+// only ever sees metadata (label, dates, size, verdict). What the protocol
+// stores in cleartext (label, conditions, deposit time, size) is what the
+// list shows; only the document is encrypted.
+const ESCROW_CLI_REL = path.join('scripts', 'public', 'escrow_cli.py');
+const ESCROW_ID_REGEX = /^[A-Za-z0-9_\-]{1,80}$/;
+const ESCROW_SUBCOMMANDS = new Set(['deposit', 'list', 'show', 'retrieve', 'verify', 'delete']);
+const ESCROW_MAX_DOCUMENT_BYTES = 64 * 1024 * 1024;
+const ESCROW_LABEL_MAX = 200;
+
+// One escrow runtime at a time per vault: two writers on the same escrows
+// dir would race on the atomic writes. The renderer store serialises its own
+// calls; this holds for any caller (a second window, a remount).
+/** @type {Map<string, Promise<unknown>>} */
+const escrowLocks = new Map();
+/**
+ * @template T
+ * @param {string} vaultId
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+function withEscrowLock(vaultId, fn) {
+  const prev = escrowLocks.get(vaultId) ?? Promise.resolve();
+  const next = prev.catch(() => {}).then(fn);
+  escrowLocks.set(vaultId, next);
+  next
+    .catch(() => {})
+    .finally(() => {
+      if (escrowLocks.get(vaultId) === next) escrowLocks.delete(vaultId);
+    });
+  return next;
+}
+
+/**
+ * Run one `escrow` subcommand for `vaultId` and return its JSON reply with
+ * every absolute path stripped. Serialised per vault: one escrow runtime at
+ * a time on a vault's envelopes.
+ * @param {unknown} vaultId
+ * @param {string} subcommand
+ * @param {string[]} [extraArgs]
+ */
+async function runEscrowCli(vaultId, subcommand, extraArgs = []) {
+  if (!ESCROW_SUBCOMMANDS.has(subcommand)) {
+    return { ok: false, error: 'unknown escrow subcommand', errorCode: 'invalid_input' };
+  }
+  const requestedId = String(vaultId ?? '').trim().toLowerCase();
+  if (!VAULT_ID_REGEX.test(requestedId)) {
+    return { ok: false, error: 'invalid vaultId', errorCode: 'invalid_vault_id' };
+  }
+  let sources;
+  try {
+    sources = await resolveVaultFileSources({ vaultId: requestedId });
+  } catch (err) {
+    return { ok: false, error: stripAbsolutePaths(err?.message ?? 'resolve_failed'), errorCode: 'resolve_failed' };
+  }
+  if (!sources.psnx) {
+    return { ok: false, error: 'PSNX file not found on this device', errorCode: 'psnx_not_found' };
+  }
+  const args = [subcommand, ...extraArgs, '--psnx', sources.psnx];
+  let result;
+  try {
+    result = await withEscrowLock(requestedId, () => runCipherRuntimeCli('escrow', ESCROW_CLI_REL, args));
+  } catch (err) {
+    return { ok: false, error: stripAbsolutePaths(err?.message ?? 'runtime_unavailable'), errorCode: 'runtime_unavailable' };
+  }
+  const payload = parseLastJsonLineFromBuffer(result.stdout);
+  if (!payload || typeof payload !== 'object') {
+    const detail = result.stderr.slice(-500) || `exit ${result.code}`;
+    return { ok: false, error: stripAbsolutePaths(`escrow ${subcommand} failed: ${detail}`), errorCode: 'runtime_failed' };
+  }
+  if (payload.ok !== true) {
+    return {
+      ok: false,
+      error: stripAbsolutePaths(String(payload.error ?? `exit ${result.code}`)),
+      errorCode: typeof payload.error_code === 'string' ? payload.error_code : 'escrow_failed',
+      releaseAfter: typeof payload.release_after === 'string' ? payload.release_after : undefined,
+    };
+  }
+  if (typeof payload.path === 'string') payload.path = path.basename(payload.path);
+  if (Array.isArray(payload.unreadable)) {
+    payload.unreadable = payload.unreadable.map((u) => ({
+      escrow_id: String(u?.escrow_id ?? ''),
+      error: stripAbsolutePaths(String(u?.error ?? '')),
+    }));
+  }
+  if (Array.isArray(payload.results)) {
+    for (const r of payload.results) {
+      if (r && typeof r.reason === 'string') r.reason = stripAbsolutePaths(r.reason);
+    }
+  }
+  const resolvedId = String(payload.vault_id ?? '').trim().toLowerCase();
+  if (resolvedId && resolvedId !== requestedId) {
+    return { ok: false, error: 'vault_mismatch', errorCode: 'vault_mismatch' };
+  }
+  return payload;
+}
+
+/**
+ * A `--release-after` value the runtime will accept: ISO 8601 → UTC ISO
+ * string; null when absent; undefined when malformed.
+ * @param {unknown} value
+ */
+function normaliseReleaseAfter(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const text = String(value).trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/.test(text)) return undefined;
+  const at = new Date(text);
+  if (Number.isNaN(at.getTime())) return undefined;
+  return at.toISOString();
+}
+
+ipcMain.handle('escrow:list', async (event, payload) => {
+  requireTrustedRenderer(event);
+  return runEscrowCli(payload?.vaultId, 'list');
+});
+
+// Deposit: the document is picked here, sealed by the runtime, and never read
+// by main. Reply: the new escrow as `list` shows it, plus the file name.
+ipcMain.handle('escrow:deposit', async (event, payload) => {
+  requireTrustedRenderer(event);
+  const releaseAfter = normaliseReleaseAfter(payload?.releaseAfter);
+  if (releaseAfter === undefined) {
+    return { ok: false, error: 'invalid release date', errorCode: 'invalid_input' };
+  }
+  const label = payload?.label === undefined || payload?.label === null ? null : String(payload.label).trim();
+  if (label !== null && (label.length > ESCROW_LABEL_MAX || /[\r\n]/.test(label))) {
+    return { ok: false, error: 'invalid label', errorCode: 'invalid_input' };
+  }
+  const picked = await showVaultFilesDialog('showOpenDialog', {
+    title: 'Escrow Nexus',
+    properties: ['openFile'],
+  });
+  if (picked.canceled || !picked.filePaths?.length) {
+    return { ok: false, error: 'canceled', errorCode: 'canceled' };
+  }
+  const src = picked.filePaths[0];
+  let stat;
+  try {
+    stat = statSync(src);
+  } catch {
+    return { ok: false, error: 'file not found', errorCode: 'not_found' };
+  }
+  if (!stat.isFile() || stat.size > ESCROW_MAX_DOCUMENT_BYTES) {
+    return { ok: false, error: 'not a document, or larger than 64 MiB', errorCode: 'invalid_input' };
+  }
+  const args = ['--file', src];
+  if (label) args.push('--label', label);
+  if (releaseAfter) args.push('--release-after', releaseAfter);
+  if (payload?.ownerOnly === true) args.push('--owner-only');
+  const result = await runEscrowCli(payload?.vaultId, 'deposit', args);
+  return result.ok ? { ...result, filename: path.basename(src) } : result;
+});
+
+// Retrieve: the runtime verifies, evaluates the conditions and writes the
+// document where the user chose; the save dialog already asked about
+// overwriting, so the runtime is told so. Reply: file name and size only.
+ipcMain.handle('escrow:retrieve', async (event, payload) => {
+  requireTrustedRenderer(event);
+  const escrowId = String(payload?.escrowId ?? '').trim();
+  if (!ESCROW_ID_REGEX.test(escrowId)) {
+    return { ok: false, error: 'invalid escrowId', errorCode: 'invalid_input' };
+  }
+  const suggested = String(payload?.suggestedName ?? '').replace(/[\\/:*?"<>|\r\n]+/g, '_').trim().slice(0, 120);
+  const picked = await showVaultFilesDialog('showSaveDialog', {
+    title: 'Escrow Nexus',
+    defaultPath: suggested || `${escrowId}.bin`,
+    properties: ['createDirectory', 'showOverwriteConfirmation'],
+  });
+  if (picked.canceled || !picked.filePath) {
+    return { ok: false, error: 'canceled', errorCode: 'canceled' };
+  }
+  const result = await runEscrowCli(payload?.vaultId, 'retrieve', ['--id', escrowId, '--out', picked.filePath, '--overwrite']);
+  if (!result.ok) return result;
+  return { ok: true, escrowId, filename: path.basename(picked.filePath), size: Number(result.size ?? 0) };
+});
+
+ipcMain.handle('escrow:verify', async (event, payload) => {
+  requireTrustedRenderer(event);
+  const escrowId = payload?.escrowId === undefined || payload?.escrowId === null ? '' : String(payload.escrowId).trim();
+  if (escrowId && !ESCROW_ID_REGEX.test(escrowId)) {
+    return { ok: false, error: 'invalid escrowId', errorCode: 'invalid_input' };
+  }
+  return runEscrowCli(payload?.vaultId, 'verify', escrowId ? ['--id', escrowId] : []);
+});
+
+// Delete is irreversible: the renderer confirms with the user, main passes
+// the runtime's own --confirm only when told so.
+ipcMain.handle('escrow:delete', async (event, payload) => {
+  requireTrustedRenderer(event);
+  const escrowId = String(payload?.escrowId ?? '').trim();
+  if (!ESCROW_ID_REGEX.test(escrowId)) {
+    return { ok: false, error: 'invalid escrowId', errorCode: 'invalid_input' };
+  }
+  if (payload?.confirm !== true) {
+    return { ok: false, error: 'confirmation required', errorCode: 'confirmation_required' };
+  }
+  return runEscrowCli(payload?.vaultId, 'delete', ['--id', escrowId, '--confirm']);
+});
+
 ipcMain.handle('eidolon:open-launcher', async () => launchEidolonLauncher());
 ipcMain.handle('eidolon:open-installer', async () => openEidolonInstaller());
 ipcMain.handle('eidolon:get-vault-metrics', async (_event, vaultRef) => readEidolonVaultMetrics(vaultRef));

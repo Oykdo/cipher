@@ -771,7 +771,8 @@
         "description": "O Cipher permanece ativo para que você não perca mensagens. Reabra-o pelo ícone perto do relógio."
       }
     },
-    "spheres": "Esferas"
+    "spheres": "Esferas",
+    "escrow": "Custódia"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1593,6 +1594,92 @@
       "import": "Importação recusada: {{detail}}",
       "export": "Falha na exportação: {{detail}}",
       "transfer": "Transferência recusada: {{detail}}"
+    }
+  },
+  "escrow": {
+    "title": "Escrow Nexus",
+    "description": "Documentos selados com a chave deste cofre e guardados neste dispositivo, cada um recuperável agora ou bloqueado até uma data que você escolheu. O documento nunca sai desta máquina; só você, com este cofre, pode abri-lo.",
+    "plain": "Dito claramente: o bloqueio temporal é aplicado pelo relógio desta máquina, não por um terceiro; o rótulo, a data de liberação, a data de depósito e o tamanho ficam em claro — só o documento é cifrado; quem tem o cofre tem os documentos.",
+    "desktop_only": "A custódia funciona no aplicativo de desktop, com o runtime Eidolon.",
+    "no_vault": "Vincule um cofre Eidolon para selar documentos.",
+    "summary": {
+      "ready": "{{count}} pronto(s)",
+      "locked": "{{count}} bloqueado(s)",
+      "bad": "{{count}} danificado(s)"
+    },
+    "status": {
+      "working_deposit": "selando o documento…",
+      "working_retrieve": "abrindo o envelope…",
+      "working_verify": "verificando os envelopes…",
+      "working_delete": "excluindo…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Cada ação inicia primeiro o runtime Eidolon — cerca de 30 segundos."
+    },
+    "actions": {
+      "deposit": "Selar um documento",
+      "retrieve": "Recuperar",
+      "verify": "Verificar tudo",
+      "refresh": "Atualizar",
+      "delete": "Excluir",
+      "working": "Em andamento…"
+    },
+    "deposit": {
+      "title": "Selar um documento",
+      "description": "Escolha um rótulo e, se quiser, uma data antes da qual o documento não poderá ser recuperado. Depois escolha o arquivo: ele é cifrado aqui e guardado neste dispositivo.",
+      "label": "Rótulo (em claro)",
+      "label_placeholder": "Por padrão, o nome do arquivo",
+      "release_after": "Bloqueado até (opcional)",
+      "release_after_hint": "Aplicado pelo relógio desta máquina. Deixe vazio para manter o documento recuperável a qualquer momento.",
+      "owner_only": "Registrar também que só este cofre pode abri-lo (assinatura do proprietário)",
+      "choose_file": "Escolher o arquivo",
+      "invalid_date": "Essa data não é válida.",
+      "date_in_past": "A data de liberação deve estar no futuro.",
+      "done": "{{label}} selado.",
+      "done_locked": "{{label}} selado — bloqueado até {{until}}."
+    },
+    "retrieve": {
+      "done": "Documento gravado: {{filename}} ({{size}})."
+    },
+    "verify": {
+      "done": "{{checked}} envelope(s) verificado(s), todos intactos.",
+      "failed": "{{checked}} envelope(s) verificado(s), {{failed}} danificado(s)."
+    },
+    "delete": {
+      "title": "Excluir esta custódia?",
+      "description": "{{label}} será removido deste dispositivo. Isso não pode ser desfeito: o documento se perde se você não tiver mais o original.",
+      "confirm": "Excluir",
+      "done": "Custódia excluída.",
+      "nothing": "Nada a excluir."
+    },
+    "inventory": {
+      "title": "Documentos selados",
+      "empty": "Nenhum documento selado ainda. Sele um para guardá-lo sob a chave deste cofre.",
+      "deposited": "selado em {{when}}",
+      "owner_only": "Assinatura do proprietário exigida: só este cofre pode abri-lo.",
+      "integrity_ok": "Intacto.",
+      "integrity_failed": "Danificado: {{reason}}",
+      "unreadable": "Ilegível: {{detail}}"
+    },
+    "state": {
+      "ready": "pronto",
+      "locked": "bloqueado até {{until}}",
+      "tampered": "alterado",
+      "invalid": "inválido",
+      "unreadable": "ilegível"
+    },
+    "errors": {
+      "canceled": "Cancelado.",
+      "locked": "Ainda bloqueado até {{until}}.",
+      "integrity": "Este envelope não se verifica com a chave deste cofre: cofre errado, ou arquivo alterado.",
+      "not_found": "Esta custódia não existe mais.",
+      "unreadable": "Este arquivo não pode ser lido (corrompido, ou gravado por uma versão mais recente).",
+      "runtime": "Não foi possível executar o runtime Eidolon: {{detail}}",
+      "no_psnx": "O arquivo do cofre (.psnx) não está neste dispositivo.",
+      "list": "Não foi possível ler a lista: {{detail}}",
+      "deposit": "Falha ao selar: {{detail}}",
+      "retrieve": "Falha ao recuperar: {{detail}}",
+      "verify": "Falha na verificação: {{detail}}",
+      "delete": "Falha ao excluir: {{detail}}"
     }
   }
 }

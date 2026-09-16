@@ -735,7 +735,8 @@
         "description": "Cipher permanece activo para que no te pierdas mensajes. Vuelve a abrirlo desde el icono junto al reloj."
       }
     },
-    "spheres": "Esferas"
+    "spheres": "Esferas",
+    "escrow": "Custodia"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1598,6 +1599,92 @@
       "import": "Importación rechazada: {{detail}}",
       "export": "Exportación fallida: {{detail}}",
       "transfer": "Transferencia rechazada: {{detail}}"
+    }
+  },
+  "escrow": {
+    "title": "Escrow Nexus",
+    "description": "Documentos sellados con la clave de esta bóveda y guardados en este dispositivo, cada uno recuperable ahora o bloqueado hasta una fecha que usted eligió. El documento nunca sale de esta máquina; solo usted, con esta bóveda, puede abrirlo.",
+    "plain": "Dicho claramente: el bloqueo temporal lo aplica el reloj de esta máquina, no un tercero; la etiqueta, la fecha de liberación, la fecha de depósito y el tamaño se guardan en claro — solo el documento está cifrado; quien tiene la bóveda tiene los documentos.",
+    "desktop_only": "La custodia funciona en la aplicación de escritorio, con el runtime de Eidolon.",
+    "no_vault": "Vincule una bóveda Eidolon para sellar documentos.",
+    "summary": {
+      "ready": "{{count}} listo(s)",
+      "locked": "{{count}} bloqueado(s)",
+      "bad": "{{count}} dañado(s)"
+    },
+    "status": {
+      "working_deposit": "sellando el documento…",
+      "working_retrieve": "abriendo el sobre…",
+      "working_verify": "comprobando los sobres…",
+      "working_delete": "eliminando…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Cada acción inicia primero el runtime de Eidolon — unos 30 segundos."
+    },
+    "actions": {
+      "deposit": "Sellar un documento",
+      "retrieve": "Recuperar",
+      "verify": "Verificar todo",
+      "refresh": "Actualizar",
+      "delete": "Eliminar",
+      "working": "En curso…"
+    },
+    "deposit": {
+      "title": "Sellar un documento",
+      "description": "Elija una etiqueta y, si quiere, una fecha antes de la cual el documento no podrá recuperarse. Luego elija el archivo: se cifra aquí y se guarda en este dispositivo.",
+      "label": "Etiqueta (en claro)",
+      "label_placeholder": "Por defecto, el nombre del archivo",
+      "release_after": "Bloqueado hasta (opcional)",
+      "release_after_hint": "Aplicado por el reloj de esta máquina. Déjelo vacío para que el documento sea recuperable en cualquier momento.",
+      "owner_only": "Anotar también que solo esta bóveda puede abrirlo (firma del propietario)",
+      "choose_file": "Elegir el archivo",
+      "invalid_date": "Esa fecha no es válida.",
+      "date_in_past": "La fecha de liberación debe estar en el futuro.",
+      "done": "{{label}} sellado.",
+      "done_locked": "{{label}} sellado — bloqueado hasta {{until}}."
+    },
+    "retrieve": {
+      "done": "Documento escrito: {{filename}} ({{size}})."
+    },
+    "verify": {
+      "done": "{{checked}} sobre(s) comprobado(s), todos intactos.",
+      "failed": "{{checked}} sobre(s) comprobado(s), {{failed}} dañado(s)."
+    },
+    "delete": {
+      "title": "¿Eliminar esta custodia?",
+      "description": "{{label}} se eliminará de este dispositivo. No se puede deshacer: el documento se pierde si ya no tiene el original.",
+      "confirm": "Eliminar",
+      "done": "Custodia eliminada.",
+      "nothing": "Nada que eliminar."
+    },
+    "inventory": {
+      "title": "Documentos sellados",
+      "empty": "Aún no hay documentos sellados. Selle uno para guardarlo bajo la clave de esta bóveda.",
+      "deposited": "sellado el {{when}}",
+      "owner_only": "Firma del propietario requerida: solo esta bóveda puede abrirlo.",
+      "integrity_ok": "Intacto.",
+      "integrity_failed": "Dañado: {{reason}}",
+      "unreadable": "Ilegible: {{detail}}"
+    },
+    "state": {
+      "ready": "listo",
+      "locked": "bloqueado hasta {{until}}",
+      "tampered": "alterado",
+      "invalid": "inválido",
+      "unreadable": "ilegible"
+    },
+    "errors": {
+      "canceled": "Cancelado.",
+      "locked": "Todavía bloqueado hasta {{until}}.",
+      "integrity": "Este sobre no se verifica con la clave de esta bóveda: bóveda equivocada o archivo alterado.",
+      "not_found": "Esta custodia ya no existe.",
+      "unreadable": "Este archivo no se puede leer (corrupto, o escrito por una versión más reciente).",
+      "runtime": "No se pudo ejecutar el runtime de Eidolon: {{detail}}",
+      "no_psnx": "El archivo de la bóveda (.psnx) no está en este dispositivo.",
+      "list": "No se pudo leer la lista: {{detail}}",
+      "deposit": "Sellado fallido: {{detail}}",
+      "retrieve": "Recuperación fallida: {{detail}}",
+      "verify": "Verificación fallida: {{detail}}",
+      "delete": "Eliminación fallida: {{detail}}"
     }
   }
 }

@@ -771,7 +771,8 @@
         "description": "Cipher stays active so you don't miss messages. Reopen it from the icon near the clock."
       }
     },
-    "spheres": "Spheres"
+    "spheres": "Spheres",
+    "escrow": "Escrow"
   },
   "tray": {
     "tooltip": "Cipher",
@@ -1593,6 +1594,92 @@
       "import": "Import refused: {{detail}}",
       "export": "Export failed: {{detail}}",
       "transfer": "Transfer refused: {{detail}}"
+    }
+  },
+  "escrow": {
+    "title": "Escrow Nexus",
+    "description": "Documents sealed under this vault's key and kept on this device, each one retrievable now or locked until a date you chose. The document never leaves this machine; only you, with this vault, can open it.",
+    "plain": "Plainly: the time lock is enforced by this machine's clock, not by a third party; the label, the release date, the deposit time and the size are stored in cleartext — only the document is encrypted; whoever holds the vault holds the documents.",
+    "desktop_only": "The escrow runs in the desktop app, with the Eidolon runtime.",
+    "no_vault": "Link an Eidolon vault to seal documents.",
+    "summary": {
+      "ready": "{{count}} ready",
+      "locked": "{{count}} locked",
+      "bad": "{{count}} damaged"
+    },
+    "status": {
+      "working_deposit": "sealing the document…",
+      "working_retrieve": "opening the envelope…",
+      "working_verify": "checking the envelopes…",
+      "working_delete": "deleting…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Each action first starts the Eidolon runtime — about 30 seconds."
+    },
+    "actions": {
+      "deposit": "Seal a document",
+      "retrieve": "Retrieve",
+      "verify": "Verify all",
+      "refresh": "Refresh",
+      "delete": "Delete",
+      "working": "Working…"
+    },
+    "deposit": {
+      "title": "Seal a document",
+      "description": "Choose a label and, if you want, a date before which the document cannot be retrieved. Then pick the file: it is encrypted here and stored on this device.",
+      "label": "Label (stored in cleartext)",
+      "label_placeholder": "Defaults to the file name",
+      "release_after": "Locked until (optional)",
+      "release_after_hint": "Enforced by this machine's clock. Leave empty to keep the document retrievable at any time.",
+      "owner_only": "Also record that only this vault may open it (owner signature)",
+      "choose_file": "Choose the file",
+      "invalid_date": "That date is not valid.",
+      "date_in_past": "The release date must be in the future.",
+      "done": "{{label}} sealed.",
+      "done_locked": "{{label}} sealed — locked until {{until}}."
+    },
+    "retrieve": {
+      "done": "Document written: {{filename}} ({{size}})."
+    },
+    "verify": {
+      "done": "{{checked}} envelope(s) checked, all intact.",
+      "failed": "{{checked}} envelope(s) checked, {{failed}} damaged."
+    },
+    "delete": {
+      "title": "Delete this escrow?",
+      "description": "{{label}} will be removed from this device. This cannot be undone: the document is gone unless you still have the original.",
+      "confirm": "Delete",
+      "done": "Escrow deleted.",
+      "nothing": "Nothing to delete."
+    },
+    "inventory": {
+      "title": "Sealed documents",
+      "empty": "No sealed document yet. Seal one to keep it under this vault's key.",
+      "deposited": "sealed {{when}}",
+      "owner_only": "Owner signature required: only this vault can open it.",
+      "integrity_ok": "Intact.",
+      "integrity_failed": "Damaged: {{reason}}",
+      "unreadable": "Unreadable: {{detail}}"
+    },
+    "state": {
+      "ready": "ready",
+      "locked": "locked until {{until}}",
+      "tampered": "tampered",
+      "invalid": "invalid",
+      "unreadable": "unreadable"
+    },
+    "errors": {
+      "canceled": "Canceled.",
+      "locked": "Still locked until {{until}}.",
+      "integrity": "This envelope does not verify under this vault's key: wrong vault, or an altered file.",
+      "not_found": "This escrow no longer exists.",
+      "unreadable": "This file cannot be read (corrupt, or written by a newer version).",
+      "runtime": "The Eidolon runtime could not be run: {{detail}}",
+      "no_psnx": "The vault file (.psnx) is not on this device.",
+      "list": "The list could not be read: {{detail}}",
+      "deposit": "Sealing failed: {{detail}}",
+      "retrieve": "Retrieval failed: {{detail}}",
+      "verify": "Verification failed: {{detail}}",
+      "delete": "Deletion failed: {{detail}}"
     }
   }
 }
