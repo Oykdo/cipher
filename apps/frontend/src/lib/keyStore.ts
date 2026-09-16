@@ -186,7 +186,11 @@ export async function clearAllKeys(): Promise<boolean> {
       store.clear();
     });
     
-    console.warn('[KeyStore] Cleared all keys (emergency wipe)');
+    // Info, not warn: this runs on every user-initiated logout (the unlocked
+    // master key must not outlive the session on this device), so it is the
+    // expected outcome, not an alarm — same level as its caller in
+    // secureKeyAccess.ts.
+    console.info('[KeyStore] Cleared all keys (logout / security wipe)');
     return true;
   } catch (error) {
     console.error('[KeyStore] Failed to clear keys:', error);
