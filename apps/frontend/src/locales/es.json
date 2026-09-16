@@ -915,7 +915,10 @@
     "error_mnemonic_invalid": "La frase de recuperación no coincide con esta cuenta.",
     "error_server_proof": "El servidor devolvió una prueba inválida. Inténtelo de nuevo.",
     "error_vault_seal": "No se pudo sellar su bóveda local. Inténtelo de nuevo.",
-    "error_generic": "Ocurrió un error. Inténtelo de nuevo."
+    "error_generic": "Ocurrió un error. Inténtelo de nuevo.",
+    "vault_section_title": "Reanudar con su vault Eidolon",
+    "vault_desc": "Esta cuenta está anclada en su vault Eidolon: no tiene frase de recuperación ni contraseña de dispositivo. La sesión se reanuda a través del vault — un clic cuando su archivo .psnx está registrado en este dispositivo.",
+    "vault_cta": "Reanudar con Eidolon →"
   },
   "recovery": {
     "title": "Recuperación de cuenta",

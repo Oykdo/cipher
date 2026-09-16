@@ -1080,7 +1080,10 @@
     "error_mnemonic_invalid": "A frase de recuperação não corresponde a esta conta.",
     "error_server_proof": "O servidor retornou uma prova inválida. Tente novamente.",
     "error_vault_seal": "Não foi possível selar seu cofre local. Tente novamente.",
-    "error_generic": "Ocorreu um erro. Tente novamente."
+    "error_generic": "Ocorreu um erro. Tente novamente.",
+    "vault_section_title": "Retomar com seu cofre Eidolon",
+    "vault_desc": "Esta conta está ancorada no seu cofre Eidolon: não tem frase de recuperação nem senha de dispositivo. A sessão é retomada pelo cofre — um clique quando o arquivo .psnx dele está registrado neste dispositivo.",
+    "vault_cta": "Retomar com o Eidolon →"
   },
   "recovery": {
     "title": "Account Recovery",

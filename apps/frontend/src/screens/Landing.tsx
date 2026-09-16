@@ -22,6 +22,8 @@ export default function Landing() {
   // single CTA that redirects to /quick-connect, where the user will
   // either enter their password (unlock mode) or mnemonic + new password
   // (provision mode, for legacy accounts that predate the password step).
+  // A vault-native Eidolon account (authMethod: 'vault') has neither and
+  // resumes through the vault login, so its banner goes to /login directly.
   // We re-probe on `focus` and `storage` so the banner state stays current
   // after a signup finishes in the same process.
   useEffect(() => {
@@ -105,7 +107,7 @@ export default function Landing() {
           {knownAccount && (
             <QuickConnectBanner
               account={knownAccount}
-              onClick={() => navigate('/quick-connect')}
+              onClick={() => navigate(knownAccount.authMethod === 'vault' ? '/login' : '/quick-connect')}
             />
           )}
 

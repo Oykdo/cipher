@@ -915,7 +915,10 @@
     "error_mnemonic_invalid": "恢复短语与此账户不匹配。",
     "error_server_proof": "服务器返回了无效的证明。请重试。",
     "error_vault_seal": "无法封装您的本地保险库。请重试。",
-    "error_generic": "发生错误。请重试。"
+    "error_generic": "发生错误。请重试。",
+    "vault_section_title": "使用您的 Eidolon 保险库恢复",
+    "vault_desc": "此账户锚定在您的 Eidolon 保险库上：它没有恢复短语，也没有设备密码。会话通过保险库恢复——当其 .psnx 文件已在此设备上注册时，只需一键。",
+    "vault_cta": "使用 Eidolon 恢复 →"
   },
   "recovery": {
     "title": "账户恢复",

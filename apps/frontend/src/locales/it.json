@@ -915,7 +915,10 @@
     "error_mnemonic_invalid": "La frase di recupero non corrisponde a questo account.",
     "error_server_proof": "Il server ha restituito una prova non valida. Riprova.",
     "error_vault_seal": "Impossibile sigillare il tuo caveau locale. Riprova.",
-    "error_generic": "Si è verificato un errore. Riprova."
+    "error_generic": "Si è verificato un errore. Riprova.",
+    "vault_section_title": "Riprendi con il tuo vault Eidolon",
+    "vault_desc": "Questo account è ancorato al tuo vault Eidolon: non ha né frase di recupero né password del dispositivo. La sessione riprende tramite il vault — un clic quando il suo file .psnx è registrato su questo dispositivo.",
+    "vault_cta": "Riprendi con Eidolon →"
   },
   "recovery": {
     "title": "Recupero account",

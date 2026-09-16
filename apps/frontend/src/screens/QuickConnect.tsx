@@ -2,7 +2,7 @@
  * Quick Connect — dedicated screen for returning users.
  *
  * Reached from the banner on Landing.tsx when `getLastKnownAccount()` finds
- * an entry in localStorage. Two modes :
+ * an entry in localStorage. Three modes :
  *
  * 1. Unlock mode — the account was set up with the password step at signup
  *    (pwd_<username> present). User enters their password, we verify via
@@ -15,7 +15,13 @@
  *    the mnemonic, run srp-seed login for a fresh JWT, then write the PBKDF2
  *    hash + seal KeyVault so future returns use unlock mode.
  *
- * Both modes end by setSession + initializeE2EE + navigate('/conversations').
+ * 3. Vault mode — a vault-native Eidolon account (authMethod: 'vault'). It
+ *    has neither a recovery phrase nor a device password: the vault file is
+ *    its key material and the vault login on /login is its resume path (one
+ *    click when the .psnx is known on this device). Nothing to unlock or
+ *    provision here, so the screen only explains and hands over to /login.
+ *
+ * Modes 1 and 2 end by setSession + initializeE2EE + navigate('/conversations').
  */
 
 import { useMemo, useState } from 'react';
@@ -85,13 +91,15 @@ export default function QuickConnect() {
   // was added). We fall back to provision mode which will call `/srp/setup`.
   const [forceProvision, setForceProvision] = useState<string | null>(null);
 
-  const mode: 'unlock' | 'provision' | 'empty' = selectedAccount
-    ? forceProvision === selectedAccount.username
-      ? 'provision'
-      : hasLocalPassword(selectedAccount.username)
-        ? 'unlock'
-        : 'provision'
-    : 'empty';
+  const mode: 'vault' | 'unlock' | 'provision' | 'empty' = !selectedAccount
+    ? 'empty'
+    : selectedAccount.authMethod === 'vault'
+      ? 'vault'
+      : forceProvision === selectedAccount.username
+        ? 'provision'
+        : hasLocalPassword(selectedAccount.username)
+          ? 'unlock'
+          : 'provision';
 
   return (
     <div className="signup-screen relative min-h-screen overflow-hidden">
@@ -125,6 +133,13 @@ export default function QuickConnect() {
 
           {mode === 'empty' && (
             <EmptyState onBackToSignup={() => navigate('/signup')} />
+          )}
+
+          {mode === 'vault' && selectedAccount && (
+            <VaultResumeCard
+              account={selectedAccount}
+              onResume={() => navigate('/login')}
+            />
           )}
 
           {mode === 'unlock' && selectedAccount && (
@@ -683,6 +698,49 @@ function ProvisionForm({
         </div>
       </MouseGlowCard>
     </motion.form>
+  );
+}
+
+// ============================================================================
+// Vault card — vault-native Eidolon account. No secret to type here: the
+// vault login owns the resume path, this only says why and sends there.
+// ============================================================================
+
+function VaultResumeCard({
+  account,
+  onResume,
+}: {
+  account: LocalAccount;
+  onResume: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="cosmic-glass-card relative"
+      aria-label={t('quick_connect.vault_section_title')}
+    >
+      <div className="cosmic-glow-border" aria-hidden="true" />
+      <MouseGlowCard className="space-y-5 p-6 md:p-8">
+        <AccountHeader account={account} />
+
+        <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-3 text-sm text-cyan-100/90">
+          {t('quick_connect.vault_desc')}
+        </div>
+
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onResume}
+            className="cosmic-cta text-sm !w-auto !px-5 !py-2.5"
+          >
+            <span>{t('quick_connect.vault_cta')}</span>
+            <div className="cosmic-cta-glow" aria-hidden="true" />
+          </button>
+        </div>
+      </MouseGlowCard>
+    </motion.section>
   );
 }
 

@@ -171,15 +171,23 @@ export default function LoginNew() {
   };
 
   /**
+   * Which secret roots E2EE for a vault session: 'vault' for a vault-native
+   * account (no mnemonic), 'mnemonic' for an account that merely linked its
+   * vault as a sign-in factor (D1). An older bridge without the field is
+   * treated as 'vault'. Also recorded on the device's known-account entry as
+   * `authMethod`, so Landing / QuickConnect send a vault-native account back
+   * here instead of asking it for a recovery phrase it never had.
+   */
+  const e2eeRootOf = (data: VaultSessionResponse): 'vault' | 'mnemonic' =>
+    data.vaultBridge?.e2eeRoot === 'mnemonic' ? 'mnemonic' : 'vault';
+
+  /**
    * Vault → E2EE root. Runs in both vault success paths once the session is
    * stored, and decides whether the app can be entered right away.
    *
-   * `vaultBridge.e2eeRoot` tells which secret roots E2EE: 'vault' for a
-   * vault-native account (no mnemonic — the masterKeyHex is the seed the
-   * Eidolon runtime derives from the .psnx, contract v1), 'mnemonic' for an
-   * account that merely linked its vault as a sign-in factor (D1: the
-   * recovery phrase stays the only E2EE root). An older bridge without the
-   * field is treated as 'vault'.
+   * For a vault-native account the masterKeyHex is the seed the Eidolon
+   * runtime derives from the .psnx (contract v1); for a linked mnemonic
+   * account (D1) the recovery phrase stays the only E2EE root.
    *
    * The .psnx is resolved main-side from the bridge context / registry — a
    * QR / code token never carries the file, so on a device that has never
@@ -190,8 +198,7 @@ export default function LoginNew() {
     data: VaultSessionResponse,
     requestedVaultId?: string | null,
   ): Promise<boolean> => {
-    const e2eeRoot = data.vaultBridge?.e2eeRoot === 'mnemonic' ? 'mnemonic' : 'vault';
-    if (e2eeRoot === 'mnemonic') {
+    if (e2eeRootOf(data) === 'mnemonic') {
       // The vault only proved identity: this account's E2EE root is its
       // recovery phrase. Drop the vault session so a Back to '/' cannot land
       // on /conversations without a key (same rule as Cipher mobile).
@@ -315,6 +322,7 @@ export default function LoginNew() {
         username: data.user.username,
         securityTier: data.user.securityTier,
         quickUnlockEnabled: false,
+        authMethod: e2eeRootOf(data),
       });
 
       clearPasswordCache(data.user.username);
@@ -461,6 +469,7 @@ export default function LoginNew() {
         username: data.user.username,
         securityTier: data.user.securityTier,
         quickUnlockEnabled: false,
+        authMethod: e2eeRootOf(data),
       });
       // The token only names the vault; the file must already be on this device.
       if (await settleVaultE2EE(data)) {

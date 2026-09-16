@@ -1080,7 +1080,10 @@
     "error_mnemonic_invalid": "Recovery phrase does not match this account.",
     "error_server_proof": "The server returned an invalid proof. Please retry.",
     "error_vault_seal": "Could not seal your local vault. Please retry.",
-    "error_generic": "Something went wrong. Please retry."
+    "error_generic": "Something went wrong. Please retry.",
+    "vault_section_title": "Resume with your Eidolon vault",
+    "vault_desc": "This account is rooted on your Eidolon vault: it has no recovery phrase and no device password. Your session resumes through the vault — one click when its .psnx file is registered on this device.",
+    "vault_cta": "Resume with Eidolon →"
   },
   "recovery": {
     "title": "Account Recovery",

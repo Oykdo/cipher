@@ -915,7 +915,10 @@
     "error_mnemonic_invalid": "Die Wiederherstellungsphrase passt nicht zu diesem Konto.",
     "error_server_proof": "Der Server hat einen ungültigen Nachweis zurückgegeben. Bitte erneut versuchen.",
     "error_vault_seal": "Lokaler Tresor konnte nicht versiegelt werden. Bitte erneut versuchen.",
-    "error_generic": "Ein Fehler ist aufgetreten. Bitte erneut versuchen."
+    "error_generic": "Ein Fehler ist aufgetreten. Bitte erneut versuchen.",
+    "vault_section_title": "Mit Ihrem Eidolon-Vault fortsetzen",
+    "vault_desc": "Dieses Konto ist in Ihrem Eidolon-Vault verankert: Es hat weder eine Wiederherstellungsphrase noch ein Gerätepasswort. Die Sitzung wird über den Vault fortgesetzt — ein Klick, wenn seine .psnx-Datei auf diesem Gerät registriert ist.",
+    "vault_cta": "Mit Eidolon fortsetzen →"
   },
   "recovery": {
     "title": "Kontowiederherstellung",

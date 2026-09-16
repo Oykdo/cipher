@@ -950,7 +950,10 @@
     "error_mnemonic_invalid": "La phrase de récupération ne correspond pas à ce compte.",
     "error_server_proof": "Le serveur a renvoyé une preuve invalide. Réessayez.",
     "error_vault_seal": "Impossible de sceller votre coffre local. Réessayez.",
-    "error_generic": "Une erreur est survenue. Réessayez."
+    "error_generic": "Une erreur est survenue. Réessayez.",
+    "vault_section_title": "Reprendre avec votre coffre Eidolon",
+    "vault_desc": "Ce compte est ancré sur votre coffre Eidolon : il n'a ni phrase de récupération ni mot de passe d'appareil. La session reprend par le coffre — un clic lorsque son fichier .psnx est enregistré sur cet appareil.",
+    "vault_cta": "Reprendre avec Eidolon →"
   },
   "recovery": {
     "title": "Récupération de votre compte",
