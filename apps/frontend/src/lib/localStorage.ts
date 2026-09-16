@@ -12,6 +12,14 @@ export interface LocalAccount {
   securityTier: 'standard' | 'dice-key';
   quickUnlockEnabled?: boolean;
   lastUsed?: number;
+  /**
+   * How the account gets back in on this device. 'vault' is a vault-native
+   * Eidolon account: no recovery phrase, no device password — the vault
+   * login is its resume path, and QuickConnect must not ask it for a
+   * mnemonic. Absent (records written before the field existed) or
+   * 'mnemonic': the password / recovery-phrase flows apply.
+   */
+  authMethod?: 'mnemonic' | 'vault';
 }
 
 const KNOWN_ACCOUNTS_KEY = 'cipher_pulse_known_accounts';

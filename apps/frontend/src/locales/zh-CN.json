@@ -1527,7 +1527,27 @@
     "summary": {
       "final": "{{count}} 个最终",
       "waiting": "{{count}} 个等待中",
+      "claimable": "{{count}} 个待领取",
       "untrusted_issuer": "此版本未固定发行者密钥：创世在首次读取时被信任。"
+    },
+    "status": {
+      "never": "此设备尚未与锚点同步。",
+      "synced": "{{when}}已与 {{host}} 同步",
+      "unreachable": "无法连接锚点 — {{minutes}} 分钟后自动重试，点击“同步”可立即重试",
+      "refused": "锚点拒绝了此保险库（未注册，或没有注册编号）— 自动同步已暂停，点击“同步”可重试",
+      "claim_done": "已认领 {{count}} 个创世球体",
+      "claim_queued": "{{count}} 个创世认领在锚点排队中，稍后同步将带回它们",
+      "claim_not_enrolled": "保险库未注册创世",
+      "mailbox": "锚点处有 {{count}} 个未使用的接收密钥",
+      "pending": "{{count}} 个已签名的转移正在等待锚点",
+      "first_contact": "首次连接锚点 — {{step}}",
+      "working_sync": "正在与锚点同步…",
+      "working_claim": "正在认领创世球体…",
+      "working_mailbox": "正在发布接收密钥…",
+      "working_burn": "正在销毁球体…",
+      "working_reissue": "正在重新签发密钥…",
+      "elapsed": "{{seconds}} 秒",
+      "runtime_hint": "每次调用锚点都会先启动 Eidolon 运行时 — 约 30 秒。"
     },
     "actions": {
       "sync": "与锚点同步",
@@ -1538,6 +1558,10 @@
       "import": "导入球体文件",
       "export": "导出",
       "transfer": "转移",
+      "reissue": "重新签发密钥",
+      "reissue_hint": "球体不动：已承诺的密钥成为下一跳的密钥。",
+      "burn": "销毁",
+      "burn_hint": "不可逆：终止托管链。",
       "working": "处理中…"
     },
     "sync": {
@@ -1566,6 +1590,19 @@
       "self": "转移必须更换保险库。",
       "confirm": "签名并转移",
       "done": "{{id}} 已转移给 {{to}} — {{state}}。"
+    },
+    "burn": {
+      "title": "销毁此球体？",
+      "description": "{{id}} 将被销毁：托管链终止，该球体不能再转让或重新签发。清单中会保留一块墓碑。此操作无法撤销。",
+      "confirm": "永久销毁",
+      "done": "{{id}} 已销毁（{{state}}）。"
+    },
+    "reissue": {
+      "title": "重新签发托管密钥",
+      "description": "新密钥将签署 {{id}} 的下一跳；球体留在此保险库中。",
+      "revokes_pending": "一笔已签名的转让仍在等待锚点：重新签发将以第二个签名撤销它，由锚点裁定。",
+      "confirm": "重新签发",
+      "done": "{{id}} 的密钥已重新签发（第 {{seq}} 跳，{{state}}）。"
     },
     "inventory": {
       "title": "库存",
@@ -1598,7 +1635,9 @@
       "mailbox": "无法发布密钥：{{detail}}",
       "import": "导入被拒绝：{{detail}}",
       "export": "导出失败：{{detail}}",
-      "transfer": "转移被拒绝：{{detail}}"
+      "transfer": "转移被拒绝：{{detail}}",
+      "burn": "销毁失败：{{detail}}",
+      "reissue": "重新签发失败：{{detail}}"
     }
   },
   "escrow": {

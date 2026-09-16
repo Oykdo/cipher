@@ -1523,7 +1523,27 @@
     "summary": {
       "final": "{{count}} finale(s)",
       "waiting": "{{count}} en attente",
+      "claimable": "{{count}} à réclamer",
       "untrusted_issuer": "Clé d'émetteur non épinglée dans cette version : la genèse est crue à la première lecture."
+    },
+    "status": {
+      "never": "Pas encore synchronisé avec l'ancre depuis cet appareil.",
+      "synced": "Synchronisé {{when}} avec {{host}}",
+      "unreachable": "ancre injoignable — nouvel essai automatique dans {{minutes}} min, Synchroniser réessaie tout de suite",
+      "refused": "l'ancre a refusé cette voûte (non enrôlée, ou sans numéro d'enrôlement) — synchronisation automatique en pause, Synchroniser réessaie",
+      "claim_done": "{{count}} sphère(s) de genèse réclamée(s)",
+      "claim_queued": "{{count}} réclamation(s) de genèse en file à l'ancre, une prochaine synchronisation les ramènera",
+      "claim_not_enrolled": "voûte non enrôlée pour la genèse",
+      "mailbox": "{{count}} clé(s) de réception non consommée(s) à l'ancre",
+      "pending": "{{count}} cession(s) signée(s) en attente de l'ancre",
+      "first_contact": "Premier contact avec l'ancre — {{step}}",
+      "working_sync": "synchronisation avec l'ancre…",
+      "working_claim": "réclamation des sphères de genèse…",
+      "working_mailbox": "publication des clés de réception…",
+      "working_burn": "brûlage de la sphère…",
+      "working_reissue": "réémission de la clé…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Chaque appel à l'ancre démarre d'abord le runtime Eidolon — environ 30 s."
     },
     "actions": {
       "sync": "Synchroniser avec l'ancre",
@@ -1534,6 +1554,10 @@
       "import": "Importer un fichier de sphère",
       "export": "Exporter",
       "transfer": "Céder",
+      "reissue": "Réémettre la clé",
+      "reissue_hint": "La sphère ne bouge pas : la clé engagée devient celle du saut suivant.",
+      "burn": "Brûler",
+      "burn_hint": "Irréversible : termine la chaîne de garde.",
       "working": "En cours…"
     },
     "sync": {
@@ -1562,6 +1586,19 @@
       "self": "Une cession change de voûte.",
       "confirm": "Signer et céder",
       "done": "{{id}} cédée à {{to}} — {{state}}."
+    },
+    "burn": {
+      "title": "Brûler cette sphère ?",
+      "description": "{{id}} sera brûlée : la chaîne de garde se termine, la sphère ne pourra plus être cédée ni réémise. Une pierre tombale reste dans l'inventaire. C'est irréversible.",
+      "confirm": "Brûler définitivement",
+      "done": "{{id}} brûlée ({{state}})."
+    },
+    "reissue": {
+      "title": "Réémettre la clé de garde",
+      "description": "Une nouvelle clé signera le prochain saut de {{id}} ; la sphère reste dans cette voûte.",
+      "revokes_pending": "Une cession signée attend encore l'ancre : la réémission la révoque par une seconde signature, et l'ancre tranche.",
+      "confirm": "Réémettre",
+      "done": "Clé de {{id}} réémise (saut {{seq}}, {{state}})."
     },
     "inventory": {
       "title": "Inventaire",
@@ -1594,7 +1631,9 @@
       "mailbox": "Publication des clés impossible : {{detail}}",
       "import": "Import refusé : {{detail}}",
       "export": "Export en échec : {{detail}}",
-      "transfer": "Cession refusée : {{detail}}"
+      "transfer": "Cession refusée : {{detail}}",
+      "burn": "Brûlage en échec : {{detail}}",
+      "reissue": "Réémission en échec : {{detail}}"
     }
   },
   "escrow": {

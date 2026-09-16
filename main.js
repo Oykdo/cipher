@@ -1986,7 +1986,31 @@ ipcMain.handle('vault-e2ee:derive-seed', async (event, payload) => {
 //     head): main only transports its verdict.
 const SPHERE_CLI_REL = path.join('scripts', 'public', 'sphere_cli.py');
 const SPHERE_ID_REGEX = /^[A-Za-z0-9_\-]{1,80}$/;
-const SPHERE_SUBCOMMANDS = new Set(['list', 'claim', 'transfer', 'import', 'export', 'sync', 'mailbox']);
+const SPHERE_SUBCOMMANDS = new Set(['list', 'claim', 'transfer', 'import', 'export', 'sync', 'mailbox', 'queue', 'burn', 'reissue-key']);
+
+// One runtime at a time per vault: two wallets on the same spheres dir would
+// race on the atomic writes and on mailbox.json (the receiving-key index).
+// The renderer store already serialises its own calls; this holds for any
+// caller (a second window, a remount that lost track of a running call).
+/** @type {Map<string, Promise<unknown>>} */
+const sphereLocks = new Map();
+/**
+ * @template T
+ * @param {string} vaultId
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+function withSphereLock(vaultId, fn) {
+  const prev = sphereLocks.get(vaultId) ?? Promise.resolve();
+  const next = prev.catch(() => {}).then(fn);
+  sphereLocks.set(vaultId, next);
+  next
+    .catch(() => {})
+    .finally(() => {
+      if (sphereLocks.get(vaultId) === next) sphereLocks.delete(vaultId);
+    });
+  return next;
+}
 
 /**
  * Run one `sphere` subcommand for `vaultId` and return its JSON reply with
@@ -2021,7 +2045,7 @@ async function runSphereCli(vaultId, subcommand, extraArgs = [], { apiUrl } = {}
 
   let result;
   try {
-    result = await runCipherRuntimeCli('sphere', SPHERE_CLI_REL, args);
+    result = await withSphereLock(requestedId, () => runCipherRuntimeCli('sphere', SPHERE_CLI_REL, args));
   } catch (err) {
     return { ok: false, error: stripAbsolutePaths(err?.message ?? 'runtime_unavailable'), errorCode: 'runtime_unavailable' };
   }
@@ -2078,6 +2102,42 @@ ipcMain.handle('sphere:transfer', async (event, payload) => {
     return { ok: false, error: 'recipient must be a 64-hex vault id', errorCode: 'invalid_input' };
   }
   return runSphereCli(payload?.vaultId, 'transfer', ['--sphere', sphereId, '--to', to], { apiUrl: payload?.apiUrl });
+});
+
+// The claims the anchor deferred for this vault (key window not released).
+// `sync` names them too (`queued`); this is the standalone read.
+ipcMain.handle('sphere:queue', async (event, payload) => {
+  requireTrustedRenderer(event);
+  return runSphereCli(payload?.vaultId, 'queue', [], { apiUrl: payload?.apiUrl });
+});
+
+// Burn: ends the custody chain for good (a tombstone stays in the inventory).
+// The runtime refuses without --confirm; main refuses without the renderer's
+// explicit `confirm: true`, so a stray call can never pass it along.
+ipcMain.handle('sphere:burn', async (event, payload) => {
+  requireTrustedRenderer(event);
+  const sphereId = String(payload?.sphereId ?? '').trim();
+  if (!SPHERE_ID_REGEX.test(sphereId)) {
+    return { ok: false, error: 'invalid sphereId', errorCode: 'invalid_input' };
+  }
+  if (payload?.confirm !== true) {
+    return { ok: false, error: 'burning is irreversible: confirm it', errorCode: 'confirmation_required', sphereId };
+  }
+  return runSphereCli(payload?.vaultId, 'burn', ['--sphere', sphereId, '--confirm'], { apiUrl: payload?.apiUrl });
+});
+
+// Reissue the controlling key: the sphere does not move, the committed key
+// becomes the next hop's. `force` revokes, by a second signature, a signed
+// transfer that never reached the anchor (the one exception to "a key signs
+// once" — the anchor arbitrates); the renderer asks before passing it.
+ipcMain.handle('sphere:reissue-key', async (event, payload) => {
+  requireTrustedRenderer(event);
+  const sphereId = String(payload?.sphereId ?? '').trim();
+  if (!SPHERE_ID_REGEX.test(sphereId)) {
+    return { ok: false, error: 'invalid sphereId', errorCode: 'invalid_input' };
+  }
+  const args = ['--sphere', sphereId, ...(payload?.force === true ? ['--force'] : [])];
+  return runSphereCli(payload?.vaultId, 'reissue-key', args, { apiUrl: payload?.apiUrl });
 });
 
 // Import: the user picks a *.sphere.json; the runtime verifies it offline,

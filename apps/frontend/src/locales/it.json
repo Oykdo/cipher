@@ -1527,7 +1527,27 @@
     "summary": {
       "final": "{{count}} finale/i",
       "waiting": "{{count}} in attesa",
+      "claimable": "{{count}} da reclamare",
       "untrusted_issuer": "Chiave dell'emittente non fissata in questa build: la genesi è accettata alla prima lettura."
+    },
+    "status": {
+      "never": "Non ancora sincronizzato con l'ancora da questo dispositivo.",
+      "synced": "Sincronizzato {{when}} con {{host}}",
+      "unreachable": "ancora irraggiungibile — nuovo tentativo automatico tra {{minutes}} min, Sincronizza riprova subito",
+      "refused": "l'ancora ha rifiutato questo vault (non iscritto, o senza numero di iscrizione) — sincronizzazione automatica in pausa, Sincronizza riprova",
+      "claim_done": "{{count}} sfera/e di genesi rivendicata/e",
+      "claim_queued": "{{count}} rivendicazione/i di genesi in coda all'ancora, una sincronizzazione successiva le porterà",
+      "claim_not_enrolled": "vault non iscritto per la genesi",
+      "mailbox": "{{count}} chiave/i di ricezione non usata/e all'ancora",
+      "pending": "{{count}} trasferimento/i firmato/i in attesa dell'ancora",
+      "first_contact": "Primo contatto con l'ancora — {{step}}",
+      "working_sync": "sincronizzazione con l'ancora…",
+      "working_claim": "rivendicazione delle sfere di genesi…",
+      "working_mailbox": "pubblicazione delle chiavi di ricezione…",
+      "working_burn": "bruciatura della sfera…",
+      "working_reissue": "riemissione della chiave…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Ogni chiamata all'ancora avvia prima il runtime Eidolon — circa 30 s."
     },
     "actions": {
       "sync": "Sincronizza con l'ancora",
@@ -1538,6 +1558,10 @@
       "import": "Importa un file di sfera",
       "export": "Esporta",
       "transfer": "Trasferisci",
+      "reissue": "Riemetti la chiave",
+      "reissue_hint": "La sfera non si muove: la chiave impegnata diventa quella del salto successivo.",
+      "burn": "Brucia",
+      "burn_hint": "Irreversibile: termina la catena di custodia.",
       "working": "In corso…"
     },
     "sync": {
@@ -1566,6 +1590,19 @@
       "self": "Un trasferimento cambia vault.",
       "confirm": "Firma e trasferisci",
       "done": "{{id}} trasferita a {{to}} — {{state}}."
+    },
+    "burn": {
+      "title": "Bruciare questa sfera?",
+      "description": "{{id}} verrà bruciata: la catena di custodia termina, la sfera non potrà più essere ceduta né riemessa. Una lapide resta nell'inventario. Non si può annullare.",
+      "confirm": "Brucia definitivamente",
+      "done": "{{id}} bruciata ({{state}})."
+    },
+    "reissue": {
+      "title": "Riemetti la chiave di custodia",
+      "description": "Una nuova chiave firmerà il prossimo salto di {{id}}; la sfera resta in questa cassaforte.",
+      "revokes_pending": "Una cessione firmata attende ancora l'ancora: la riemissione la revoca con una seconda firma, e l'ancora decide.",
+      "confirm": "Riemetti",
+      "done": "Chiave di {{id}} riemessa (salto {{seq}}, {{state}})."
     },
     "inventory": {
       "title": "Inventario",
@@ -1598,7 +1635,9 @@
       "mailbox": "Impossibile pubblicare le chiavi: {{detail}}",
       "import": "Importazione rifiutata: {{detail}}",
       "export": "Esportazione non riuscita: {{detail}}",
-      "transfer": "Trasferimento rifiutato: {{detail}}"
+      "transfer": "Trasferimento rifiutato: {{detail}}",
+      "burn": "Bruciatura non riuscita: {{detail}}",
+      "reissue": "Riemissione non riuscita: {{detail}}"
     }
   },
   "escrow": {

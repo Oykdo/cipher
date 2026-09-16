@@ -49,6 +49,11 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('sphere:transfer', { vaultId, sphereId, to, apiUrl }),
     importFile: (vaultId, apiUrl) => ipcRenderer.invoke('sphere:import', { vaultId, apiUrl }),
     exportFile: (vaultId, sphereId) => ipcRenderer.invoke('sphere:export', { vaultId, sphereId }),
+    queue: (vaultId, apiUrl) => ipcRenderer.invoke('sphere:queue', { vaultId, apiUrl }),
+    burn: (vaultId, sphereId, confirm, apiUrl) =>
+      ipcRenderer.invoke('sphere:burn', { vaultId, sphereId, confirm: confirm === true, apiUrl }),
+    reissueKey: (vaultId, sphereId, force, apiUrl) =>
+      ipcRenderer.invoke('sphere:reissue-key', { vaultId, sphereId, force: force === true, apiUrl }),
   },
 
   // Escrow Nexus (Eidolon escrow_7d). Sealed, time-locked documents bound to

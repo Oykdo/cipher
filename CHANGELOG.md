@@ -35,6 +35,79 @@
   `.psnx` and the keys never cross IPC; import/export go through native
   dialogs. Shown only in Electron with `VITE_EIDOLON_CONNECT_ENABLED=true` and
   a linked vault; texts in the eight locales.
+- **Spheres tab: burn and reissue-key, rarest first.** The two custody steps
+  the runtime has offered since 1.2.1 reach the tab: *Burn* ends a sphere's
+  chain for good (a tombstone stays in the inventory) and sits behind a
+  confirmation modal — main refuses the call without the renderer's explicit
+  confirmation, the runtime refuses it without `--confirm`; *Reissue key*
+  retires the controlling key without moving the sphere, and, over a signed
+  transfer the anchor never received, revokes it by a second signature
+  (`--force`) after the modal has said so. Both patch the remembered row
+  from the runtime's reply (no trailing `list`); a failure that reached the
+  runtime re-lists, since the signed record was written before submission.
+  `sphere:queue` is exposed too (the anchor's deferred claims; `sync` already
+  names them). The inventory is now sorted by rarity — primordial, genesis,
+  mythic, legendary, epic, rare, uncommon, common — then by id, instead of
+  the on-disk file order. Twenty-one strings in the eight locales.
+
+### Changed
+
+- **The Spheres tab remembers what the anchor said, and stops re-syncing for
+  nothing.** Every `cipher-runtime sphere …` call costs ~30 s of runtime
+  start-up before its 2 s of work, and the tab used to spawn one on every
+  visit (`list`), one per button, and one more after each button (a second
+  `list`). Now a volatile store (`store/spheres.ts`) owns the runtime calls —
+  one at a time per vault, unaffected by tab switches or StrictMode
+  remounts — and a per-vault memory (`lib/spheresMemory.ts`,
+  `cipher.spheres.v1:<vaultId>` in localStorage: sphere statuses,
+  timestamps, counters; never a path, a secret or an error text) records
+  the inventory, the last sync that really reached the anchor, the claim
+  outcome and the receiving-key estimate. Opening the tab renders the
+  remembered inventory instantly with zero spawns; the first contact of a
+  vault from a device runs sync → claim genesis → publish receiving keys
+  once, by itself; later automatic syncs are daily, or hourly while a
+  signed transfer waits, back off (5 min → 24 h) while the anchor is
+  unreachable and pause a week when it refuses the vault — the manual Sync
+  always runs. Buttons no longer re-list: `sync` already returns the
+  inventory, `claim` the rows it wrote, `mailbox` touches no sphere file,
+  a transfer removes its row (a failed one re-lists, because its signed
+  record may already be waiting). A status line says when the anchor was
+  last reached and by which host, what is claimed or queued, how many
+  receiving keys are left, and — while the runtime works — which step is
+  running and for how long, so a 30 s "Claiming…" no longer looks stuck.
+  `main.js` serialises sphere runtime calls per vault; "forget this device"
+  also forgets the sphere memory. Fifteen `spheres.status.*` strings in the
+  eight locales; `lib/__tests__/spheresMemory.test.ts` covers the rules.
+
+### Fixed
+
+- **Spheres tab: every anchor call answered "ancre injoignable (404) : Not
+  Found".** The client was handed the Eidolon *Connect* URL
+  (`eidolon.logos-project.xyz`, apps + sessions) as its API, while the vault
+  auth and the sphere anchor (`/auth/*`, `/api/v1/sphere/*`) are served by the
+  Eidolon *REST API* (`api.eidolon.logos-project.xyz`). `lib/spheres.ts` now
+  targets `EIDOLON_API_BASE_URL` (`VITE_EIDOLON_API_URL`, default the
+  production REST API); the runtime's own default moves to the same host.
+- **Spheres tab: genesis spheres not yet claimed were invisible — "0 final,
+  0 waiting" with nothing to show for a vault the treasury still holds eight
+  spheres for.** A sphere without a head is in neither counter: the ledger
+  only knows it once the vault has claimed it. Whether a claim was needed
+  was decided from the device's memory alone, so a memory left by an
+  earlier genesis ("2 genesis spheres claimed", from the trial anchor) kept
+  the first contact with the real anchor from claiming anything. The
+  runtime's `sync` (≥ 1.3.1) now names what the treasury still holds for
+  the vault (`claimable`); the tab shows it as a third badge (*N to claim*,
+  `spheres.summary.claimable` in the eight locales), remembers it, and a
+  full sync that names any chains a claim, whatever the memory says. A
+  claim takes what it wrote or deferred out of the list. Older runtimes
+  report nothing and the previous rules apply unchanged.
+- **`npm run dev` opened CardSwap, then "connection refused" on login.**
+  `dev:electron` only waited for `:5173`, so a Vite already listening there
+  (CardSwap's) was loaded into Cipher's window, and the bridge (`tsx`, slower
+  to start than Vite) was not yet up when the window opened. It now waits
+  for both `http://127.0.0.1:5173` and `http://127.0.0.1:4000/health` (the
+  loopback family Vite is now pinned to — `host: '127.0.0.1'`, `strictPort`
+  — so a taken port fails loudly instead of opening a foreign app).
 
 ## v1.4.3 — the packaged app no longer dies on an expired session
 

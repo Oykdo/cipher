@@ -89,6 +89,17 @@ export const setEidolonConnectUrlOverride = (value: string | null): void => {
 
 export const getEidolonConnectBaseUrl = (): string =>
   getEidolonConnectUrlOverride() || EIDOLON_CONNECT_DEFAULT_BASE_URL;
+
+// The Eidolon REST API (src.api.server) is a different service from Eidolon
+// Connect: on the VPS, Connect (apps + sessions) answers on eidolon.<domain>
+// and the REST API on api.eidolon.<domain>. Vault auth (/auth/*) and the
+// sphere custody anchor (/api/v1/sphere/*) live on the REST API only — sent
+// to the Connect host they get a plain 404. Same local-dev convention as the
+// Connect URL: VITE_EIDOLON_API_URL=http://127.0.0.1:8000 (see .env.local).
+const DEFAULT_EIDOLON_API_URL = 'https://api.eidolon.logos-project.xyz';
+export const EIDOLON_API_BASE_URL: string = (
+  import.meta.env.VITE_EIDOLON_API_URL || DEFAULT_EIDOLON_API_URL
+).replace(/\/+$/, '');
 // No Eidolon shared secret here, deliberately. The Eidolon API routes that
 // require one — /connect/vault/economy among them — are called by the bridge,
 // which holds the secret server-side (apps/bridge/src/services/

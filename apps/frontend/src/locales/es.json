@@ -1527,7 +1527,27 @@
     "summary": {
       "final": "{{count}} final(es)",
       "waiting": "{{count}} pendiente(s)",
+      "claimable": "{{count}} por reclamar",
       "untrusted_issuer": "Clave del emisor no fijada en esta versión: el génesis se acepta en la primera lectura."
+    },
+    "status": {
+      "never": "Aún no sincronizado con el ancla desde este dispositivo.",
+      "synced": "Sincronizado {{when}} con {{host}}",
+      "unreachable": "ancla inalcanzable — nuevo intento automático en {{minutes}} min, Sincronizar reintenta ahora",
+      "refused": "el ancla rechazó esta bóveda (no inscrita, o sin número de inscripción) — sincronización automática en pausa, Sincronizar reintenta",
+      "claim_done": "{{count}} esfera(s) de génesis reclamada(s)",
+      "claim_queued": "{{count}} reclamación(es) de génesis en cola en el ancla, una sincronización posterior las traerá",
+      "claim_not_enrolled": "bóveda no inscrita para la génesis",
+      "mailbox": "{{count}} clave(s) de recepción sin usar en el ancla",
+      "pending": "{{count}} transferencia(s) firmada(s) esperando al ancla",
+      "first_contact": "Primer contacto con el ancla — {{step}}",
+      "working_sync": "sincronizando con el ancla…",
+      "working_claim": "reclamando las esferas de génesis…",
+      "working_mailbox": "publicando las claves de recepción…",
+      "working_burn": "quemando la esfera…",
+      "working_reissue": "reemitiendo la clave…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Cada llamada al ancla inicia primero el runtime de Eidolon — unos 30 s."
     },
     "actions": {
       "sync": "Sincronizar con el ancla",
@@ -1538,6 +1558,10 @@
       "import": "Importar un archivo de esfera",
       "export": "Exportar",
       "transfer": "Transferir",
+      "reissue": "Reemitir la clave",
+      "reissue_hint": "La esfera no se mueve: la clave comprometida pasa a ser la del siguiente salto.",
+      "burn": "Quemar",
+      "burn_hint": "Irreversible: termina la cadena de custodia.",
       "working": "En curso…"
     },
     "sync": {
@@ -1566,6 +1590,19 @@
       "self": "Una transferencia cambia de bóveda.",
       "confirm": "Firmar y transferir",
       "done": "{{id}} transferida a {{to}} — {{state}}."
+    },
+    "burn": {
+      "title": "¿Quemar esta esfera?",
+      "description": "{{id}} se quemará: la cadena de custodia termina y la esfera ya no podrá cederse ni reemitirse. Queda una lápida en el inventario. No se puede deshacer.",
+      "confirm": "Quemar definitivamente",
+      "done": "{{id}} quemada ({{state}})."
+    },
+    "reissue": {
+      "title": "Reemitir la clave de custodia",
+      "description": "Una clave nueva firmará el siguiente salto de {{id}}; la esfera permanece en esta bóveda.",
+      "revokes_pending": "Una cesión firmada sigue esperando al ancla: la reemisión la revoca con una segunda firma, y el ancla decide.",
+      "confirm": "Reemitir",
+      "done": "Clave de {{id}} reemitida (salto {{seq}}, {{state}})."
     },
     "inventory": {
       "title": "Inventario",
@@ -1598,7 +1635,9 @@
       "mailbox": "No se pudieron publicar las claves: {{detail}}",
       "import": "Importación rechazada: {{detail}}",
       "export": "Exportación fallida: {{detail}}",
-      "transfer": "Transferencia rechazada: {{detail}}"
+      "transfer": "Transferencia rechazada: {{detail}}",
+      "burn": "Fallo al quemar: {{detail}}",
+      "reissue": "Fallo al reemitir: {{detail}}"
     }
   },
   "escrow": {

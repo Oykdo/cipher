@@ -1,30 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth";
 import { EIDOLON_CONNECT_ENABLED } from "../../config";
-import {
-    claimSpheres,
-    depositSphereMailbox,
-    exportSphereFile,
-    importSphereFile,
-    isSphereClientAvailable,
-    isValidVaultId,
-    listSpheres,
-    syncSpheres,
-    transferSphere,
-    type SphereState,
-    type SphereStatus,
-} from "../../lib/spheres";
+import { isSphereClientAvailable, isValidVaultId, type SphereState, type SphereStatus } from "../../lib/spheres";
+import { MAILBOX_LOW, anchorHost } from "../../lib/spheresMemory";
+import { useSphereStore, type SphereNotice, type SphereStep } from "../../store/spheres";
 
 /**
  * The vault's spheres: what the custody ledger says this vault holds, each
- * one "finale" (the anchor has ordered its head) or "en attente". Every
- * action goes through the Eidolon runtime (lib/spheres.ts): the renderer
- * never sees a key, a path, or the .psnx. `list` is offline and instant;
- * `sync`, `claim`, `mailbox`, `transfer`, `import` talk to the anchor.
+ * one "finale" (the anchor has ordered its head) or "en attente". This is a
+ * view of store/spheres.ts, which owns every call to the Eidolon runtime
+ * (lib/spheres.ts): the renderer never sees a key, a path, or the .psnx.
+ *
+ * Opening the tab costs nothing when the memory is fresh: the remembered
+ * inventory is shown and the status line says when the anchor was last
+ * reached. The store spawns the runtime only for a reason (first contact,
+ * daily refresh, a signed transfer waiting) or on a button. Each spawn is
+ * ~30 s of runtime start-up, so the running step is named and timed.
  */
-
-type Notice = { type: "success" | "error" | "info"; text: string };
 
 const STATE_STYLE: Record<SphereState, string> = {
     "finale": "border-emerald-400/30 bg-emerald-500/10 text-emerald-200",
@@ -44,6 +37,33 @@ const RARITY_STYLE: Record<string, string> = {
     common: "text-slate-300",
 };
 
+const NOTICE_STYLE: Record<SphereNotice["tone"], string> = {
+    error: "text-rose-200",
+    success: "text-emerald-200",
+    info: "text-slate-300",
+};
+
+/** Rarest first — the order of the genesis caps (Eidolon RARITY_ORDER); unknown rarities last. */
+const RARITY_RANK: Record<string, number> = {
+    primordial: 0,
+    genesis: 1,
+    mythic: 2,
+    legendary: 3,
+    epic: 4,
+    rare: 5,
+    uncommon: 6,
+    common: 7,
+};
+
+function byRarityThenId(a: SphereStatus, b: SphereStatus): number {
+    const ra = RARITY_RANK[a.rarity] ?? 99;
+    const rb = RARITY_RANK[b.rarity] ?? 99;
+    return ra - rb || a.sphere_id.localeCompare(b.sphere_id);
+}
+
+/** A custody step that signs with the vault key: asked for, never implied. */
+type CustodyPrompt = { kind: "burn" | "reissue"; sphere: SphereStatus };
+
 function shortId(value: string | null | undefined, keep = 12): string {
     const s = String(value ?? "");
     return s.length > keep ? `${s.slice(0, keep)}…` : s;
@@ -55,14 +75,30 @@ export function SphereSettings() {
     const vaultId = linkedVault?.vaultId ?? null;
     const available = EIDOLON_CONNECT_ENABLED && isSphereClientAvailable();
 
-    const [spheres, setSpheres] = useState<SphereStatus[]>([]);
-    const [loaded, setLoaded] = useState(false);
-    const [busy, setBusy] = useState<string | null>(null);
-    const [notice, setNotice] = useState<Notice | null>(null);
-    const [trustedIssuer, setTrustedIssuer] = useState<boolean | null>(null);
+    const view = useSphereStore((s) => (vaultId ? s.vaults[vaultId] : undefined));
+    const open = useSphereStore((s) => s.open);
+    // Store actions are stable: read them once, outside the render subscription.
+    const actions = useSphereStore.getState();
+
     const [transferTarget, setTransferTarget] = useState<SphereStatus | null>(null);
     const [recipient, setRecipient] = useState("");
     const [recipientError, setRecipientError] = useState<string | null>(null);
+    const [custodyPrompt, setCustodyPrompt] = useState<CustodyPrompt | null>(null);
+    // Re-render once a second while the runtime works, for the elapsed time.
+    const [, setTick] = useState(0);
+
+    const busy = view?.busy ?? null;
+    const step = view?.step ?? null;
+
+    useEffect(() => {
+        if (available && vaultId) void open(vaultId);
+    }, [available, vaultId, open]);
+
+    useEffect(() => {
+        if (!busy) return;
+        const id = window.setInterval(() => setTick((n) => n + 1), 1000);
+        return () => window.clearInterval(id);
+    }, [busy]);
 
     const stateLabel = (state: SphereState): string => {
         switch (state) {
@@ -83,98 +119,41 @@ export function SphereSettings() {
         return label === key ? rarity : label;
     };
 
-    const refresh = useCallback(async () => {
-        if (!vaultId || !available) return;
-        const result = await listSpheres(vaultId);
-        if (result.ok) {
-            setSpheres(result.spheres);
-            setTrustedIssuer(result.trustedIssuer);
-        } else if (result.error !== "unavailable") {
-            setNotice({ type: "error", text: t("spheres.errors.list", { detail: result.error }) });
-        }
-        setLoaded(true);
-    }, [vaultId, available, t]);
+    const relativeTime = (at: number): string => {
+        const diffMs = Math.max(0, Date.now() - at);
+        const mins = Math.floor(diffMs / 60000);
+        const hours = Math.floor(diffMs / 3600000);
+        const days = Math.floor(diffMs / 86400000);
+        if (mins < 1) return t("common.just_now");
+        if (mins < 60) return t("common.minutes_ago", { count: mins });
+        if (hours < 24) return t("common.hours_ago", { count: hours });
+        if (days < 7) return t("common.days_ago", { count: days });
+        return new Date(at).toLocaleDateString();
+    };
 
-    useEffect(() => {
-        void refresh();
-    }, [refresh]);
-
-    const run = async (label: string, action: () => Promise<Notice | null>) => {
-        if (!vaultId || busy) return;
-        setBusy(label);
-        setNotice(null);
-        try {
-            const outcome = await action();
-            if (outcome) setNotice(outcome);
-        } finally {
-            setBusy(null);
-            await refresh();
+    const stepLabel = (s: SphereStep): string => {
+        switch (s) {
+            case "sync":
+                return t("spheres.status.working_sync");
+            case "claim":
+                return t("spheres.status.working_claim");
+            case "mailbox":
+                return t("spheres.status.working_mailbox");
+            case "list":
+                return t("common.loading");
+            case "burn":
+                return t("spheres.status.working_burn");
+            case "reissue":
+                return t("spheres.status.working_reissue");
+            default:
+                return t("spheres.actions.working");
         }
     };
 
-    const onSync = () =>
-        run("sync", async () => {
-            const r = await syncSpheres(vaultId!);
-            if (!r.ok) return { type: "error", text: t("spheres.errors.sync", { detail: r.error }) };
-            setSpheres(r.spheres);
-            const issues = [...r.mismatches, ...Object.values(r.errors)];
-            if (issues.length) {
-                return { type: "error", text: t("spheres.sync.issues", { count: issues.length, detail: issues[0] }) };
-            }
-            return {
-                type: "success",
-                text: t("spheres.sync.done", {
-                    final: r.final,
-                    waiting: r.waiting,
-                    received: r.received.length,
-                    away: r.transferredAway.length,
-                }),
-            };
-        });
-
-    const onClaim = () =>
-        run("claim", async () => {
-            const r = await claimSpheres(vaultId!);
-            if (!r.ok) return { type: "error", text: t("spheres.errors.claim", { detail: r.error }) };
-            const failed = Object.keys(r.errors).length;
-            if (r.claimed.length === 0 && r.deferred.length === 0) {
-                return { type: "info", text: t("spheres.claim.nothing", { already: r.already.length }) };
-            }
-            return {
-                type: failed ? "error" : "success",
-                text: t("spheres.claim.done", { claimed: r.claimed.length, deferred: r.deferred.length, failed }),
-            };
-        });
-
-    const onMailbox = () =>
-        run("mailbox", async () => {
-            const r = await depositSphereMailbox(vaultId!, 8);
-            if (!r.ok) return { type: "error", text: t("spheres.errors.mailbox", { detail: r.error }) };
-            return { type: "success", text: t("spheres.mailbox.done", { deposited: r.deposited, pending: r.pending ?? "?" }) };
-        });
-
-    const onImport = () =>
-        run("import", async () => {
-            const r = await importSphereFile(vaultId!);
-            if (!r.ok) {
-                if (r.errorCode === "canceled") return null;
-                return { type: "error", text: t("spheres.errors.import", { detail: r.error }) };
-            }
-            return {
-                type: "success",
-                text: t("spheres.import.done", { id: r.sphereId, state: stateLabel(r.state), submitted: r.submitted.length }),
-            };
-        });
-
-    const onExport = (sphere: SphereStatus) =>
-        run(`export:${sphere.sphere_id}`, async () => {
-            const r = await exportSphereFile(vaultId!, sphere.sphere_id);
-            if (!r.ok) {
-                if (r.errorCode === "canceled") return null;
-                return { type: "error", text: t("spheres.errors.export", { detail: r.error }) };
-            }
-            return { type: "success", text: t("spheres.export.done", { filename: r.filename }) };
-        });
+    const noticeText = (notice: SphereNotice): string => {
+        const params = notice.state ? { ...notice.params, state: stateLabel(notice.state) } : notice.params;
+        return t(notice.key, params);
+    };
 
     const openTransfer = (sphere: SphereStatus) => {
         setTransferTarget(sphere);
@@ -182,9 +161,9 @@ export function SphereSettings() {
         setRecipientError(null);
     };
 
-    const onTransfer = async () => {
+    const onTransfer = () => {
         const target = transferTarget;
-        if (!target) return;
+        if (!target || !vaultId) return;
         const to = recipient.trim().toLowerCase();
         if (!isValidVaultId(to)) {
             setRecipientError(t("spheres.transfer.invalid_recipient"));
@@ -195,14 +174,16 @@ export function SphereSettings() {
             return;
         }
         setTransferTarget(null);
-        await run(`transfer:${target.sphere_id}`, async () => {
-            const r = await transferSphere(vaultId!, target.sphere_id, to);
-            if (!r.ok) return { type: "error", text: t("spheres.errors.transfer", { detail: r.error }) };
-            return {
-                type: "success",
-                text: t("spheres.transfer.done", { id: r.sphereId, to: shortId(r.to), state: stateLabel(r.state) }),
-            };
-        });
+        void actions.transfer(vaultId, target.sphere_id, to);
+    };
+
+    const onCustodyConfirm = () => {
+        const prompt = custodyPrompt;
+        if (!prompt || !vaultId) return;
+        setCustodyPrompt(null);
+        if (prompt.kind === "burn") void actions.burn(vaultId, prompt.sphere.sphere_id, true);
+        // A pending signed transfer is revoked by the reissue (`--force`): the modal said so.
+        else void actions.reissueKey(vaultId, prompt.sphere.sphere_id, prompt.sphere.pending);
     };
 
     if (!available) {
@@ -223,8 +204,43 @@ export function SphereSettings() {
         );
     }
 
+    const memory = view?.memory ?? null;
+    const spheres = [...(memory?.inventory ?? [])].sort(byRarityThenId);
+    const loaded = memory?.inventory !== null && memory !== null;
     const finalCount = spheres.filter((s) => s.state === "finale").length;
     const waitingCount = spheres.filter((s) => s.state === "en attente").length;
+    // Genesis spheres the treasury still holds for this vault: not heads yet, so counted in neither badge above.
+    const claimableCount = memory?.claim.claimable?.length ?? 0;
+    const pendingCount = spheres.filter((s) => s.pending).length;
+    const now = Date.now();
+
+    // What the memory says, one segment each; the working line replaces them.
+    const status: { text: string; tone: "muted" | "warn" | "error" }[] = [];
+    if (busy && step) {
+        const seconds = view?.startedAt ? Math.max(0, Math.round((now - view.startedAt) / 1000)) : 0;
+        const working = view?.firstContact ? t("spheres.status.first_contact", { step: stepLabel(step) }) : stepLabel(step);
+        status.push({ text: `${working} · ${t("spheres.status.elapsed", { seconds })}`, tone: "muted" });
+    } else if (memory) {
+        status.push(
+            memory.syncOkAt === null
+                ? { text: t("spheres.status.never"), tone: "muted" }
+                : { text: t("spheres.status.synced", { when: relativeTime(memory.syncOkAt), host: memory.anchorHost ?? anchorHost() }), tone: "muted" },
+        );
+        if (memory.failKind === "unreachable" && now < memory.backoffUntil) {
+            status.push({ text: t("spheres.status.unreachable", { minutes: Math.max(1, Math.ceil((memory.backoffUntil - now) / 60000)) }), tone: "warn" });
+        }
+        if (memory.failKind === "refused") status.push({ text: t("spheres.status.refused"), tone: "error" });
+        if (memory.claim.state === "done") status.push({ text: t("spheres.status.claim_done", { count: memory.claim.count }), tone: "muted" });
+        if (memory.claim.state === "queued") status.push({ text: t("spheres.status.claim_queued", { count: memory.claim.queued.length }), tone: "warn" });
+        if (memory.claim.state === "not_enrolled") status.push({ text: t("spheres.status.claim_not_enrolled"), tone: "warn" });
+        if (memory.mailbox.pending !== null) {
+            status.push({ text: t("spheres.status.mailbox", { count: memory.mailbox.pending }), tone: memory.mailbox.pending < MAILBOX_LOW ? "warn" : "muted" });
+        }
+        if (pendingCount) status.push({ text: t("spheres.status.pending", { count: pendingCount }), tone: "warn" });
+    }
+
+    const statusTone = (tone: "muted" | "warn" | "error") =>
+        tone === "error" ? "text-rose-300/90" : tone === "warn" ? "text-amber-300/90" : "text-slate-400";
 
     return (
         <div className="space-y-8">
@@ -261,43 +277,88 @@ export function SphereSettings() {
                 </div>
             )}
 
+            {custodyPrompt && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+                    <div className="cosmic-glass-card cosmic-glow-border w-full max-w-md rounded-3xl p-6">
+                        <h3 className="mb-2 text-xl font-semibold text-white">
+                            {t(custodyPrompt.kind === "burn" ? "spheres.burn.title" : "spheres.reissue.title")}
+                        </h3>
+                        <p className="mb-4 text-sm text-slate-300">
+                            {t(custodyPrompt.kind === "burn" ? "spheres.burn.description" : "spheres.reissue.description", {
+                                id: custodyPrompt.sphere.name || custodyPrompt.sphere.sphere_id,
+                            })}
+                        </p>
+                        {custodyPrompt.kind === "reissue" && custodyPrompt.sphere.pending && (
+                            <p className="mb-4 text-sm text-amber-200">{t("spheres.reissue.revokes_pending")}</p>
+                        )}
+                        <div className="flex gap-3">
+                            <button type="button" onClick={() => setCustodyPrompt(null)} className="cosmic-btn-ghost flex-1">
+                                {t("common.cancel")}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onCustodyConfirm}
+                                className={
+                                    custodyPrompt.kind === "burn"
+                                        ? "flex-1 rounded-xl border border-rose-400/40 bg-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-100 hover:bg-rose-500/30"
+                                        : "cosmic-cta flex-1"
+                                }
+                            >
+                                {t(custodyPrompt.kind === "burn" ? "spheres.burn.confirm" : "spheres.reissue.confirm")}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <section>
                 <h2 className="mb-1 text-xl font-semibold text-white">{t("spheres.title")}</h2>
                 <p className="mb-4 text-sm leading-6 text-slate-300">{t("spheres.description")}</p>
                 <div className="cosmic-glass-card cosmic-glow-border rounded-3xl p-6">
-                    <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                    <div className="mb-3 flex flex-wrap items-center gap-3 text-sm text-slate-300">
                         <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-3 py-1 text-emerald-200">
                             {t("spheres.summary.final", { count: finalCount })}
                         </span>
                         <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-500/10 px-3 py-1 text-amber-200">
                             {t("spheres.summary.waiting", { count: waitingCount })}
                         </span>
-                        {trustedIssuer === false && (
+                        {claimableCount > 0 && (
+                            <span className="inline-flex items-center gap-2 rounded-full border border-sky-400/25 bg-sky-500/10 px-3 py-1 text-sky-200">
+                                {t("spheres.summary.claimable", { count: claimableCount })}
+                            </span>
+                        )}
+                        {memory?.trustedIssuer === false && (
                             <span className="text-xs text-amber-300/80">{t("spheres.summary.untrusted_issuer")}</span>
                         )}
                     </div>
+                    {status.length > 0 && (
+                        <p className="mb-4 text-xs leading-5">
+                            {status.map((seg, i) => (
+                                <span key={i} className={statusTone(seg.tone)}>
+                                    {i > 0 && <span className="text-slate-600"> · </span>}
+                                    {seg.text}
+                                </span>
+                            ))}
+                        </p>
+                    )}
                     <div className="flex flex-wrap items-center gap-3">
-                        <button type="button" onClick={onSync} disabled={busy !== null} className="cosmic-cta inline-flex items-center gap-2 disabled:opacity-50">
-                            {busy === "sync" ? t("spheres.actions.syncing") : t("spheres.actions.sync")}
+                        <button type="button" onClick={() => actions.sync(vaultId)} disabled={busy !== null} className="cosmic-cta inline-flex items-center gap-2 disabled:opacity-50">
+                            {step === "sync" ? t("spheres.actions.syncing") : t("spheres.actions.sync")}
                         </button>
-                        <button type="button" onClick={onClaim} disabled={busy !== null} className="cosmic-btn-ghost disabled:opacity-50">
-                            {busy === "claim" ? t("spheres.actions.claiming") : t("spheres.actions.claim")}
+                        <button type="button" onClick={() => actions.claim(vaultId)} disabled={busy !== null} className="cosmic-btn-ghost disabled:opacity-50">
+                            {step === "claim" ? t("spheres.actions.claiming") : t("spheres.actions.claim")}
                         </button>
-                        <button type="button" onClick={onMailbox} disabled={busy !== null} className="cosmic-btn-ghost disabled:opacity-50">
-                            {t("spheres.actions.mailbox")}
+                        <button type="button" onClick={() => actions.mailbox(vaultId)} disabled={busy !== null} className="cosmic-btn-ghost disabled:opacity-50">
+                            {step === "mailbox" ? t("spheres.actions.working") : t("spheres.actions.mailbox")}
                         </button>
-                        <button type="button" onClick={onImport} disabled={busy !== null} className="cosmic-btn-ghost disabled:opacity-50">
-                            {t("spheres.actions.import")}
+                        <button type="button" onClick={() => actions.importFile(vaultId)} disabled={busy !== null} className="cosmic-btn-ghost disabled:opacity-50">
+                            {step === "import" ? t("spheres.actions.working") : t("spheres.actions.import")}
                         </button>
                     </div>
-                    {notice && (
-                        <p
-                            className={`mt-4 text-sm ${
-                                notice.type === "error" ? "text-rose-200" : notice.type === "success" ? "text-emerald-200" : "text-slate-300"
-                            }`}
-                        >
-                            {notice.text}
-                        </p>
+                    {busy && <p className="mt-3 text-xs text-slate-500">{t("spheres.status.runtime_hint")}</p>}
+                    {view?.notice && <p className={`mt-4 text-sm ${NOTICE_STYLE[view.notice.tone]}`}>{noticeText(view.notice)}</p>}
+                    {view?.listError && (
+                        <p className="mt-4 text-sm text-rose-200">{t("spheres.errors.list", { detail: view.listError })}</p>
                     )}
                 </div>
             </section>
@@ -313,8 +374,15 @@ export function SphereSettings() {
                 ) : (
                     <ul className="space-y-3">
                         {spheres.map((sphere) => {
-                            const busyHere = busy === `export:${sphere.sphere_id}` || busy === `transfer:${sphere.sphere_id}`;
+                            const busyHere =
+                                busy === `export:${sphere.sphere_id}` ||
+                                busy === `transfer:${sphere.sphere_id}` ||
+                                busy === `burn:${sphere.sphere_id}` ||
+                                busy === `reissue:${sphere.sphere_id}`;
                             const canTransfer = sphere.ok && !sphere.burned && sphere.controllable && !sphere.pending;
+                            // Reissuing is allowed over a pending transfer (it revokes it, the modal says so); burning is not.
+                            const canReissue = sphere.ok && !sphere.burned && sphere.controllable;
+                            const canBurn = canTransfer;
                             return (
                                 <li key={sphere.sphere_id} className="cosmic-glass-card cosmic-glow-border rounded-2xl p-4">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -343,11 +411,29 @@ export function SphereSettings() {
                                             </span>
                                             <button
                                                 type="button"
-                                                onClick={() => onExport(sphere)}
+                                                onClick={() => actions.exportFile(vaultId, sphere.sphere_id)}
                                                 disabled={busy !== null}
                                                 className="cosmic-btn-ghost px-3 py-1 text-xs disabled:opacity-50"
                                             >
                                                 {t("spheres.actions.export")}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCustodyPrompt({ kind: "reissue", sphere })}
+                                                disabled={busy !== null || !canReissue}
+                                                className="cosmic-btn-ghost px-3 py-1 text-xs disabled:opacity-50"
+                                                title={t("spheres.actions.reissue_hint")}
+                                            >
+                                                {t("spheres.actions.reissue")}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCustodyPrompt({ kind: "burn", sphere })}
+                                                disabled={busy !== null || !canBurn}
+                                                className="rounded-full border border-rose-400/30 px-3 py-1 text-xs text-rose-200/90 hover:bg-rose-500/10 disabled:opacity-50"
+                                                title={t("spheres.actions.burn_hint")}
+                                            >
+                                                {t("spheres.actions.burn")}
                                             </button>
                                             <button
                                                 type="button"

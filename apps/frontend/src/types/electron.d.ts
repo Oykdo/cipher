@@ -150,11 +150,18 @@ type SphereSyncResult =
       updated: string[];
       received: string[];
       transferred_away: string[];
+      burned: string[];
       mismatches: string[];
+      queued: string[];
       final: number;
       waiting: number;
       errors: Record<string, string>;
       spheres: SphereStatus[];
+      /** runtime ≥ 1.2.1 */
+      trusted_issuer?: boolean;
+      genesis_cached?: boolean;
+      /** runtime ≥ 1.3.1: ids the treasury still holds for this vault (a right, not a head — claim them). */
+      claimable?: string[];
     }
   | SphereFailure;
 
@@ -197,6 +204,16 @@ type SphereImportResult =
 
 type SphereExportResult =
   | { ok: true; sphereId: string; state: SphereState; filename: string; size: number }
+  | SphereFailure;
+
+/** runtime ≥ 1.2.1 — the claims the anchor deferred for this vault. */
+type SphereQueueResult =
+  | { ok: true; vault_id: string; count: number; queued: { sphere_id: string; vault_number: number; requested_at: string }[] }
+  | SphereFailure;
+
+/** runtime ≥ 1.2.1 — a custody step signed by this vault: burn (irreversible) or reissue-key (the sphere stays). */
+type SphereCustodyResult =
+  | { ok: true; vault_id: string; sphere_id: string; to: string | null; seq: number; head_hash: string; reason: string; final: boolean; state: SphereState }
   | SphereFailure;
 
 /**
@@ -323,6 +340,11 @@ declare global {
         transfer: (vaultId: string, sphereId: string, to: string, apiUrl?: string) => Promise<SphereTransferResult>;
         importFile: (vaultId: string, apiUrl?: string) => Promise<SphereImportResult>;
         exportFile: (vaultId: string, sphereId: string) => Promise<SphereExportResult>;
+        queue: (vaultId: string, apiUrl?: string) => Promise<SphereQueueResult>;
+        /** `confirm` must be true: main refuses otherwise (burning is irreversible). */
+        burn: (vaultId: string, sphereId: string, confirm: boolean, apiUrl?: string) => Promise<SphereCustodyResult>;
+        /** `force` revokes a signed, unsubmitted transfer of that sphere by a second signature. */
+        reissueKey: (vaultId: string, sphereId: string, force: boolean, apiUrl?: string) => Promise<SphereCustodyResult>;
       };
       escrow?: {
         list: (vaultId: string) => Promise<EscrowListResult>;

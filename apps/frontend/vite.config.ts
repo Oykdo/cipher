@@ -88,7 +88,14 @@ export default defineConfig(({ mode }) => ({
     dedupe: ['react', 'react-dom'],
   },
   server: {
+    // Pin the loopback family and the port: Electron loads localhost:5173
+    // and Chromium takes whatever answers there. Left to Vite's defaults,
+    // a foreign dev server on 127.0.0.1:5173 lets ours bind ::1 and the
+    // desktop window silently opens the other app. Now a taken port is a
+    // hard 'Port 5173 is already in use' instead.
+    host: '127.0.0.1',
     port: 5173,
+    strictPort: true,
     proxy: {
       '/api': {
         target: 'http://localhost:4000',

@@ -1527,7 +1527,27 @@
     "summary": {
       "final": "{{count}} final",
       "waiting": "{{count}} ausstehend",
+      "claimable": "{{count}} zu beanspruchen",
       "untrusted_issuer": "Herausgeberschlüssel in diesem Build nicht verankert: der Genesis wird beim ersten Lesen vertraut."
+    },
+    "status": {
+      "never": "Von diesem Gerät noch nie mit dem Anker abgeglichen.",
+      "synced": "Abgeglichen {{when}} mit {{host}}",
+      "unreachable": "Anker nicht erreichbar — automatischer Neuversuch in {{minutes}} Min., Abgleichen versucht es sofort",
+      "refused": "der Anker hat diese Vault abgelehnt (nicht registriert oder ohne Registrierungsnummer) — automatischer Abgleich pausiert, Abgleichen versucht es erneut",
+      "claim_done": "{{count}} Genesis-Sphäre(n) beansprucht",
+      "claim_queued": "{{count}} Genesis-Anspruch/-Ansprüche am Anker in der Warteschlange, ein späterer Abgleich holt sie",
+      "claim_not_enrolled": "Vault nicht für den Genesis registriert",
+      "mailbox": "{{count}} Empfangsschlüssel am Anker unbenutzt",
+      "pending": "{{count}} signierte Übertragung(en) warten auf den Anker",
+      "first_contact": "Erster Kontakt mit dem Anker — {{step}}",
+      "working_sync": "Abgleich mit dem Anker…",
+      "working_claim": "Genesis-Sphären werden beansprucht…",
+      "working_mailbox": "Empfangsschlüssel werden veröffentlicht…",
+      "working_burn": "Sphäre wird verbrannt…",
+      "working_reissue": "Schlüssel wird neu ausgestellt…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Jeder Aufruf des Ankers startet zuerst die Eidolon-Laufzeit — etwa 30 s."
     },
     "actions": {
       "sync": "Mit dem Anker abgleichen",
@@ -1538,6 +1558,10 @@
       "import": "Sphärendatei importieren",
       "export": "Exportieren",
       "transfer": "Übertragen",
+      "reissue": "Schlüssel neu ausstellen",
+      "reissue_hint": "Die Sphäre bleibt: der festgelegte Schlüssel wird der des nächsten Sprungs.",
+      "burn": "Verbrennen",
+      "burn_hint": "Unumkehrbar: beendet die Verwahrungskette.",
       "working": "Läuft…"
     },
     "sync": {
@@ -1566,6 +1590,19 @@
       "self": "Eine Übertragung wechselt die Vault.",
       "confirm": "Signieren und übertragen",
       "done": "{{id}} an {{to}} übertragen — {{state}}."
+    },
+    "burn": {
+      "title": "Diese Sphäre verbrennen?",
+      "description": "{{id}} wird verbrannt: die Verwahrungskette endet, die Sphäre kann weder übertragen noch neu ausgestellt werden. Ein Grabstein bleibt im Inventar. Das lässt sich nicht rückgängig machen.",
+      "confirm": "Endgültig verbrennen",
+      "done": "{{id}} verbrannt ({{state}})."
+    },
+    "reissue": {
+      "title": "Verwahrungsschlüssel neu ausstellen",
+      "description": "Ein neuer Schlüssel signiert den nächsten Sprung von {{id}}; die Sphäre bleibt in diesem Tresor.",
+      "revokes_pending": "Eine signierte Übertragung wartet noch auf den Anker: die Neuausstellung widerruft sie durch eine zweite Signatur, der Anker entscheidet.",
+      "confirm": "Neu ausstellen",
+      "done": "Schlüssel von {{id}} neu ausgestellt (Sprung {{seq}}, {{state}})."
     },
     "inventory": {
       "title": "Bestand",
@@ -1598,7 +1635,9 @@
       "mailbox": "Schlüssel konnten nicht veröffentlicht werden: {{detail}}",
       "import": "Import abgelehnt: {{detail}}",
       "export": "Export fehlgeschlagen: {{detail}}",
-      "transfer": "Übertragung abgelehnt: {{detail}}"
+      "transfer": "Übertragung abgelehnt: {{detail}}",
+      "burn": "Verbrennen fehlgeschlagen: {{detail}}",
+      "reissue": "Neuausstellung fehlgeschlagen: {{detail}}"
     }
   },
   "escrow": {

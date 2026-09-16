@@ -9,6 +9,7 @@ import { EIDOLON_CONNECT_ENABLED } from "../../config";
 import { emergencyWipeKeys } from "../../lib/secureKeyAccess";
 import { clearAllDecryptedCache, flushPendingWrites as flushDecryptedCacheWrites } from "../../lib/e2ee/decryptedMessageCache";
 import { clearLocalAccount } from "../../lib/localStorage";
+import { clearSphereMemory } from "../../lib/spheresMemory";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../ui/Dialog";
 
 export function SecuritySettings() {
@@ -89,6 +90,15 @@ export function SecuritySettings() {
                 clearLocalAccount(user.username);
             } catch (err) {
                 console.error("[logout] clearLocalAccount failed:", err);
+            }
+        }
+        // Forgetting the device also forgets what the sphere anchor said to it
+        // (inventory snapshot, last sync, claim state) — a plain logout keeps it.
+        if (linkedVault?.vaultId) {
+            try {
+                clearSphereMemory(linkedVault.vaultId);
+            } catch (err) {
+                console.error("[logout] clearSphereMemory failed:", err);
             }
         }
         clearSession();

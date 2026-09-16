@@ -1522,7 +1522,27 @@
     "summary": {
       "final": "{{count}} final(is)",
       "waiting": "{{count}} pendente(s)",
+      "claimable": "{{count}} a reclamar",
       "untrusted_issuer": "Chave do emissor não fixada nesta versão: a gênese é aceita na primeira leitura."
+    },
+    "status": {
+      "never": "Ainda não sincronizado com a âncora a partir deste dispositivo.",
+      "synced": "Sincronizado {{when}} com {{host}}",
+      "unreachable": "âncora inacessível — nova tentativa automática em {{minutes}} min, Sincronizar tenta agora",
+      "refused": "a âncora recusou este cofre (não inscrito, ou sem número de inscrição) — sincronização automática em pausa, Sincronizar tenta de novo",
+      "claim_done": "{{count}} esfera(s) de génese reclamada(s)",
+      "claim_queued": "{{count}} reclamação(ões) de génese em fila na âncora, uma sincronização posterior trá-las-á",
+      "claim_not_enrolled": "cofre não inscrito para a génese",
+      "mailbox": "{{count}} chave(s) de receção por usar na âncora",
+      "pending": "{{count}} transferência(s) assinada(s) à espera da âncora",
+      "first_contact": "Primeiro contacto com a âncora — {{step}}",
+      "working_sync": "a sincronizar com a âncora…",
+      "working_claim": "a reclamar as esferas de génese…",
+      "working_mailbox": "a publicar as chaves de receção…",
+      "working_burn": "queimando a esfera…",
+      "working_reissue": "reemitindo a chave…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Cada chamada à âncora inicia primeiro o runtime Eidolon — cerca de 30 s."
     },
     "actions": {
       "sync": "Sincronizar com a âncora",
@@ -1533,6 +1553,10 @@
       "import": "Importar um arquivo de esfera",
       "export": "Exportar",
       "transfer": "Transferir",
+      "reissue": "Reemitir a chave",
+      "reissue_hint": "A esfera não se move: a chave comprometida passa a ser a do próximo salto.",
+      "burn": "Queimar",
+      "burn_hint": "Irreversível: encerra a cadeia de custódia.",
       "working": "Em andamento…"
     },
     "sync": {
@@ -1561,6 +1585,19 @@
       "self": "Uma transferência muda de cofre.",
       "confirm": "Assinar e transferir",
       "done": "{{id}} transferida para {{to}} — {{state}}."
+    },
+    "burn": {
+      "title": "Queimar esta esfera?",
+      "description": "{{id}} será queimada: a cadeia de custódia termina e a esfera não poderá mais ser cedida nem reemitida. Uma lápide fica no inventário. Não é possível desfazer.",
+      "confirm": "Queimar definitivamente",
+      "done": "{{id}} queimada ({{state}})."
+    },
+    "reissue": {
+      "title": "Reemitir a chave de custódia",
+      "description": "Uma nova chave assinará o próximo salto de {{id}}; a esfera permanece neste cofre.",
+      "revokes_pending": "Uma cessão assinada ainda aguarda a âncora: a reemissão a revoga com uma segunda assinatura, e a âncora decide.",
+      "confirm": "Reemitir",
+      "done": "Chave de {{id}} reemitida (salto {{seq}}, {{state}})."
     },
     "inventory": {
       "title": "Inventário",
@@ -1593,7 +1630,9 @@
       "mailbox": "Não foi possível publicar as chaves: {{detail}}",
       "import": "Importação recusada: {{detail}}",
       "export": "Falha na exportação: {{detail}}",
-      "transfer": "Transferência recusada: {{detail}}"
+      "transfer": "Transferência recusada: {{detail}}",
+      "burn": "Falha ao queimar: {{detail}}",
+      "reissue": "Falha ao reemitir: {{detail}}"
     }
   },
   "escrow": {

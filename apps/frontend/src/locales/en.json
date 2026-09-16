@@ -1522,7 +1522,27 @@
     "summary": {
       "final": "{{count}} final",
       "waiting": "{{count}} waiting",
+      "claimable": "{{count}} to claim",
       "untrusted_issuer": "Issuer key not pinned in this build: genesis is trusted on first use."
+    },
+    "status": {
+      "never": "Not yet synced with the anchor from this device.",
+      "synced": "Synced {{when}} with {{host}}",
+      "unreachable": "anchor unreachable — automatic retry in {{minutes}} min, Sync retries now",
+      "refused": "the anchor refused this vault (not enrolled, or no enrolment number) — automatic sync paused, Sync retries now",
+      "claim_done": "{{count}} genesis sphere(s) claimed",
+      "claim_queued": "{{count}} genesis claim(s) queued at the anchor, a later sync brings them",
+      "claim_not_enrolled": "vault not enrolled for genesis",
+      "mailbox": "{{count}} receiving key(s) unused at the anchor",
+      "pending": "{{count}} signed transfer(s) waiting for the anchor",
+      "first_contact": "First contact with the anchor — {{step}}",
+      "working_sync": "syncing with the anchor…",
+      "working_claim": "claiming genesis spheres…",
+      "working_mailbox": "publishing receiving keys…",
+      "working_burn": "burning the sphere…",
+      "working_reissue": "reissuing the key…",
+      "elapsed": "{{seconds}} s",
+      "runtime_hint": "Each anchor call first starts the Eidolon runtime — about 30 s."
     },
     "actions": {
       "sync": "Sync with the anchor",
@@ -1533,6 +1553,10 @@
       "import": "Import a sphere file",
       "export": "Export",
       "transfer": "Transfer",
+      "reissue": "Reissue key",
+      "reissue_hint": "The sphere stays: the committed key becomes the next hop's.",
+      "burn": "Burn",
+      "burn_hint": "Irreversible: ends the custody chain.",
       "working": "Working…"
     },
     "sync": {
@@ -1561,6 +1585,19 @@
       "self": "A transfer changes vault.",
       "confirm": "Sign and transfer",
       "done": "{{id}} transferred to {{to}} — {{state}}."
+    },
+    "burn": {
+      "title": "Burn this sphere?",
+      "description": "{{id}} will be burnt: the custody chain ends, the sphere can no longer be transferred or reissued. A tombstone stays in the inventory. This cannot be undone.",
+      "confirm": "Burn for good",
+      "done": "{{id}} burnt ({{state}})."
+    },
+    "reissue": {
+      "title": "Reissue the custody key",
+      "description": "A fresh key will sign the next hop of {{id}}; the sphere stays in this vault.",
+      "revokes_pending": "A signed transfer is still waiting for the anchor: reissuing revokes it by a second signature, and the anchor arbitrates.",
+      "confirm": "Reissue",
+      "done": "Key of {{id}} reissued (hop {{seq}}, {{state}})."
     },
     "inventory": {
       "title": "Inventory",
@@ -1593,7 +1630,9 @@
       "mailbox": "Could not publish keys: {{detail}}",
       "import": "Import refused: {{detail}}",
       "export": "Export failed: {{detail}}",
-      "transfer": "Transfer refused: {{detail}}"
+      "transfer": "Transfer refused: {{detail}}",
+      "burn": "Burn failed: {{detail}}",
+      "reissue": "Reissue failed: {{detail}}"
     }
   },
   "escrow": {
