@@ -2273,9 +2273,19 @@ async function runEscrowCli(vaultId, subcommand, extraArgs = []) {
     return { ok: false, error: stripAbsolutePaths(`escrow ${subcommand} failed: ${detail}`), errorCode: 'runtime_failed' };
   }
   if (payload.ok !== true) {
+    let error = String(payload.error ?? `exit ${result.code}`);
+    // An uncaught runtime exception is a bug report: keep the frame it came
+    // from (file, line, function — never a full path) so the notice says
+    // where, not just "Invalid argument".
+    if (payload.error_code === 'uncaught' && typeof payload.traceback === 'string') {
+      const frames = payload.traceback.split('\n').filter((line) => /^\s+File "/.test(line));
+      const last = frames[frames.length - 1];
+      if (last) error += ` — ${last.trim().replace(/^File "(?:.*[\\/])?([^"\\/]+)"/, 'in $1')}`;
+      console.error('[escrow] runtime traceback:\n' + stripAbsolutePaths(payload.traceback));
+    }
     return {
       ok: false,
-      error: stripAbsolutePaths(String(payload.error ?? `exit ${result.code}`)),
+      error: stripAbsolutePaths(error),
       errorCode: typeof payload.error_code === 'string' ? payload.error_code : 'escrow_failed',
       releaseAfter: typeof payload.release_after === 'string' ? payload.release_after : undefined,
     };
