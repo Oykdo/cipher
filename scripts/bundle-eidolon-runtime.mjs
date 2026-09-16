@@ -152,16 +152,22 @@ const PBS_CACHE_DIR = path.join(cipherRoot, 'assets', '.python-cache');
 // both platforms against a throwaway data dir (sphere trust, escrow deposit /
 // list / retrieve / verify / delete, keybundle and ceremony --help). The
 // Settings › Spheres and › Escrow tabs need this runtime or newer.
-const RUNTIME_RELEASE = 'cipher-runtime-20260916';
+// 20260916b (`--version` 1.3.1) differs by one thing: `sphere sync` also
+// names what the genesis treasury still holds for the vault (`claimable`),
+// so the Spheres tab can show "N to claim" and chain a claim whatever its
+// memory says (with 1.3.0 the badge never appears and the old rules apply).
+// Built from the private core at 75c42eb; verified against the production
+// anchor on the owner's vault (final 8, claimable []).
+const RUNTIME_RELEASE = 'cipher-runtime-20260916b';
 const RUNTIME_TARGETS = {
   win32: {
     asset: 'cipher-runtime.exe',
-    sha256: '648b748c35d619e8f22ccdcb85fb85b1dfacbf602127d9ce86139d19c4cf00ca',
+    sha256: 'ac5ad809712b503754f42dd5d04ca212bafe7f1c7243bd7c90d9ca5f2243b309',
     localDirs: ['dist-cipher-runtime'],
   },
   linux: {
     asset: 'cipher-runtime',
-    sha256: '09740ff57befb8c6a075ce78a0a71e596ebcada1f22e074386fbe5e6337d5879',
+    sha256: '541ea3d2c98b8b32a4700b2ac40937b4add10fff199b8d55efb7666e270adf69',
     localDirs: ['dist-cipher-runtime-linux', 'dist-cipher-runtime'],
   },
 };
