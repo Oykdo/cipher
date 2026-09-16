@@ -202,3 +202,9 @@ assets/.python-cache/
 
 # Cache du runtime de ceremonie telecharge par bundle-eidolon-runtime.mjs
 assets/.runtime-cache/
+
+# Local, never published: bridge deployment notes (env var names, ops steps), the
+# currency-counter integration notes, and editor "as-found" backups of components.
+apps/bridge/deploy/
+EIDOLON_INTEGRATION.md
+*.as-found-*
