@@ -4,6 +4,24 @@ import { useAuthStore } from "../../store/auth";
 import { EIDOLON_CONNECT_ENABLED } from "../../config";
 import { escrowVerdict, isEscrowClientAvailable, type EscrowEntry, type EscrowVerdict } from "../../lib/escrow";
 import { useEscrowStore, type EscrowNotice, type EscrowStep } from "../../store/escrow";
+import {
+    ActionButton,
+    Chip,
+    CustodyDialog,
+    CustodyHero,
+    EmptyPanel,
+    EscrowEmblem,
+    EscrowSeal,
+    FinePrint,
+    Icon,
+    IconButton,
+    NoticeBanner,
+    Pill,
+    RuntimeBar,
+    SectionHeading,
+    StatTile,
+    type PillTone,
+} from "./custodyUi";
 
 /**
  * Escrow Nexus: the vault's sealed, time-locked documents, kept on this
@@ -16,19 +34,17 @@ import { useEscrowStore, type EscrowNotice, type EscrowStep } from "../../store/
  *
  * Every call spawns the runtime (~30 s cold), so the running step is named
  * and timed, and the inventory is kept for the session.
+ *
+ * Layout: a hero band (emblem, stat tiles), the actions, then the sealed
+ * documents as a grid of verdict-tinted cards, a locked one carrying its
+ * countdown and the fraction of the lock already elapsed.
  */
 
-const VERDICT_STYLE: Record<EscrowVerdict, string> = {
-    ready: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200",
-    locked: "border-amber-400/30 bg-amber-500/10 text-amber-200",
-    tampered: "border-rose-400/30 bg-rose-500/10 text-rose-200",
-    invalid: "border-slate-500/30 bg-slate-500/10 text-slate-300",
-};
-
-const NOTICE_STYLE: Record<EscrowNotice["tone"], string> = {
-    error: "text-rose-200",
-    success: "text-emerald-200",
-    info: "text-slate-300",
+const VERDICT_TONE: Record<EscrowVerdict, PillTone> = {
+    ready: "emerald",
+    locked: "amber",
+    tampered: "rose",
+    invalid: "slate",
 };
 
 function formatBytes(n: number): string {
@@ -48,6 +64,15 @@ function localInputToIso(value: string): string | null {
     if (!value) return null;
     const at = new Date(value);
     return Number.isNaN(at.getTime()) ? null : at.toISOString();
+}
+
+/** How much of a time lock has elapsed, 0..1, from deposit to release; null when either date is unreadable. */
+function lockProgress(entry: EscrowEntry, now: number): number | null {
+    if (!entry.release_after) return null;
+    const from = new Date(entry.deposited_at).getTime();
+    const to = new Date(entry.release_after).getTime();
+    if (Number.isNaN(from) || Number.isNaN(to) || to <= from) return null;
+    return Math.min(1, Math.max(0, (now - from) / (to - from)));
 }
 
 export function EscrowSettings() {
@@ -82,6 +107,18 @@ export function EscrowSettings() {
         const id = window.setInterval(() => setTick((n) => n + 1), 1000);
         return () => window.clearInterval(id);
     }, [busy]);
+
+    /** "in 3 days" / "in 2 hours" / "in 5 minutes", from the existing common keys. */
+    const relativeFuture = (iso: string): string => {
+        const diffMs = new Date(iso).getTime() - Date.now();
+        if (Number.isNaN(diffMs) || diffMs <= 0) return "";
+        const mins = Math.ceil(diffMs / 60000);
+        const hours = Math.round(diffMs / 3600000);
+        const days = Math.round(diffMs / 86400000);
+        if (mins < 60) return t("common.in_minutes", { count: mins });
+        if (hours < 48) return t("common.in_hours", { count: hours });
+        return t("common.in_days", { count: days });
+    };
 
     const verdictLabel = (entry: EscrowEntry): string => {
         switch (escrowVerdict(entry)) {
@@ -152,21 +189,9 @@ export function EscrowSettings() {
         void actions.remove(vaultId, target.id);
     };
 
-    if (!available) {
+    if (!available || !vaultId) {
         return (
-            <div className="cosmic-glass-card cosmic-glow-border rounded-3xl p-6">
-                <h2 className="mb-2 text-xl font-semibold text-white">{t("escrow.title")}</h2>
-                <p className="text-sm leading-6 text-slate-300">{t("escrow.desktop_only")}</p>
-            </div>
-        );
-    }
-
-    if (!vaultId) {
-        return (
-            <div className="cosmic-glass-card cosmic-glow-border rounded-3xl p-6">
-                <h2 className="mb-2 text-xl font-semibold text-white">{t("escrow.title")}</h2>
-                <p className="text-sm leading-6 text-slate-300">{t("escrow.no_vault")}</p>
-            </div>
+            <CustodyHero emblem={<EscrowEmblem />} kicker={t("escrow.kicker")} title={t("escrow.title")} lead={t(available ? "escrow.no_vault" : "escrow.desktop_only")} />
         );
     }
 
@@ -176,192 +201,215 @@ export function EscrowSettings() {
     const readyCount = entries.filter((e) => escrowVerdict(e) === "ready").length;
     const lockedCount = entries.filter((e) => escrowVerdict(e) === "locked").length;
     const badCount = entries.filter((e) => ["tampered", "invalid"].includes(escrowVerdict(e))).length + unreadable.length;
-    const seconds = view?.startedAt ? Math.max(0, Math.round((Date.now() - view.startedAt) / 1000)) : 0;
+    const now = Date.now();
+    const seconds = view?.startedAt ? Math.max(0, Math.round((now - view.startedAt) / 1000)) : 0;
+    const totalBytes = entries.reduce((sum, e) => sum + e.payload_size, 0);
 
     return (
-        <div className="space-y-8">
-            {depositOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-                    <div className="cosmic-glass-card cosmic-glow-border w-full max-w-md rounded-3xl p-6">
-                        <h3 className="mb-2 text-xl font-semibold text-white">{t("escrow.deposit.title")}</h3>
-                        <p className="mb-4 text-sm text-slate-300">{t("escrow.deposit.description")}</p>
-                        <label className="mb-1 block text-xs text-slate-400">{t("escrow.deposit.label")}</label>
-                        <input
-                            type="text"
-                            value={label}
-                            onChange={(e) => setLabel(e.target.value)}
-                            placeholder={t("escrow.deposit.label_placeholder")}
-                            className="cosmic-input mb-3 w-full text-sm"
-                            maxLength={200}
-                            autoFocus
-                        />
-                        <label className="mb-1 block text-xs text-slate-400">{t("escrow.deposit.release_after")}</label>
-                        <input
-                            type="datetime-local"
-                            value={releaseAfter}
-                            onChange={(e) => {
-                                setReleaseAfter(e.target.value);
-                                setDepositError(null);
-                            }}
-                            className="cosmic-input mb-1 w-full text-sm"
-                        />
-                        <p className="mb-3 text-xs text-slate-400">{t("escrow.deposit.release_after_hint")}</p>
-                        <label className="mb-4 flex items-start gap-2 text-xs text-slate-300">
-                            <input type="checkbox" checked={ownerOnly} onChange={(e) => setOwnerOnly(e.target.checked)} className="mt-0.5" />
-                            <span>{t("escrow.deposit.owner_only")}</span>
-                        </label>
-                        {depositError && <p className="mb-4 text-sm text-red-200">{depositError}</p>}
-                        <div className="flex gap-3">
-                            <button type="button" onClick={() => setDepositOpen(false)} className="cosmic-btn-ghost flex-1">
-                                {t("common.cancel")}
-                            </button>
-                            <button type="button" onClick={onDeposit} className="cosmic-cta flex-1">
-                                {t("escrow.deposit.choose_file")}
-                            </button>
-                        </div>
-                    </div>
+        <div className="space-y-6">
+            <CustodyDialog
+                open={depositOpen}
+                onOpenChange={setDepositOpen}
+                emblem={<Icon.seal className="text-cyan-300" />}
+                title={t("escrow.deposit.title")}
+                description={t("escrow.deposit.description")}
+                footer={
+                    <>
+                        <button type="button" onClick={() => setDepositOpen(false)} className="cosmic-btn-ghost flex-1">
+                            {t("common.cancel")}
+                        </button>
+                        <button type="button" onClick={onDeposit} className="cosmic-cta flex-1">
+                            {t("escrow.deposit.choose_file")}
+                        </button>
+                    </>
+                }
+            >
+                <div className="custody-field">
+                    <label htmlFor="escrow-label">{t("escrow.deposit.label")}</label>
+                    <input
+                        id="escrow-label"
+                        type="text"
+                        value={label}
+                        onChange={(e) => setLabel(e.target.value)}
+                        placeholder={t("escrow.deposit.label_placeholder")}
+                        className="cosmic-input w-full text-sm"
+                        maxLength={200}
+                        autoFocus
+                    />
                 </div>
-            )}
+                <div className="custody-field">
+                    <label htmlFor="escrow-release">{t("escrow.deposit.release_after")}</label>
+                    <input
+                        id="escrow-release"
+                        type="datetime-local"
+                        value={releaseAfter}
+                        onChange={(e) => {
+                            setReleaseAfter(e.target.value);
+                            setDepositError(null);
+                        }}
+                        className="cosmic-input w-full text-sm"
+                    />
+                    <p className="hint">{t("escrow.deposit.release_after_hint")}</p>
+                </div>
+                <label className="custody-check">
+                    <input type="checkbox" checked={ownerOnly} onChange={(e) => setOwnerOnly(e.target.checked)} />
+                    <span>{t("escrow.deposit.owner_only")}</span>
+                </label>
+                {depositError && <p className="mt-3 text-sm text-rose-200">{depositError}</p>}
+            </CustodyDialog>
 
-            {deleteTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-                    <div className="cosmic-glass-card cosmic-glow-border w-full max-w-md rounded-3xl p-6">
-                        <h3 className="mb-2 text-xl font-semibold text-white">{t("escrow.delete.title")}</h3>
-                        <p className="mb-4 text-sm text-slate-300">{t("escrow.delete.description", { label: deleteTarget.label })}</p>
-                        <div className="flex gap-3">
-                            <button type="button" onClick={() => setDeleteTarget(null)} className="cosmic-btn-ghost flex-1">
-                                {t("common.cancel")}
-                            </button>
-                            <button type="button" onClick={onDelete} className="cosmic-cta flex-1">
-                                {t("escrow.delete.confirm")}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <CustodyDialog
+                open={deleteTarget !== null}
+                onOpenChange={(o) => {
+                    if (!o) setDeleteTarget(null);
+                }}
+                emblem={<Icon.trash className="text-rose-300" />}
+                danger
+                title={t("escrow.delete.title")}
+                description={t("escrow.delete.description", { label: deleteTarget?.label ?? "" })}
+                footer={
+                    <>
+                        <button type="button" onClick={() => setDeleteTarget(null)} className="cosmic-btn-ghost flex-1">
+                            {t("common.cancel")}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onDelete}
+                            className="flex-1 rounded-xl border border-rose-400/40 bg-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-100 hover:bg-rose-500/30"
+                        >
+                            {t("escrow.delete.confirm")}
+                        </button>
+                    </>
+                }
+            />
 
-            <section>
-                <h2 className="mb-1 text-xl font-semibold text-white">{t("escrow.title")}</h2>
-                <p className="mb-4 text-sm leading-6 text-slate-300">{t("escrow.description")}</p>
-                <div className="cosmic-glass-card cosmic-glow-border rounded-3xl p-6">
-                    <div className="mb-3 flex flex-wrap items-center gap-3 text-sm text-slate-300">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-3 py-1 text-emerald-200">
-                            {t("escrow.summary.ready", { count: readyCount })}
-                        </span>
-                        <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-500/10 px-3 py-1 text-amber-200">
-                            {t("escrow.summary.locked", { count: lockedCount })}
-                        </span>
-                        {badCount > 0 && (
-                            <span className="inline-flex items-center gap-2 rounded-full border border-rose-400/25 bg-rose-500/10 px-3 py-1 text-rose-200">
-                                {t("escrow.summary.bad", { count: badCount })}
-                            </span>
-                        )}
-                    </div>
-                    {busy && step && (
-                        <p className="mb-4 text-xs leading-5 text-slate-400">
-                            {stepLabel(step)} · {t("escrow.status.elapsed", { seconds })}
-                        </p>
-                    )}
-                    <div className="flex flex-wrap items-center gap-3">
-                        <button type="button" onClick={openDeposit} disabled={busy !== null} className="cosmic-cta inline-flex items-center gap-2 disabled:opacity-50">
-                            {step === "deposit" ? t("escrow.actions.working") : t("escrow.actions.deposit")}
-                        </button>
-                        <button type="button" onClick={() => actions.verify(vaultId)} disabled={busy !== null} className="cosmic-btn-ghost disabled:opacity-50">
-                            {step === "verify" ? t("escrow.actions.working") : t("escrow.actions.verify")}
-                        </button>
-                        <button type="button" onClick={() => actions.refresh(vaultId)} disabled={busy !== null} className="cosmic-btn-ghost disabled:opacity-50">
-                            {step === "list" ? t("escrow.actions.working") : t("escrow.actions.refresh")}
-                        </button>
-                    </div>
-                    {busy && <p className="mt-3 text-xs text-slate-500">{t("escrow.status.runtime_hint")}</p>}
-                    {view?.notice && <p className={`mt-4 text-sm ${NOTICE_STYLE[view.notice.tone]}`}>{noticeText(view.notice)}</p>}
-                    {view?.listError && (
-                        <p className="mt-4 text-sm text-rose-200">{t("escrow.errors.list", { detail: view.listError })}</p>
-                    )}
-                    <p className="mt-4 text-xs leading-5 text-slate-500">{t("escrow.plain")}</p>
+            <CustodyHero emblem={<EscrowEmblem />} kicker={t("escrow.kicker")} title={t("escrow.title")} lead={t("escrow.description")}>
+                <div className="custody-stats">
+                    <StatTile value={readyCount} label={t("escrow.state.ready")} tone="emerald" />
+                    <StatTile value={lockedCount} label={t("escrow.tiles.locked")} tone="amber" />
+                    <StatTile value={badCount} label={t("escrow.tiles.damaged")} tone="rose" />
+                    <StatTile value={entries.length} label={t("escrow.inventory.title")} tone="violet" />
                 </div>
+            </CustodyHero>
+
+            <section className="cosmic-glass-card rounded-3xl p-5 space-y-4">
+                {busy && step ? (
+                    <RuntimeBar text={stepLabel(step)} seconds={seconds} hint={t("escrow.status.runtime_hint")} />
+                ) : (
+                    <p className="text-xs text-slate-500">
+                        {loaded ? t("escrow.status.summary", { count: entries.length, size: formatBytes(totalBytes) }) : t("common.loading")}
+                    </p>
+                )}
+
+                <div className="custody-actions">
+                    <ActionButton variant="primary" icon={<Icon.seal />} label={t("escrow.actions.deposit")} onClick={openDeposit} disabled={busy !== null} busy={step === "deposit"} />
+                    <ActionButton icon={<Icon.verify />} label={t("escrow.actions.verify")} onClick={() => actions.verify(vaultId)} disabled={busy !== null} busy={step === "verify"} />
+                    <ActionButton icon={<Icon.refresh />} label={t("escrow.actions.refresh")} onClick={() => actions.refresh(vaultId)} disabled={busy !== null} busy={step === "list"} />
+                </div>
+
+                {view?.notice && (
+                    <NoticeBanner tone={view.notice.tone} text={noticeText(view.notice)} onClose={() => actions.dismissNotice(vaultId)} closeLabel={t("common.close")} />
+                )}
+                {view?.listError && <NoticeBanner tone="error" text={t("escrow.errors.list", { detail: view.listError })} closeLabel={t("common.close")} />}
+
+                <FinePrint text={t("escrow.plain")} />
             </section>
 
             <section>
-                <h2 className="mb-4 text-xl font-semibold text-white">{t("escrow.inventory.title")}</h2>
+                <SectionHeading title={t("escrow.inventory.title")} aside={loaded && entries.length ? t("escrow.inventory.newest_first") : undefined} />
                 {!loaded ? (
-                    <p className="text-sm text-slate-400">{t("common.loading")}</p>
+                    <RuntimeBar text={t("common.loading")} seconds={seconds} />
                 ) : entries.length === 0 && unreadable.length === 0 ? (
-                    <div className="cosmic-glass-card cosmic-glow-border rounded-3xl p-6">
-                        <p className="text-sm leading-6 text-slate-300">{t("escrow.inventory.empty")}</p>
-                    </div>
+                    <EmptyPanel emblem={<EscrowEmblem />} text={t("escrow.inventory.empty")} />
                 ) : (
-                    <ul className="space-y-3">
+                    <ul className="custody-grid">
                         {entries.map((entry) => {
                             const verdict = escrowVerdict(entry);
-                            const busyHere = busy === `retrieve:${entry.escrow_id}` || busy === `delete:${entry.escrow_id}`;
                             const checked = view?.verified?.[entry.escrow_id];
                             const title = entry.label || entry.escrow_id;
+                            const ownerOnlyCondition = entry.conditions.some(
+                                (c) => c.type === "owner_signature" || (c.children ?? []).some((k) => k.type === "owner_signature"),
+                            );
+                            const progress = verdict === "locked" ? lockProgress(entry, now) : null;
+                            const countdown = verdict === "locked" && entry.release_after ? relativeFuture(entry.release_after) : "";
                             return (
-                                <li key={entry.escrow_id} className="cosmic-glass-card cosmic-glow-border rounded-2xl p-4">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <span className="block truncate font-semibold text-white">{title}</span>
-                                            <p className="mt-1 font-mono text-[11px] text-slate-400">
-                                                {entry.escrow_id} · {formatBytes(entry.payload_size)} · {t("escrow.inventory.deposited", { when: formatWhen(entry.deposited_at) })}
-                                            </p>
-                                            {entry.conditions.some((c) => c.type === "owner_signature" || (c.children ?? []).some((k) => k.type === "owner_signature")) && (
-                                                <p className="mt-1 text-xs text-slate-400">{t("escrow.inventory.owner_only")}</p>
-                                            )}
-                                            {verdict !== "ready" && verdict !== "locked" && (
-                                                <p className="mt-1 text-xs text-rose-300/80">{entry.reason}</p>
-                                            )}
-                                            {checked && (
-                                                <p className={`mt-1 text-xs ${checked.ok ? "text-emerald-300/80" : "text-rose-300/80"}`}>
-                                                    {checked.ok ? t("escrow.inventory.integrity_ok") : t("escrow.inventory.integrity_failed", { reason: checked.reason })}
+                                <li key={entry.escrow_id} className={`custody-card custody-card--${verdict}`}>
+                                    <EscrowSeal verdict={verdict} />
+                                    <div className="min-w-0">
+                                        <div className="custody-card__title" title={title}>
+                                            {title}
+                                        </div>
+                                        <div className="custody-chips">
+                                            <Pill tone={VERDICT_TONE[verdict]}>{verdict === "locked" ? t("escrow.state.locked_short") : verdictLabel(entry)}</Pill>
+                                            <Chip>{formatBytes(entry.payload_size)}</Chip>
+                                            <Chip>{t("escrow.inventory.deposited", { when: formatWhen(entry.deposited_at) })}</Chip>
+                                            <Chip title={entry.escrow_id}>{entry.escrow_id}</Chip>
+                                        </div>
+                                        {verdict === "locked" && (
+                                            <>
+                                                <p className="custody-card__flag custody-card__flag--warn">
+                                                    {t("escrow.state.locked", { until: formatWhen(entry.release_after) })}
+                                                    {countdown ? ` · ${t("escrow.inventory.unlocks", { when: countdown })}` : ""}
                                                 </p>
-                                            )}
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${VERDICT_STYLE[verdict]}`}>
-                                                {verdictLabel(entry)}
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => actions.retrieve(vaultId, entry.escrow_id, entry.label || undefined)}
-                                                disabled={busy !== null || verdict !== "ready"}
-                                                className="cosmic-cta px-3 py-1 text-xs disabled:opacity-50"
-                                            >
-                                                {busyHere && step === "retrieve" ? t("escrow.actions.working") : t("escrow.actions.retrieve")}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setDeleteTarget({ id: entry.escrow_id, label: title })}
-                                                disabled={busy !== null}
-                                                className="cosmic-btn-ghost px-3 py-1 text-xs disabled:opacity-50"
-                                            >
-                                                {busyHere && step === "delete" ? t("escrow.actions.working") : t("escrow.actions.delete")}
-                                            </button>
-                                        </div>
+                                                {progress !== null && (
+                                                    <div className="custody-lockbar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} aria-label={t("escrow.inventory.lock_progress")}>
+                                                        <div className="custody-lockbar__fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                        {ownerOnlyCondition && <p className="custody-card__flag custody-card__flag--muted">{t("escrow.inventory.owner_only")}</p>}
+                                        {verdict !== "ready" && verdict !== "locked" && <p className="custody-card__flag custody-card__flag--error">{entry.reason}</p>}
+                                        {checked && (
+                                            <p className={`custody-card__flag ${checked.ok ? "custody-card__flag--ok" : "custody-card__flag--error"}`}>
+                                                {checked.ok ? t("escrow.inventory.integrity_ok") : t("escrow.inventory.integrity_failed", { reason: checked.reason })}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="custody-card__foot">
+                                        <IconButton
+                                            danger
+                                            icon={<Icon.trash />}
+                                            label={t("escrow.actions.delete")}
+                                            onClick={() => setDeleteTarget({ id: entry.escrow_id, label: title })}
+                                            disabled={busy !== null}
+                                            busy={busy === `delete:${entry.escrow_id}`}
+                                        />
+                                        <ActionButton
+                                            size="sm"
+                                            variant="primary"
+                                            icon={verdict === "locked" ? <Icon.lock /> : <Icon.retrieve />}
+                                            label={t("escrow.actions.retrieve")}
+                                            onClick={() => actions.retrieve(vaultId, entry.escrow_id, entry.label || undefined)}
+                                            disabled={busy !== null || verdict !== "ready"}
+                                            busy={busy === `retrieve:${entry.escrow_id}`}
+                                            title={verdict === "locked" ? t("escrow.state.locked", { until: formatWhen(entry.release_after) }) : undefined}
+                                        />
                                     </div>
                                 </li>
                             );
                         })}
                         {unreadable.map((bad) => (
-                            <li key={`bad:${bad.escrow_id}`} className="cosmic-glass-card cosmic-glow-border rounded-2xl p-4">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <span className="block truncate font-mono text-sm text-slate-200">{bad.escrow_id}</span>
-                                        <p className="mt-1 text-xs text-rose-300/80">{t("escrow.inventory.unreadable", { detail: bad.error })}</p>
+                            <li key={`bad:${bad.escrow_id}`} className="custody-card custody-card--invalid custody-card--muted">
+                                <EscrowSeal verdict="invalid" />
+                                <div className="min-w-0">
+                                    <div className="custody-card__title font-mono text-sm" title={bad.escrow_id}>
+                                        {bad.escrow_id}
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${VERDICT_STYLE.invalid}`}>
-                                            {t("escrow.state.unreadable")}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setDeleteTarget({ id: bad.escrow_id, label: bad.escrow_id })}
-                                            disabled={busy !== null}
-                                            className="cosmic-btn-ghost px-3 py-1 text-xs disabled:opacity-50"
-                                        >
-                                            {t("escrow.actions.delete")}
-                                        </button>
+                                    <div className="custody-chips">
+                                        <Pill tone="slate">{t("escrow.state.unreadable")}</Pill>
                                     </div>
+                                    <p className="custody-card__flag custody-card__flag--error">{t("escrow.inventory.unreadable", { detail: bad.error })}</p>
+                                </div>
+                                <div className="custody-card__foot">
+                                    <IconButton
+                                        danger
+                                        icon={<Icon.trash />}
+                                        label={t("escrow.actions.delete")}
+                                        onClick={() => setDeleteTarget({ id: bad.escrow_id, label: bad.escrow_id })}
+                                        disabled={busy !== null}
+                                        busy={busy === `delete:${bad.escrow_id}`}
+                                    />
                                 </div>
                             </li>
                         ))}

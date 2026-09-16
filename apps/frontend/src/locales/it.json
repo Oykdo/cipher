@@ -16,7 +16,11 @@
     "minutes_ago": "{{count}}min fa",
     "hours_ago": "{{count}}h fa",
     "days_ago": "{{count}}g fa",
-    "copy": "Copia"
+    "copy": "Copia",
+    "in_minutes": "tra {{count}} min",
+    "in_hours": "tra {{count}} h",
+    "in_days": "tra {{count}} giorni",
+    "close": "Chiudi"
   },
   "status": {
     "online": "Online",
@@ -1612,7 +1616,8 @@
       "empty": "Nessuna sfera qui per ora. Rivendica le tue sfere della genesi o sincronizza con l'ancora.",
       "seq": "passo {{seq}}",
       "pending": "Un trasferimento firmato attende l'ancora — sincronizza per rinviarlo.",
-      "uncontrolled": "Nessuna chiave di questo vault controlla questa sfera."
+      "uncontrolled": "Nessuna chiave di questo vault controlla questa sfera.",
+      "rarest_first": "le più rare prima"
     },
     "state": {
       "final": "finale",
@@ -1641,6 +1646,10 @@
       "transfer": "Trasferimento rifiutato: {{detail}}",
       "burn": "Bruciatura non riuscita: {{detail}}",
       "reissue": "Riemissione non riuscita: {{detail}}"
+    },
+    "kicker": "Eidolon · registro di custodia",
+    "tiles": {
+      "claimable": "da reclamare"
     }
   },
   "escrow": {
@@ -1660,7 +1669,8 @@
       "working_verify": "controllo delle buste…",
       "working_delete": "eliminazione…",
       "elapsed": "{{seconds}} s",
-      "runtime_hint": "Ogni azione avvia prima il runtime Eidolon — circa 30 secondi."
+      "runtime_hint": "Ogni azione avvia prima il runtime Eidolon — circa 30 secondi.",
+      "summary": "{{count}} documento/i sigillato/i su questo dispositivo · {{size}}"
     },
     "actions": {
       "deposit": "Sigilla un documento",
@@ -1705,14 +1715,18 @@
       "owner_only": "Firma del proprietario richiesta: solo questa cassaforte può aprirlo.",
       "integrity_ok": "Integro.",
       "integrity_failed": "Danneggiato: {{reason}}",
-      "unreadable": "Illeggibile: {{detail}}"
+      "unreadable": "Illeggibile: {{detail}}",
+      "newest_first": "i più recenti prima",
+      "unlocks": "si sblocca {{when}}",
+      "lock_progress": "Parte del blocco già trascorsa"
     },
     "state": {
       "ready": "pronto",
       "locked": "bloccato fino a {{until}}",
       "tampered": "alterato",
       "invalid": "non valido",
-      "unreadable": "illeggibile"
+      "unreadable": "illeggibile",
+      "locked_short": "bloccato"
     },
     "errors": {
       "canceled": "Annullato.",
@@ -1727,6 +1741,11 @@
       "retrieve": "Recupero fallito: {{detail}}",
       "verify": "Verifica fallita: {{detail}}",
       "delete": "Eliminazione fallita: {{detail}}"
+    },
+    "kicker": "Eidolon · Escrow Nexus",
+    "tiles": {
+      "locked": "bloccati",
+      "damaged": "danneggiati"
     }
   }
 }

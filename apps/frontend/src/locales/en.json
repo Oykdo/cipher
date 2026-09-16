@@ -31,7 +31,10 @@
     "just_now": "Just now",
     "minutes_ago": "{{count}}m ago",
     "hours_ago": "{{count}}h ago",
-    "days_ago": "{{count}}d ago"
+    "days_ago": "{{count}}d ago",
+    "in_minutes": "in {{count}} min",
+    "in_hours": "in {{count}} h",
+    "in_days": "in {{count}} days"
   },
   "status": {
     "online": "Online",
@@ -1607,7 +1610,8 @@
       "empty": "No sphere here yet. Claim your genesis spheres, or sync with the anchor.",
       "seq": "hop {{seq}}",
       "pending": "A signed transfer is waiting for the anchor — sync to resend it.",
-      "uncontrolled": "No key of this vault controls this sphere."
+      "uncontrolled": "No key of this vault controls this sphere.",
+      "rarest_first": "rarest first"
     },
     "state": {
       "final": "final",
@@ -1636,6 +1640,10 @@
       "transfer": "Transfer refused: {{detail}}",
       "burn": "Burn failed: {{detail}}",
       "reissue": "Reissue failed: {{detail}}"
+    },
+    "kicker": "Eidolon · custody ledger",
+    "tiles": {
+      "claimable": "to claim"
     }
   },
   "escrow": {
@@ -1655,7 +1663,8 @@
       "working_verify": "checking the envelopes…",
       "working_delete": "deleting…",
       "elapsed": "{{seconds}} s",
-      "runtime_hint": "Each action first starts the Eidolon runtime — about 30 seconds."
+      "runtime_hint": "Each action first starts the Eidolon runtime — about 30 seconds.",
+      "summary": "{{count}} sealed document(s) on this device · {{size}}"
     },
     "actions": {
       "deposit": "Seal a document",
@@ -1700,14 +1709,18 @@
       "owner_only": "Owner signature required: only this vault can open it.",
       "integrity_ok": "Intact.",
       "integrity_failed": "Damaged: {{reason}}",
-      "unreadable": "Unreadable: {{detail}}"
+      "unreadable": "Unreadable: {{detail}}",
+      "newest_first": "newest first",
+      "unlocks": "unlocks {{when}}",
+      "lock_progress": "Share of the lock already elapsed"
     },
     "state": {
       "ready": "ready",
       "locked": "locked until {{until}}",
       "tampered": "tampered",
       "invalid": "invalid",
-      "unreadable": "unreadable"
+      "unreadable": "unreadable",
+      "locked_short": "locked"
     },
     "errors": {
       "canceled": "Canceled.",
@@ -1722,6 +1735,11 @@
       "retrieve": "Retrieval failed: {{detail}}",
       "verify": "Verification failed: {{detail}}",
       "delete": "Deletion failed: {{detail}}"
+    },
+    "kicker": "Eidolon · Escrow Nexus",
+    "tiles": {
+      "locked": "locked",
+      "damaged": "damaged"
     }
   }
 }

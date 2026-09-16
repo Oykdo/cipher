@@ -5,6 +5,25 @@ import { EIDOLON_CONNECT_ENABLED } from "../../config";
 import { isSphereClientAvailable, isValidVaultId, type SphereState, type SphereStatus } from "../../lib/spheres";
 import { MAILBOX_LOW, anchorHost } from "../../lib/spheresMemory";
 import { useSphereStore, type SphereNotice, type SphereStep } from "../../store/spheres";
+import {
+    ActionButton,
+    Chip,
+    CustodyDialog,
+    CustodyHero,
+    EmptyPanel,
+    Icon,
+    IconButton,
+    NoticeBanner,
+    Pill,
+    RuntimeBar,
+    SectionHeading,
+    SphereOrb,
+    SpheresEmblem,
+    StatTile,
+    StatusSegments,
+    type PillTone,
+    type StatusSeg,
+} from "./custodyUi";
 
 /**
  * The vault's spheres: what the custody ledger says this vault holds, each
@@ -17,30 +36,16 @@ import { useSphereStore, type SphereNotice, type SphereStep } from "../../store/
  * reached. The store spawns the runtime only for a reason (first contact,
  * daily refresh, a signed transfer waiting) or on a button. Each spawn is
  * ~30 s of runtime start-up, so the running step is named and timed.
+ *
+ * Layout: a hero band (emblem, stat tiles), the anchor status and actions,
+ * then the inventory as a grid of rarity-tinted cards, rarest first.
  */
 
-const STATE_STYLE: Record<SphereState, string> = {
-    "finale": "border-emerald-400/30 bg-emerald-500/10 text-emerald-200",
-    "en attente": "border-amber-400/30 bg-amber-500/10 text-amber-200",
-    "brûlée": "border-slate-500/30 bg-slate-500/10 text-slate-300",
-    "invalide": "border-rose-400/30 bg-rose-500/10 text-rose-200",
-};
-
-const RARITY_STYLE: Record<string, string> = {
-    primordial: "text-fuchsia-200",
-    genesis: "text-violet-200",
-    mythic: "text-indigo-200",
-    legendary: "text-amber-200",
-    epic: "text-purple-200",
-    rare: "text-sky-200",
-    uncommon: "text-emerald-200",
-    common: "text-slate-300",
-};
-
-const NOTICE_STYLE: Record<SphereNotice["tone"], string> = {
-    error: "text-rose-200",
-    success: "text-emerald-200",
-    info: "text-slate-300",
+const STATE_TONE: Record<SphereState, PillTone> = {
+    "finale": "emerald",
+    "en attente": "amber",
+    "brûlée": "slate",
+    "invalide": "rose",
 };
 
 /** Rarest first — the order of the genesis caps (Eidolon RARITY_ORDER); unknown rarities last. */
@@ -186,21 +191,9 @@ export function SphereSettings() {
         else void actions.reissueKey(vaultId, prompt.sphere.sphere_id, prompt.sphere.pending);
     };
 
-    if (!available) {
+    if (!available || !vaultId) {
         return (
-            <div className="cosmic-glass-card cosmic-glow-border rounded-3xl p-6">
-                <h2 className="mb-2 text-xl font-semibold text-white">{t("spheres.title")}</h2>
-                <p className="text-sm leading-6 text-slate-300">{t("spheres.desktop_only")}</p>
-            </div>
-        );
-    }
-
-    if (!vaultId) {
-        return (
-            <div className="cosmic-glass-card cosmic-glow-border rounded-3xl p-6">
-                <h2 className="mb-2 text-xl font-semibold text-white">{t("spheres.title")}</h2>
-                <p className="text-sm leading-6 text-slate-300">{t("spheres.no_vault")}</p>
-            </div>
+            <CustodyHero emblem={<SpheresEmblem />} kicker={t("spheres.kicker")} title={t("spheres.title")} lead={t(available ? "spheres.no_vault" : "spheres.desktop_only")} />
         );
     }
 
@@ -209,18 +202,15 @@ export function SphereSettings() {
     const loaded = memory?.inventory !== null && memory !== null;
     const finalCount = spheres.filter((s) => s.state === "finale").length;
     const waitingCount = spheres.filter((s) => s.state === "en attente").length;
-    // Genesis spheres the treasury still holds for this vault: not heads yet, so counted in neither badge above.
+    // Genesis spheres the treasury still holds for this vault: not heads yet, so counted in neither tile above.
     const claimableCount = memory?.claim.claimable?.length ?? 0;
     const pendingCount = spheres.filter((s) => s.pending).length;
     const now = Date.now();
+    const seconds = view?.startedAt ? Math.max(0, Math.round((now - view.startedAt) / 1000)) : 0;
 
-    // What the memory says, one segment each; the working line replaces them.
-    const status: { text: string; tone: "muted" | "warn" | "error" }[] = [];
-    if (busy && step) {
-        const seconds = view?.startedAt ? Math.max(0, Math.round((now - view.startedAt) / 1000)) : 0;
-        const working = view?.firstContact ? t("spheres.status.first_contact", { step: stepLabel(step) }) : stepLabel(step);
-        status.push({ text: `${working} · ${t("spheres.status.elapsed", { seconds })}`, tone: "muted" });
-    } else if (memory) {
+    // What the memory says, one segment each; the runtime bar replaces them while it works.
+    const status: StatusSeg[] = [];
+    if (memory && !(busy && step)) {
         status.push(
             memory.syncOkAt === null
                 ? { text: t("spheres.status.never"), tone: "muted" }
@@ -237,213 +227,212 @@ export function SphereSettings() {
             status.push({ text: t("spheres.status.mailbox", { count: memory.mailbox.pending }), tone: memory.mailbox.pending < MAILBOX_LOW ? "warn" : "muted" });
         }
         if (pendingCount) status.push({ text: t("spheres.status.pending", { count: pendingCount }), tone: "warn" });
+        if (memory.trustedIssuer === false) status.push({ text: t("spheres.summary.untrusted_issuer"), tone: "warn" });
     }
 
-    const statusTone = (tone: "muted" | "warn" | "error") =>
-        tone === "error" ? "text-rose-300/90" : tone === "warn" ? "text-amber-300/90" : "text-slate-400";
+    const workingText = busy && step ? (view?.firstContact ? t("spheres.status.first_contact", { step: stepLabel(step) }) : stepLabel(step)) : null;
 
     return (
-        <div className="space-y-8">
-            {transferTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-                    <div className="cosmic-glass-card cosmic-glow-border w-full max-w-md rounded-3xl p-6">
-                        <h3 className="mb-2 text-xl font-semibold text-white">{t("spheres.transfer.title")}</h3>
-                        <p className="mb-4 text-sm text-slate-300">
-                            {t("spheres.transfer.description", { id: transferTarget.name || transferTarget.sphere_id })}
-                        </p>
-                        <input
-                            type="text"
-                            value={recipient}
-                            onChange={(e) => {
-                                setRecipient(e.target.value);
-                                setRecipientError(null);
-                            }}
-                            placeholder={t("spheres.transfer.recipient_placeholder")}
-                            className="cosmic-input mb-2 w-full font-mono text-xs"
-                            autoFocus
-                            spellCheck={false}
-                        />
-                        <p className="mb-4 text-xs text-slate-400">{t("spheres.transfer.hint")}</p>
-                        {recipientError && <p className="mb-4 text-sm text-red-200">{recipientError}</p>}
-                        <div className="flex gap-3">
-                            <button type="button" onClick={() => setTransferTarget(null)} className="cosmic-btn-ghost flex-1">
-                                {t("common.cancel")}
-                            </button>
-                            <button type="button" onClick={onTransfer} className="cosmic-cta flex-1">
-                                {t("spheres.transfer.confirm")}
-                            </button>
-                        </div>
-                    </div>
+        <div className="space-y-6">
+            <CustodyDialog
+                open={transferTarget !== null}
+                onOpenChange={(o) => {
+                    if (!o) setTransferTarget(null);
+                }}
+                emblem={<Icon.transfer className="text-cyan-300" />}
+                title={t("spheres.transfer.title")}
+                description={t("spheres.transfer.description", { id: transferTarget?.name || transferTarget?.sphere_id || "" })}
+                footer={
+                    <>
+                        <button type="button" onClick={() => setTransferTarget(null)} className="cosmic-btn-ghost flex-1">
+                            {t("common.cancel")}
+                        </button>
+                        <button type="button" onClick={onTransfer} className="cosmic-cta flex-1">
+                            {t("spheres.transfer.confirm")}
+                        </button>
+                    </>
+                }
+            >
+                <div className="custody-field">
+                    <label htmlFor="sphere-recipient">{t("spheres.transfer.recipient_placeholder")}</label>
+                    <input
+                        id="sphere-recipient"
+                        type="text"
+                        value={recipient}
+                        onChange={(e) => {
+                            setRecipient(e.target.value);
+                            setRecipientError(null);
+                        }}
+                        placeholder="0123abcd…"
+                        className="cosmic-input w-full font-mono text-xs"
+                        autoFocus
+                        spellCheck={false}
+                    />
+                    <p className="hint">{t("spheres.transfer.hint")}</p>
                 </div>
-            )}
+                {recipientError && <p className="text-sm text-rose-200">{recipientError}</p>}
+            </CustodyDialog>
 
-            {custodyPrompt && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-                    <div className="cosmic-glass-card cosmic-glow-border w-full max-w-md rounded-3xl p-6">
-                        <h3 className="mb-2 text-xl font-semibold text-white">
-                            {t(custodyPrompt.kind === "burn" ? "spheres.burn.title" : "spheres.reissue.title")}
-                        </h3>
-                        <p className="mb-4 text-sm text-slate-300">
-                            {t(custodyPrompt.kind === "burn" ? "spheres.burn.description" : "spheres.reissue.description", {
-                                id: custodyPrompt.sphere.name || custodyPrompt.sphere.sphere_id,
-                            })}
-                        </p>
-                        {custodyPrompt.kind === "reissue" && custodyPrompt.sphere.pending && (
-                            <p className="mb-4 text-sm text-amber-200">{t("spheres.reissue.revokes_pending")}</p>
-                        )}
-                        <div className="flex gap-3">
-                            <button type="button" onClick={() => setCustodyPrompt(null)} className="cosmic-btn-ghost flex-1">
-                                {t("common.cancel")}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={onCustodyConfirm}
-                                className={
-                                    custodyPrompt.kind === "burn"
-                                        ? "flex-1 rounded-xl border border-rose-400/40 bg-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-100 hover:bg-rose-500/30"
-                                        : "cosmic-cta flex-1"
-                                }
-                            >
-                                {t(custodyPrompt.kind === "burn" ? "spheres.burn.confirm" : "spheres.reissue.confirm")}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <CustodyDialog
+                open={custodyPrompt !== null}
+                onOpenChange={(o) => {
+                    if (!o) setCustodyPrompt(null);
+                }}
+                emblem={custodyPrompt?.kind === "burn" ? <Icon.burn className="text-rose-300" /> : <Icon.reissue className="text-cyan-300" />}
+                danger={custodyPrompt?.kind === "burn"}
+                title={t(custodyPrompt?.kind === "burn" ? "spheres.burn.title" : "spheres.reissue.title")}
+                description={t(custodyPrompt?.kind === "burn" ? "spheres.burn.description" : "spheres.reissue.description", {
+                    id: custodyPrompt?.sphere.name || custodyPrompt?.sphere.sphere_id || "",
+                })}
+                footer={
+                    <>
+                        <button type="button" onClick={() => setCustodyPrompt(null)} className="cosmic-btn-ghost flex-1">
+                            {t("common.cancel")}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onCustodyConfirm}
+                            className={
+                                custodyPrompt?.kind === "burn"
+                                    ? "flex-1 rounded-xl border border-rose-400/40 bg-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-100 hover:bg-rose-500/30"
+                                    : "cosmic-cta flex-1"
+                            }
+                        >
+                            {t(custodyPrompt?.kind === "burn" ? "spheres.burn.confirm" : "spheres.reissue.confirm")}
+                        </button>
+                    </>
+                }
+            >
+                {custodyPrompt?.kind === "reissue" && custodyPrompt.sphere.pending && (
+                    <p className="text-sm text-amber-200">{t("spheres.reissue.revokes_pending")}</p>
+                )}
+            </CustodyDialog>
 
-            <section>
-                <h2 className="mb-1 text-xl font-semibold text-white">{t("spheres.title")}</h2>
-                <p className="mb-4 text-sm leading-6 text-slate-300">{t("spheres.description")}</p>
-                <div className="cosmic-glass-card cosmic-glow-border rounded-3xl p-6">
-                    <div className="mb-3 flex flex-wrap items-center gap-3 text-sm text-slate-300">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-3 py-1 text-emerald-200">
-                            {t("spheres.summary.final", { count: finalCount })}
-                        </span>
-                        <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-500/10 px-3 py-1 text-amber-200">
-                            {t("spheres.summary.waiting", { count: waitingCount })}
-                        </span>
-                        {claimableCount > 0 && (
-                            <span className="inline-flex items-center gap-2 rounded-full border border-sky-400/25 bg-sky-500/10 px-3 py-1 text-sky-200">
-                                {t("spheres.summary.claimable", { count: claimableCount })}
-                            </span>
-                        )}
-                        {memory?.trustedIssuer === false && (
-                            <span className="text-xs text-amber-300/80">{t("spheres.summary.untrusted_issuer")}</span>
-                        )}
-                    </div>
-                    {status.length > 0 && (
-                        <p className="mb-4 text-xs leading-5">
-                            {status.map((seg, i) => (
-                                <span key={i} className={statusTone(seg.tone)}>
-                                    {i > 0 && <span className="text-slate-600"> · </span>}
-                                    {seg.text}
-                                </span>
-                            ))}
-                        </p>
-                    )}
-                    <div className="flex flex-wrap items-center gap-3">
-                        <button type="button" onClick={() => actions.sync(vaultId)} disabled={busy !== null} className="cosmic-cta inline-flex items-center gap-2 disabled:opacity-50">
-                            {step === "sync" ? t("spheres.actions.syncing") : t("spheres.actions.sync")}
-                        </button>
-                        <button type="button" onClick={() => actions.claim(vaultId)} disabled={busy !== null} className="cosmic-btn-ghost disabled:opacity-50">
-                            {step === "claim" ? t("spheres.actions.claiming") : t("spheres.actions.claim")}
-                        </button>
-                        <button type="button" onClick={() => actions.mailbox(vaultId)} disabled={busy !== null} className="cosmic-btn-ghost disabled:opacity-50">
-                            {step === "mailbox" ? t("spheres.actions.working") : t("spheres.actions.mailbox")}
-                        </button>
-                        <button type="button" onClick={() => actions.importFile(vaultId)} disabled={busy !== null} className="cosmic-btn-ghost disabled:opacity-50">
-                            {step === "import" ? t("spheres.actions.working") : t("spheres.actions.import")}
-                        </button>
-                    </div>
-                    {busy && <p className="mt-3 text-xs text-slate-500">{t("spheres.status.runtime_hint")}</p>}
-                    {view?.notice && <p className={`mt-4 text-sm ${NOTICE_STYLE[view.notice.tone]}`}>{noticeText(view.notice)}</p>}
-                    {view?.listError && (
-                        <p className="mt-4 text-sm text-rose-200">{t("spheres.errors.list", { detail: view.listError })}</p>
-                    )}
+            <CustodyHero emblem={<SpheresEmblem />} kicker={t("spheres.kicker")} title={t("spheres.title")} lead={t("spheres.description")}>
+                <div className="custody-stats">
+                    <StatTile value={finalCount} label={t("spheres.state.final")} tone="emerald" />
+                    <StatTile value={waitingCount} label={t("spheres.state.waiting")} tone="amber" />
+                    <StatTile value={claimableCount} label={t("spheres.tiles.claimable")} tone="sky" live={claimableCount > 0} />
+                    <StatTile value={spheres.length} label={t("spheres.inventory.title")} tone="violet" />
                 </div>
+            </CustodyHero>
+
+            <section className="cosmic-glass-card rounded-3xl p-5 space-y-4">
+                {workingText ? (
+                    <RuntimeBar text={workingText} seconds={seconds} hint={t("spheres.status.runtime_hint")} />
+                ) : (
+                    <StatusSegments segments={status} />
+                )}
+
+                <div className="custody-actions">
+                    <ActionButton
+                        variant="primary"
+                        icon={<Icon.sync />}
+                        label={step === "sync" ? t("spheres.actions.syncing") : t("spheres.actions.sync")}
+                        onClick={() => actions.sync(vaultId)}
+                        disabled={busy !== null}
+                        busy={step === "sync"}
+                    />
+                    <ActionButton
+                        icon={<Icon.claim />}
+                        label={step === "claim" ? t("spheres.actions.claiming") : t("spheres.actions.claim")}
+                        onClick={() => actions.claim(vaultId)}
+                        disabled={busy !== null}
+                        busy={step === "claim"}
+                    />
+                    <ActionButton
+                        icon={<Icon.mailbox />}
+                        label={t("spheres.actions.mailbox")}
+                        onClick={() => actions.mailbox(vaultId)}
+                        disabled={busy !== null}
+                        busy={step === "mailbox"}
+                    />
+                    <ActionButton
+                        icon={<Icon.importFile />}
+                        label={t("spheres.actions.import")}
+                        onClick={() => actions.importFile(vaultId)}
+                        disabled={busy !== null}
+                        busy={step === "import"}
+                    />
+                </div>
+
+                {view?.notice && (
+                    <NoticeBanner tone={view.notice.tone} text={noticeText(view.notice)} onClose={() => actions.dismissNotice(vaultId)} closeLabel={t("common.close")} />
+                )}
+                {view?.listError && <NoticeBanner tone="error" text={t("spheres.errors.list", { detail: view.listError })} closeLabel={t("common.close")} />}
             </section>
 
             <section>
-                <h2 className="mb-4 text-xl font-semibold text-white">{t("spheres.inventory.title")}</h2>
+                <SectionHeading title={t("spheres.inventory.title")} aside={loaded ? t("spheres.inventory.rarest_first") : undefined} />
                 {!loaded ? (
-                    <p className="text-sm text-slate-400">{t("common.loading")}</p>
+                    <RuntimeBar text={t("common.loading")} seconds={seconds} />
                 ) : spheres.length === 0 ? (
-                    <div className="cosmic-glass-card cosmic-glow-border rounded-3xl p-6">
-                        <p className="text-sm leading-6 text-slate-300">{t("spheres.inventory.empty")}</p>
-                    </div>
+                    <EmptyPanel emblem={<SpheresEmblem />} text={t("spheres.inventory.empty")} />
                 ) : (
-                    <ul className="space-y-3">
+                    <ul className="custody-grid">
                         {spheres.map((sphere) => {
-                            const busyHere =
-                                busy === `export:${sphere.sphere_id}` ||
-                                busy === `transfer:${sphere.sphere_id}` ||
-                                busy === `burn:${sphere.sphere_id}` ||
-                                busy === `reissue:${sphere.sphere_id}`;
                             const canTransfer = sphere.ok && !sphere.burned && sphere.controllable && !sphere.pending;
                             // Reissuing is allowed over a pending transfer (it revokes it, the modal says so); burning is not.
                             const canReissue = sphere.ok && !sphere.burned && sphere.controllable;
                             const canBurn = canTransfer;
+                            const known = RARITY_RANK[sphere.rarity] !== undefined ? sphere.rarity : "common";
                             return (
-                                <li key={sphere.sphere_id} className="cosmic-glass-card cosmic-glow-border rounded-2xl p-4">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span className="truncate font-semibold text-white">{sphere.name || sphere.sphere_id}</span>
-                                                <span className={`text-xs uppercase tracking-[0.2em] ${RARITY_STYLE[sphere.rarity] ?? "text-slate-300"}`}>
-                                                    {rarityLabel(sphere.rarity)}
-                                                </span>
-                                            </div>
-                                            <p className="mt-1 font-mono text-[11px] text-slate-400">
-                                                {sphere.sphere_id} · {t("spheres.inventory.seq", { seq: sphere.seq })} · {shortId(sphere.head_hash)}
-                                            </p>
-                                            {sphere.pending && <p className="mt-1 text-xs text-amber-300/80">{t("spheres.inventory.pending")}</p>}
-                                            {!sphere.controllable && sphere.ok && (
-                                                <p className="mt-1 text-xs text-amber-300/80">{t("spheres.inventory.uncontrolled")}</p>
-                                            )}
-                                            {sphere.errors.length > 0 && (
-                                                <p className="mt-1 text-xs text-rose-300/80">{sphere.errors[0]}</p>
-                                            )}
+                                <li key={sphere.sphere_id} className={`custody-card custody-card--${known} ${sphere.burned ? "custody-card--muted" : ""}`}>
+                                    <SphereOrb rarity={known} burned={sphere.burned} />
+                                    <div className="min-w-0">
+                                        <div className="custody-rarity">{rarityLabel(sphere.rarity)}</div>
+                                        <div className="custody-card__title" title={sphere.name || sphere.sphere_id}>
+                                            {sphere.name || sphere.sphere_id}
                                         </div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${STATE_STYLE[sphere.state]}`}>
+                                        <div className="custody-chips">
+                                            <Pill tone={STATE_TONE[sphere.state]}>
                                                 {stateLabel(sphere.state)}
                                                 {sphere.final_by === "checkpoint" ? ` · ${t("spheres.state.by_checkpoint")}` : ""}
-                                            </span>
-                                            <button
-                                                type="button"
+                                            </Pill>
+                                            {sphere.name && <Chip title={sphere.sphere_id}>{sphere.sphere_id}</Chip>}
+                                            <Chip>{t("spheres.inventory.seq", { seq: sphere.seq })}</Chip>
+                                            <Chip title={sphere.head_hash}>{shortId(sphere.head_hash)}</Chip>
+                                        </div>
+                                        {sphere.pending && <p className="custody-card__flag custody-card__flag--warn">{t("spheres.inventory.pending")}</p>}
+                                        {!sphere.controllable && sphere.ok && (
+                                            <p className="custody-card__flag custody-card__flag--warn">{t("spheres.inventory.uncontrolled")}</p>
+                                        )}
+                                        {sphere.errors.length > 0 && <p className="custody-card__flag custody-card__flag--error">{sphere.errors[0]}</p>}
+                                    </div>
+                                    <div className="custody-card__foot">
+                                        <div className="custody-card__actions">
+                                            <IconButton
+                                                icon={<Icon.exportFile />}
+                                                label={t("spheres.actions.export")}
                                                 onClick={() => actions.exportFile(vaultId, sphere.sphere_id)}
                                                 disabled={busy !== null}
-                                                className="cosmic-btn-ghost px-3 py-1 text-xs disabled:opacity-50"
-                                            >
-                                                {t("spheres.actions.export")}
-                                            </button>
-                                            <button
-                                                type="button"
+                                                busy={busy === `export:${sphere.sphere_id}`}
+                                            />
+                                            <IconButton
+                                                icon={<Icon.reissue />}
+                                                label={`${t("spheres.actions.reissue")} — ${t("spheres.actions.reissue_hint")}`}
                                                 onClick={() => setCustodyPrompt({ kind: "reissue", sphere })}
                                                 disabled={busy !== null || !canReissue}
-                                                className="cosmic-btn-ghost px-3 py-1 text-xs disabled:opacity-50"
-                                                title={t("spheres.actions.reissue_hint")}
-                                            >
-                                                {t("spheres.actions.reissue")}
-                                            </button>
-                                            <button
-                                                type="button"
+                                                busy={busy === `reissue:${sphere.sphere_id}`}
+                                            />
+                                            <IconButton
+                                                danger
+                                                icon={<Icon.burn />}
+                                                label={`${t("spheres.actions.burn")} — ${t("spheres.actions.burn_hint")}`}
                                                 onClick={() => setCustodyPrompt({ kind: "burn", sphere })}
                                                 disabled={busy !== null || !canBurn}
-                                                className="rounded-full border border-rose-400/30 px-3 py-1 text-xs text-rose-200/90 hover:bg-rose-500/10 disabled:opacity-50"
-                                                title={t("spheres.actions.burn_hint")}
-                                            >
-                                                {t("spheres.actions.burn")}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => openTransfer(sphere)}
-                                                disabled={busy !== null || !canTransfer}
-                                                className="cosmic-cta px-3 py-1 text-xs disabled:opacity-50"
-                                            >
-                                                {busyHere ? t("spheres.actions.working") : t("spheres.actions.transfer")}
-                                            </button>
+                                                busy={busy === `burn:${sphere.sphere_id}`}
+                                            />
                                         </div>
+                                        <ActionButton
+                                            size="sm"
+                                            variant="primary"
+                                            icon={<Icon.transfer />}
+                                            label={busy === `transfer:${sphere.sphere_id}` ? t("spheres.actions.working") : t("spheres.actions.transfer")}
+                                            onClick={() => openTransfer(sphere)}
+                                            disabled={busy !== null || !canTransfer}
+                                            busy={busy === `transfer:${sphere.sphere_id}`}
+                                        />
                                     </div>
                                 </li>
                             );

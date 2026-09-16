@@ -16,7 +16,11 @@
     "minutes_ago": "Vor {{count}}min",
     "hours_ago": "Vor {{count}}h",
     "days_ago": "Vor {{count}}T",
-    "copy": "Kopieren"
+    "copy": "Kopieren",
+    "in_minutes": "in {{count}} Min.",
+    "in_hours": "in {{count}} Std.",
+    "in_days": "in {{count}} Tagen",
+    "close": "Schließen"
   },
   "status": {
     "online": "Online",
@@ -1612,7 +1616,8 @@
       "empty": "Noch keine Sphäre hier. Beanspruchen Sie Ihre Genesis-Sphären oder gleichen Sie mit dem Anker ab.",
       "seq": "Schritt {{seq}}",
       "pending": "Eine signierte Übertragung wartet auf den Anker — abgleichen, um sie erneut zu senden.",
-      "uncontrolled": "Kein Schlüssel dieser Vault kontrolliert diese Sphäre."
+      "uncontrolled": "Kein Schlüssel dieser Vault kontrolliert diese Sphäre.",
+      "rarest_first": "seltenste zuerst"
     },
     "state": {
       "final": "final",
@@ -1641,6 +1646,10 @@
       "transfer": "Übertragung abgelehnt: {{detail}}",
       "burn": "Verbrennen fehlgeschlagen: {{detail}}",
       "reissue": "Neuausstellung fehlgeschlagen: {{detail}}"
+    },
+    "kicker": "Eidolon · Verwahrungsregister",
+    "tiles": {
+      "claimable": "zu beanspruchen"
     }
   },
   "escrow": {
@@ -1660,7 +1669,8 @@
       "working_verify": "Umschläge werden geprüft…",
       "working_delete": "wird gelöscht…",
       "elapsed": "{{seconds}} s",
-      "runtime_hint": "Jede Aktion startet zuerst die Eidolon-Laufzeit — etwa 30 Sekunden."
+      "runtime_hint": "Jede Aktion startet zuerst die Eidolon-Laufzeit — etwa 30 Sekunden.",
+      "summary": "{{count}} versiegelte(s) Dokument(e) auf diesem Gerät · {{size}}"
     },
     "actions": {
       "deposit": "Dokument versiegeln",
@@ -1705,14 +1715,18 @@
       "owner_only": "Eigentümersignatur erforderlich: Nur dieser Tresor kann es öffnen.",
       "integrity_ok": "Unversehrt.",
       "integrity_failed": "Beschädigt: {{reason}}",
-      "unreadable": "Unlesbar: {{detail}}"
+      "unreadable": "Unlesbar: {{detail}}",
+      "newest_first": "neueste zuerst",
+      "unlocks": "wird frei {{when}}",
+      "lock_progress": "Bereits verstrichener Anteil der Sperre"
     },
     "state": {
       "ready": "bereit",
       "locked": "gesperrt bis {{until}}",
       "tampered": "manipuliert",
       "invalid": "ungültig",
-      "unreadable": "unlesbar"
+      "unreadable": "unlesbar",
+      "locked_short": "gesperrt"
     },
     "errors": {
       "canceled": "Abgebrochen.",
@@ -1727,6 +1741,11 @@
       "retrieve": "Abruf fehlgeschlagen: {{detail}}",
       "verify": "Prüfung fehlgeschlagen: {{detail}}",
       "delete": "Löschen fehlgeschlagen: {{detail}}"
+    },
+    "kicker": "Eidolon · Escrow Nexus",
+    "tiles": {
+      "locked": "gesperrt",
+      "damaged": "beschädigt"
     }
   }
 }

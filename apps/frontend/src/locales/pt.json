@@ -31,7 +31,10 @@
     "just_now": "Agora",
     "minutes_ago": "{{count}}m atrás",
     "hours_ago": "{{count}}h atrás",
-    "days_ago": "{{count}}d atrás"
+    "days_ago": "{{count}}d atrás",
+    "in_minutes": "em {{count}} min",
+    "in_hours": "em {{count}} h",
+    "in_days": "em {{count}} dias"
   },
   "status": {
     "online": "Online",
@@ -1607,7 +1610,8 @@
       "empty": "Nenhuma esfera aqui ainda. Reivindique suas esferas da gênese ou sincronize com a âncora.",
       "seq": "salto {{seq}}",
       "pending": "Uma transferência assinada aguarda a âncora — sincronize para reenviá-la.",
-      "uncontrolled": "Nenhuma chave deste cofre controla esta esfera."
+      "uncontrolled": "Nenhuma chave deste cofre controla esta esfera.",
+      "rarest_first": "as mais raras primeiro"
     },
     "state": {
       "final": "final",
@@ -1636,6 +1640,10 @@
       "transfer": "Transferência recusada: {{detail}}",
       "burn": "Falha ao queimar: {{detail}}",
       "reissue": "Falha ao reemitir: {{detail}}"
+    },
+    "kicker": "Eidolon · registro de custódia",
+    "tiles": {
+      "claimable": "a reivindicar"
     }
   },
   "escrow": {
@@ -1655,7 +1663,8 @@
       "working_verify": "verificando os envelopes…",
       "working_delete": "excluindo…",
       "elapsed": "{{seconds}} s",
-      "runtime_hint": "Cada ação inicia primeiro o runtime Eidolon — cerca de 30 segundos."
+      "runtime_hint": "Cada ação inicia primeiro o runtime Eidolon — cerca de 30 segundos.",
+      "summary": "{{count}} documento(s) selado(s) neste dispositivo · {{size}}"
     },
     "actions": {
       "deposit": "Selar um documento",
@@ -1700,14 +1709,18 @@
       "owner_only": "Assinatura do proprietário exigida: só este cofre pode abri-lo.",
       "integrity_ok": "Intacto.",
       "integrity_failed": "Danificado: {{reason}}",
-      "unreadable": "Ilegível: {{detail}}"
+      "unreadable": "Ilegível: {{detail}}",
+      "newest_first": "os mais recentes primeiro",
+      "unlocks": "libera {{when}}",
+      "lock_progress": "Parte do bloqueio já decorrida"
     },
     "state": {
       "ready": "pronto",
       "locked": "bloqueado até {{until}}",
       "tampered": "alterado",
       "invalid": "inválido",
-      "unreadable": "ilegível"
+      "unreadable": "ilegível",
+      "locked_short": "bloqueado"
     },
     "errors": {
       "canceled": "Cancelado.",
@@ -1722,6 +1735,11 @@
       "retrieve": "Falha ao recuperar: {{detail}}",
       "verify": "Falha na verificação: {{detail}}",
       "delete": "Falha ao excluir: {{detail}}"
+    },
+    "kicker": "Eidolon · Escrow Nexus",
+    "tiles": {
+      "locked": "bloqueados",
+      "damaged": "danificados"
     }
   }
 }

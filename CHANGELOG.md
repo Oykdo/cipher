@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Changed
+
+- **The Spheres and Escrow tabs get one visual language.** A hero band per
+  ledger (emblem, kicker, stat tiles — final / waiting / to claim / total,
+  ready / locked / damaged / total), an animated runtime bar while
+  `cipher-runtime` starts (step name, elapsed seconds), status segments with
+  tone dots, dismissable notices with icons, illustrated empty states, and
+  the inventories as responsive grids of cards: a rarity-tinted orb and
+  accent per sphere (rarest breathe), a verdict-stamped seal per escrow with
+  the lock countdown and the share of the lock already elapsed; titles no
+  longer truncate, ids / hop / head / size / dates are chips, secondary
+  actions are icon buttons with tooltips, the primary one keeps its label.
+  Dialogs moved to the shared Radix dialog with an emblem and proper form
+  fields (dark date picker). Shared pieces in `settings/custodyUi.tsx`,
+  styles in the "Custody tabs" block of `fluidCrypto.css`; the cosmic
+  palette only, motion off under `prefers-reduced-motion`. No behaviour
+  change: same stores, same calls, same texts, plus a few new keys in the
+  eight locales (kickers, tiles, "unlocks in …", close).
+
 ### Added
 
 - **Escrow tab in Settings (desktop) — Escrow Nexus.** Documents sealed

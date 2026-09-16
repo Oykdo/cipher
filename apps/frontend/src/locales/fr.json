@@ -16,7 +16,11 @@
     "minutes_ago": "Il y a {{count}}min",
     "hours_ago": "Il y a {{count}}h",
     "days_ago": "Il y a {{count}}j",
-    "copy": "Copier"
+    "copy": "Copier",
+    "in_minutes": "dans {{count}} min",
+    "in_hours": "dans {{count}} h",
+    "in_days": "dans {{count}} jours",
+    "close": "Fermer"
   },
   "status": {
     "online": "En ligne",
@@ -1608,7 +1612,8 @@
       "empty": "Aucune sphère ici pour l'instant. Réclamez vos sphères de genèse, ou synchronisez avec l'ancre.",
       "seq": "saut {{seq}}",
       "pending": "Une cession signée attend l'ancre — synchronisez pour la renvoyer.",
-      "uncontrolled": "Aucune clé de cette voûte ne contrôle cette sphère."
+      "uncontrolled": "Aucune clé de cette voûte ne contrôle cette sphère.",
+      "rarest_first": "les plus rares d'abord"
     },
     "state": {
       "final": "finale",
@@ -1637,6 +1642,10 @@
       "transfer": "Cession refusée : {{detail}}",
       "burn": "Brûlage en échec : {{detail}}",
       "reissue": "Réémission en échec : {{detail}}"
+    },
+    "kicker": "Eidolon · registre de garde",
+    "tiles": {
+      "claimable": "à réclamer"
     }
   },
   "escrow": {
@@ -1656,7 +1665,8 @@
       "working_verify": "contrôle des enveloppes…",
       "working_delete": "suppression…",
       "elapsed": "{{seconds}} s",
-      "runtime_hint": "Chaque action démarre d'abord le runtime Eidolon — environ 30 secondes."
+      "runtime_hint": "Chaque action démarre d'abord le runtime Eidolon — environ 30 secondes.",
+      "summary": "{{count}} document(s) scellé(s) sur cet appareil · {{size}}"
     },
     "actions": {
       "deposit": "Sceller un document",
@@ -1701,14 +1711,18 @@
       "owner_only": "Signature du propriétaire requise : seul ce coffre peut l'ouvrir.",
       "integrity_ok": "Intact.",
       "integrity_failed": "Abîmé : {{reason}}",
-      "unreadable": "Illisible : {{detail}}"
+      "unreadable": "Illisible : {{detail}}",
+      "newest_first": "les plus récents d'abord",
+      "unlocks": "se libère {{when}}",
+      "lock_progress": "Part du verrou déjà écoulée"
     },
     "state": {
       "ready": "prêt",
       "locked": "verrouillé jusqu'au {{until}}",
       "tampered": "altéré",
       "invalid": "invalide",
-      "unreadable": "illisible"
+      "unreadable": "illisible",
+      "locked_short": "verrouillé"
     },
     "errors": {
       "canceled": "Annulé.",
@@ -1723,6 +1737,11 @@
       "retrieve": "Récupération échouée : {{detail}}",
       "verify": "Vérification échouée : {{detail}}",
       "delete": "Suppression échouée : {{detail}}"
+    },
+    "kicker": "Eidolon · Escrow Nexus",
+    "tiles": {
+      "locked": "verrouillés",
+      "damaged": "abîmés"
     }
   }
 }

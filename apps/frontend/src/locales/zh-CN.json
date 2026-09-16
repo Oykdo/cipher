@@ -16,7 +16,11 @@
     "minutes_ago": "{{count}}分钟前",
     "hours_ago": "{{count}}小时前",
     "days_ago": "{{count}}天前",
-    "copy": "复制"
+    "copy": "复制",
+    "in_minutes": "{{count}} 分钟后",
+    "in_hours": "{{count}} 小时后",
+    "in_days": "{{count}} 天后",
+    "close": "关闭"
   },
   "status": {
     "online": "在线",
@@ -1612,7 +1616,8 @@
       "empty": "这里还没有球体。认领您的创世球体，或与锚点同步。",
       "seq": "第 {{seq}} 跳",
       "pending": "一笔已签名的转移正在等待锚点 — 同步以重新发送。",
-      "uncontrolled": "此保险库没有任何密钥控制该球体。"
+      "uncontrolled": "此保险库没有任何密钥控制该球体。",
+      "rarest_first": "最稀有优先"
     },
     "state": {
       "final": "最终",
@@ -1641,6 +1646,10 @@
       "transfer": "转移被拒绝：{{detail}}",
       "burn": "销毁失败：{{detail}}",
       "reissue": "重新签发失败：{{detail}}"
+    },
+    "kicker": "Eidolon · 保管账本",
+    "tiles": {
+      "claimable": "待领取"
     }
   },
   "escrow": {
@@ -1660,7 +1669,8 @@
       "working_verify": "正在检查信封…",
       "working_delete": "正在删除…",
       "elapsed": "{{seconds}} 秒",
-      "runtime_hint": "每个操作都会先启动 Eidolon 运行时——约 30 秒。"
+      "runtime_hint": "每个操作都会先启动 Eidolon 运行时——约 30 秒。",
+      "summary": "本设备上有 {{count}} 份已封存文件 · {{size}}"
     },
     "actions": {
       "deposit": "封存文件",
@@ -1705,14 +1715,18 @@
       "owner_only": "需要所有者签名：只有此保险库可以打开它。",
       "integrity_ok": "完好。",
       "integrity_failed": "已损坏：{{reason}}",
-      "unreadable": "无法读取：{{detail}}"
+      "unreadable": "无法读取：{{detail}}",
+      "newest_first": "最新优先",
+      "unlocks": "{{when}}解锁",
+      "lock_progress": "锁定期已过去的比例"
     },
     "state": {
       "ready": "可取回",
       "locked": "锁定至 {{until}}",
       "tampered": "已篡改",
       "invalid": "无效",
-      "unreadable": "无法读取"
+      "unreadable": "无法读取",
+      "locked_short": "已锁定"
     },
     "errors": {
       "canceled": "已取消。",
@@ -1727,6 +1741,11 @@
       "retrieve": "取回失败：{{detail}}",
       "verify": "验证失败：{{detail}}",
       "delete": "删除失败：{{detail}}"
+    },
+    "kicker": "Eidolon · Escrow Nexus",
+    "tiles": {
+      "locked": "已锁定",
+      "damaged": "已损坏"
     }
   }
 }
