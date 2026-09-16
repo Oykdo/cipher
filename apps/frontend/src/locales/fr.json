@@ -1646,6 +1646,25 @@
     "kicker": "Eidolon · registre de garde",
     "tiles": {
       "claimable": "à réclamer"
+    },
+    "theme": {
+      "void": "Vide",
+      "quantum": "Quantique",
+      "temporal": "Temporel",
+      "spatial": "Spatial",
+      "entropic": "Entropique",
+      "harmonic": "Harmonique",
+      "celestial": "Céleste",
+      "spinorial": "Spinoriel",
+      "exotic": "Exotique",
+      "divine": "Divin",
+      "balance": "Équilibre",
+      "trinity": "Trinité",
+      "order": "Ordre",
+      "essence": "Essence",
+      "perfection": "Perfection",
+      "completion": "Accomplissement",
+      "ascension": "Ascension"
     }
   },
   "escrow": {

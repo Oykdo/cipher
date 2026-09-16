@@ -1644,6 +1644,25 @@
     "kicker": "Eidolon · registro de custódia",
     "tiles": {
       "claimable": "a reivindicar"
+    },
+    "theme": {
+      "void": "Vazio",
+      "quantum": "Quântico",
+      "temporal": "Temporal",
+      "spatial": "Espacial",
+      "entropic": "Entrópico",
+      "harmonic": "Harmônico",
+      "celestial": "Celestial",
+      "spinorial": "Espinorial",
+      "exotic": "Exótico",
+      "divine": "Divino",
+      "balance": "Equilíbrio",
+      "trinity": "Trindade",
+      "order": "Ordem",
+      "essence": "Essência",
+      "perfection": "Perfeição",
+      "completion": "Conclusão",
+      "ascension": "Ascensão"
     }
   },
   "escrow": {

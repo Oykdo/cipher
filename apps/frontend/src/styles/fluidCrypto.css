@@ -2886,6 +2886,30 @@ body {
   animation: none;
 }
 
+/* The WebGL orb placeholder: same footprint as the CSS orb, painted by the stage canvas. */
+.custody-orb3d {
+  position: relative;
+  flex: none;
+  border-radius: 50%;
+}
+
+/* One WebGL canvas over the viewport (portaled to body); it only paints inside each .custody-orb3d.
+   Under the dialogs (z-40/50) and the menus, above the cards. */
+.custody-orb-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.custody-card__theme {
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: rgba(200, 215, 240, 0.62);
+  text-transform: lowercase;
+}
+.custody-card__theme::first-letter { text-transform: uppercase; }
+
 /* ── Escrow seal ── */
 
 .custody-seal {

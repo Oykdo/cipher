@@ -20,6 +20,19 @@ import { EIDOLON_API_BASE_URL } from '../config';
 
 export type SphereState = 'finale' | 'en attente' | 'brûlée' | 'invalide';
 
+/**
+ * What the revealed template says of a sphere's appearance (runtime ≥ 1.3.2):
+ * theme, manifestation, essence and the cosmic signature. Public by
+ * construction — the template is served by the anchor. Null before the
+ * sphere is claimed, undefined from older runtimes.
+ */
+export interface SphereVisual {
+  theme: string | null;
+  manifestation: string | null;
+  essence: string | null;
+  signature: Partial<Record<'shell_pattern' | 'quantum_glow' | 'reality_particles' | 'cosmic_aura', string | null>>;
+}
+
 export interface SphereStatus {
   sphere_id: string;
   rarity: string;
@@ -36,6 +49,7 @@ export interface SphereStatus {
   controllable: boolean;
   errors: string[];
   state: SphereState;
+  visual?: SphereVisual | null;
 }
 
 export type SphereFailure = { ok: false; error: string; errorCode?: string; sphereId?: string };

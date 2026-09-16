@@ -134,6 +134,13 @@ type SphereStatus = {
   controllable: boolean;
   errors: string[];
   state: SphereState;
+  /** Runtime ≥ 1.3.2: theme / manifestation / essence / cosmic signature of the revealed template. */
+  visual?: {
+    theme: string | null;
+    manifestation: string | null;
+    essence: string | null;
+    signature: Partial<Record<string, string | null>>;
+  } | null;
 };
 
 type SphereFailure = { ok: false; error: string; errorCode?: string; sphereId?: string };

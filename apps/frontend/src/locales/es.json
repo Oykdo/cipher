@@ -1650,6 +1650,25 @@
     "kicker": "Eidolon · registro de custodia",
     "tiles": {
       "claimable": "por reclamar"
+    },
+    "theme": {
+      "void": "Vacío",
+      "quantum": "Cuántico",
+      "temporal": "Temporal",
+      "spatial": "Espacial",
+      "entropic": "Entrópico",
+      "harmonic": "Armónico",
+      "celestial": "Celestial",
+      "spinorial": "Espinorial",
+      "exotic": "Exótico",
+      "divine": "Divino",
+      "balance": "Equilibrio",
+      "trinity": "Trinidad",
+      "order": "Orden",
+      "essence": "Esencia",
+      "perfection": "Perfección",
+      "completion": "Culminación",
+      "ascension": "Ascensión"
     }
   },
   "escrow": {

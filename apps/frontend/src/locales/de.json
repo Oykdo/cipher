@@ -1650,6 +1650,25 @@
     "kicker": "Eidolon · Verwahrungsregister",
     "tiles": {
       "claimable": "zu beanspruchen"
+    },
+    "theme": {
+      "void": "Leere",
+      "quantum": "Quanten",
+      "temporal": "Temporal",
+      "spatial": "Räumlich",
+      "entropic": "Entropisch",
+      "harmonic": "Harmonisch",
+      "celestial": "Himmlisch",
+      "spinorial": "Spinoriell",
+      "exotic": "Exotisch",
+      "divine": "Göttlich",
+      "balance": "Gleichgewicht",
+      "trinity": "Dreiheit",
+      "order": "Ordnung",
+      "essence": "Essenz",
+      "perfection": "Vollkommenheit",
+      "completion": "Vollendung",
+      "ascension": "Aufstieg"
     }
   },
   "escrow": {

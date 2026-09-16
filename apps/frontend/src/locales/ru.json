@@ -1644,6 +1644,25 @@
     "kicker": "Eidolon · реестр хранения",
     "tiles": {
       "claimable": "к получению"
+    },
+    "theme": {
+      "void": "Пустота",
+      "quantum": "Квантовый",
+      "temporal": "Временной",
+      "spatial": "Пространственный",
+      "entropic": "Энтропийный",
+      "harmonic": "Гармонический",
+      "celestial": "Небесный",
+      "spinorial": "Спинорный",
+      "exotic": "Экзотический",
+      "divine": "Божественный",
+      "balance": "Равновесие",
+      "trinity": "Троица",
+      "order": "Порядок",
+      "essence": "Сущность",
+      "perfection": "Совершенство",
+      "completion": "Завершение",
+      "ascension": "Вознесение"
     }
   },
   "escrow": {

@@ -1650,6 +1650,25 @@
     "kicker": "Eidolon · 保管账本",
     "tiles": {
       "claimable": "待领取"
+    },
+    "theme": {
+      "void": "虚空",
+      "quantum": "量子",
+      "temporal": "时间",
+      "spatial": "空间",
+      "entropic": "熵",
+      "harmonic": "谐波",
+      "celestial": "天体",
+      "spinorial": "旋量",
+      "exotic": "奇异",
+      "divine": "神圣",
+      "balance": "平衡",
+      "trinity": "三位一体",
+      "order": "秩序",
+      "essence": "本质",
+      "perfection": "完美",
+      "completion": "圆满",
+      "ascension": "飞升"
     }
   },
   "escrow": {

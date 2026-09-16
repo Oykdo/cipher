@@ -1644,6 +1644,25 @@
     "kicker": "Eidolon · custody ledger",
     "tiles": {
       "claimable": "to claim"
+    },
+    "theme": {
+      "void": "Void",
+      "quantum": "Quantum",
+      "temporal": "Temporal",
+      "spatial": "Spatial",
+      "entropic": "Entropic",
+      "harmonic": "Harmonic",
+      "celestial": "Celestial",
+      "spinorial": "Spinorial",
+      "exotic": "Exotic",
+      "divine": "Divine",
+      "balance": "Balance",
+      "trinity": "Trinity",
+      "order": "Order",
+      "essence": "Essence",
+      "perfection": "Perfection",
+      "completion": "Completion",
+      "ascension": "Ascension"
     }
   },
   "escrow": {

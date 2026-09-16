@@ -5,9 +5,10 @@ import { EIDOLON_CONNECT_ENABLED } from "../../config";
 import { isSphereClientAvailable, isValidVaultId, type SphereState, type SphereStatus } from "../../lib/spheres";
 import { MAILBOX_LOW, anchorHost } from "../../lib/spheresMemory";
 import { useSphereStore, type SphereNotice, type SphereStep } from "../../store/spheres";
+import { visualSpec } from "../../lib/sphereVisuals";
+import { OrbStage, SphereOrb3D } from "./SphereOrb3D";
 import {
     ActionButton,
-    Chip,
     CustodyDialog,
     CustodyHero,
     EmptyPanel,
@@ -17,7 +18,6 @@ import {
     Pill,
     RuntimeBar,
     SectionHeading,
-    SphereOrb,
     SpheresEmblem,
     StatTile,
     StatusSegments,
@@ -38,7 +38,9 @@ import {
  * ~30 s of runtime start-up, so the running step is named and timed.
  *
  * Layout: a hero band (emblem, stat tiles), the anchor status and actions,
- * then the inventory as a grid of rarity-tinted cards, rarest first.
+ * then the inventory as a grid of rarity-tinted cards, rarest first — each
+ * sphere drawn as a WebGL orb from its template's signature (SphereOrb3D),
+ * the id / hop / head kept in the card's tooltip rather than on its face.
  */
 
 const STATE_TONE: Record<SphereState, PillTone> = {
@@ -122,6 +124,12 @@ export function SphereSettings() {
         const key = `spheres.rarity.${rarity}`;
         const label = t(key);
         return label === key ? rarity : label;
+    };
+
+    const themeLabel = (theme: string): string => {
+        const key = `spheres.theme.${theme}`;
+        const label = t(key);
+        return label === key ? theme : label;
     };
 
     const relativeTime = (at: number): string => {
@@ -369,75 +377,83 @@ export function SphereSettings() {
                 ) : spheres.length === 0 ? (
                     <EmptyPanel emblem={<SpheresEmblem />} text={t("spheres.inventory.empty")} />
                 ) : (
-                    <ul className="custody-grid">
-                        {spheres.map((sphere) => {
-                            const canTransfer = sphere.ok && !sphere.burned && sphere.controllable && !sphere.pending;
-                            // Reissuing is allowed over a pending transfer (it revokes it, the modal says so); burning is not.
-                            const canReissue = sphere.ok && !sphere.burned && sphere.controllable;
-                            const canBurn = canTransfer;
-                            const known = RARITY_RANK[sphere.rarity] !== undefined ? sphere.rarity : "common";
-                            return (
-                                <li key={sphere.sphere_id} className={`custody-card custody-card--${known} ${sphere.burned ? "custody-card--muted" : ""}`}>
-                                    <SphereOrb rarity={known} burned={sphere.burned} />
-                                    <div className="min-w-0">
-                                        <div className="custody-rarity">{rarityLabel(sphere.rarity)}</div>
-                                        <div className="custody-card__title" title={sphere.name || sphere.sphere_id}>
-                                            {sphere.name || sphere.sphere_id}
+                    <OrbStage>
+                        <ul className="custody-grid">
+                            {spheres.map((sphere) => {
+                                const canTransfer = sphere.ok && !sphere.burned && sphere.controllable && !sphere.pending;
+                                // Reissuing is allowed over a pending transfer (it revokes it, the modal says so); burning is not.
+                                const canReissue = sphere.ok && !sphere.burned && sphere.controllable;
+                                const canBurn = canTransfer;
+                                const known = RARITY_RANK[sphere.rarity] !== undefined ? sphere.rarity : "common";
+                                const spec = visualSpec(sphere);
+                                // The nomenclature lives in the tooltip: id, hop, head — not on the card's face.
+                                const nomenclature = `${sphere.sphere_id} · ${t("spheres.inventory.seq", { seq: sphere.seq })} · ${shortId(sphere.head_hash, 16)}`;
+                                return (
+                                    <li key={sphere.sphere_id} className={`custody-card custody-card--${known} ${sphere.burned ? "custody-card--muted" : ""}`} title={nomenclature}>
+                                        <SphereOrb3D sphere={sphere} />
+                                        <div className="min-w-0">
+                                            <div className="custody-rarity">{rarityLabel(sphere.rarity)}</div>
+                                            <div className="custody-card__title" title={nomenclature}>
+                                                {sphere.name || sphere.sphere_id}
+                                            </div>
+                                            {sphere.visual && (
+                                                <p className="custody-card__theme">
+                                                    {themeLabel(spec.theme)}
+                                                    {spec.form ? ` · ${spec.form}` : ""}
+                                                </p>
+                                            )}
+                                            <div className="custody-chips">
+                                                <Pill tone={STATE_TONE[sphere.state]}>
+                                                    {stateLabel(sphere.state)}
+                                                    {sphere.final_by === "checkpoint" ? ` · ${t("spheres.state.by_checkpoint")}` : ""}
+                                                </Pill>
+                                            </div>
+                                            {sphere.pending && <p className="custody-card__flag custody-card__flag--warn">{t("spheres.inventory.pending")}</p>}
+                                            {!sphere.controllable && sphere.ok && (
+                                                <p className="custody-card__flag custody-card__flag--warn">{t("spheres.inventory.uncontrolled")}</p>
+                                            )}
+                                            {sphere.errors.length > 0 && <p className="custody-card__flag custody-card__flag--error">{sphere.errors[0]}</p>}
                                         </div>
-                                        <div className="custody-chips">
-                                            <Pill tone={STATE_TONE[sphere.state]}>
-                                                {stateLabel(sphere.state)}
-                                                {sphere.final_by === "checkpoint" ? ` · ${t("spheres.state.by_checkpoint")}` : ""}
-                                            </Pill>
-                                            {sphere.name && <Chip title={sphere.sphere_id}>{sphere.sphere_id}</Chip>}
-                                            <Chip>{t("spheres.inventory.seq", { seq: sphere.seq })}</Chip>
-                                            <Chip title={sphere.head_hash}>{shortId(sphere.head_hash)}</Chip>
-                                        </div>
-                                        {sphere.pending && <p className="custody-card__flag custody-card__flag--warn">{t("spheres.inventory.pending")}</p>}
-                                        {!sphere.controllable && sphere.ok && (
-                                            <p className="custody-card__flag custody-card__flag--warn">{t("spheres.inventory.uncontrolled")}</p>
-                                        )}
-                                        {sphere.errors.length > 0 && <p className="custody-card__flag custody-card__flag--error">{sphere.errors[0]}</p>}
-                                    </div>
-                                    <div className="custody-card__foot">
-                                        <div className="custody-card__actions">
-                                            <IconButton
-                                                icon={<Icon.exportFile />}
-                                                label={t("spheres.actions.export")}
-                                                onClick={() => actions.exportFile(vaultId, sphere.sphere_id)}
-                                                disabled={busy !== null}
-                                                busy={busy === `export:${sphere.sphere_id}`}
-                                            />
-                                            <IconButton
-                                                icon={<Icon.reissue />}
-                                                label={`${t("spheres.actions.reissue")} — ${t("spheres.actions.reissue_hint")}`}
-                                                onClick={() => setCustodyPrompt({ kind: "reissue", sphere })}
-                                                disabled={busy !== null || !canReissue}
-                                                busy={busy === `reissue:${sphere.sphere_id}`}
-                                            />
-                                            <IconButton
-                                                danger
-                                                icon={<Icon.burn />}
-                                                label={`${t("spheres.actions.burn")} — ${t("spheres.actions.burn_hint")}`}
-                                                onClick={() => setCustodyPrompt({ kind: "burn", sphere })}
-                                                disabled={busy !== null || !canBurn}
-                                                busy={busy === `burn:${sphere.sphere_id}`}
+                                        <div className="custody-card__foot">
+                                            <div className="custody-card__actions">
+                                                <IconButton
+                                                    icon={<Icon.exportFile />}
+                                                    label={t("spheres.actions.export")}
+                                                    onClick={() => actions.exportFile(vaultId, sphere.sphere_id)}
+                                                    disabled={busy !== null}
+                                                    busy={busy === `export:${sphere.sphere_id}`}
+                                                />
+                                                <IconButton
+                                                    icon={<Icon.reissue />}
+                                                    label={`${t("spheres.actions.reissue")} — ${t("spheres.actions.reissue_hint")}`}
+                                                    onClick={() => setCustodyPrompt({ kind: "reissue", sphere })}
+                                                    disabled={busy !== null || !canReissue}
+                                                    busy={busy === `reissue:${sphere.sphere_id}`}
+                                                />
+                                                <IconButton
+                                                    danger
+                                                    icon={<Icon.burn />}
+                                                    label={`${t("spheres.actions.burn")} — ${t("spheres.actions.burn_hint")}`}
+                                                    onClick={() => setCustodyPrompt({ kind: "burn", sphere })}
+                                                    disabled={busy !== null || !canBurn}
+                                                    busy={busy === `burn:${sphere.sphere_id}`}
+                                                />
+                                            </div>
+                                            <ActionButton
+                                                size="sm"
+                                                variant="primary"
+                                                icon={<Icon.transfer />}
+                                                label={busy === `transfer:${sphere.sphere_id}` ? t("spheres.actions.working") : t("spheres.actions.transfer")}
+                                                onClick={() => openTransfer(sphere)}
+                                                disabled={busy !== null || !canTransfer}
+                                                busy={busy === `transfer:${sphere.sphere_id}`}
                                             />
                                         </div>
-                                        <ActionButton
-                                            size="sm"
-                                            variant="primary"
-                                            icon={<Icon.transfer />}
-                                            label={busy === `transfer:${sphere.sphere_id}` ? t("spheres.actions.working") : t("spheres.actions.transfer")}
-                                            onClick={() => openTransfer(sphere)}
-                                            disabled={busy !== null || !canTransfer}
-                                            busy={busy === `transfer:${sphere.sphere_id}`}
-                                        />
-                                    </div>
-                                </li>
-                            );
-                        })}
-                    </ul>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </OrbStage>
                 )}
             </section>
         </div>

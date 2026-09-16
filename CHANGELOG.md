@@ -4,6 +4,26 @@
 
 ### Changed
 
+- **Each sphere is drawn as a WebGL orb, from its template.** The Spheres
+  grid replaces the rarity-tinted CSS orb and the `id · hop · head`
+  nomenclature line (now a tooltip on the title) with a live 3D orb built
+  from what the revealed template says — theme palette and shell material
+  (obsidian, holographic, bronze, jade, plasma, crystal, gold, pearl, black
+  opal, …), rarity aura / sparkles / orbit / pulse, custody state
+  (waiting spheres pulse faster, burnt ones go grey and still), and a secondary
+  form per manifestation family (a dragon's crown, waveform rings, a
+  wireframe monolith, stellar orbits, an event horizon) — the tables of the
+  Eidolon visualizer, ported to `lib/sphereVisuals.ts`. Under the title, the
+  theme and the manifestation in words (`spheres.theme.*`, eight locales).
+  One WebGL context for the whole grid (`settings/SphereOrb3D.tsx`: a
+  viewport-fixed canvas paints each card's placeholder, clipped to the grid,
+  off-screen orbs cost nothing; ~4.5 Mpx cap), an offline room environment
+  for the metals, no image and no cache: a few hundred bytes per sphere.
+  Motion stops under `prefers-reduced-motion`; without WebGL, or if the
+  canvas throws, the CSS orb stands in. Needs `cipher-runtime` ≥ 1.3.2 for
+  the `visual` field (`sphere list` / `sync` / `claim`); older runtimes get
+  the void theme for every sphere.
+
 - **The Spheres and Escrow tabs get one visual language.** A hero band per
   ledger (emblem, kicker, stat tiles — final / waiting / to claim / total,
   ready / locked / damaged / total), an animated runtime bar while
