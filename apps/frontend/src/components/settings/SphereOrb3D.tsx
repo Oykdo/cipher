@@ -124,6 +124,10 @@ export function OrbStage({ children, className }: { children: ReactNode; classNa
                                 dpr={stageDpr()}
                                 frameloop={animate ? "always" : "demand"}
                                 gl={{ alpha: true, antialias: true, powerPreference: "low-power" }}
+                                // R3F's wrapper sets `pointer-events: auto` inline (it hosts its own pointer
+                                // events), which beats the stage's `none` and swallowed every click on the
+                                // page: the canvas must be transparent to the pointer, it paints only.
+                                style={{ pointerEvents: "none" }}
                             >
                                 <StagePort stage={stage} clip={ref} animate={animate} />
                             </Canvas>

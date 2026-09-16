@@ -379,15 +379,35 @@ describe('storage', () => {
     localStorage.clear();
   });
 
-  it('round-trips per vault and ignores a foreign or old record', () => {
+  it('round-trips per vault and ignores a foreign or unknown record', () => {
     const saved = saveSphereMemory(fullSynced());
     expect(saved.updatedAt).toBeGreaterThan(0);
     expect(loadSphereMemory(VAULT)).toEqual(saved);
     expect(loadSphereMemory('b'.repeat(64))).toEqual(defaultMemory('b'.repeat(64)));
-    localStorage.setItem(`cipher.spheres.v1:${VAULT}`, JSON.stringify({ version: 2, vaultId: VAULT }));
+    localStorage.setItem(`cipher.spheres.v1:${VAULT}`, JSON.stringify({ version: 3, vaultId: VAULT }));
     expect(loadSphereMemory(VAULT)).toEqual(defaultMemory(VAULT));
     localStorage.setItem(`cipher.spheres.v1:${VAULT}`, 'not json');
     expect(loadSphereMemory(VAULT)).toEqual(defaultMemory(VAULT));
+  });
+
+  it('upgrades a v1 record: rows without `visual` (runtime < 1.3.2) make it dirty, once', () => {
+    const v1 = { ...fullSynced(), version: 1, inventory: [sphere('A'), sphere('B')] };
+    localStorage.setItem(`cipher.spheres.v1:${VAULT}`, JSON.stringify(v1));
+    const m = loadSphereMemory(VAULT);
+    expect(m.version).toBe(2);
+    expect(m.dirty).toBe(true);
+    expect(m.syncOkAt).toBe(v1.syncOkAt); // what the anchor said still holds
+    // Listed again (by whatever runtime): saved as v2, no second upgrade.
+    saveSphereMemory(applyList(m, { ok: true, spheres: [sphere('A'), sphere('B')], trustedIssuer: true, genesisCached: true }, NOW));
+    expect(loadSphereMemory(VAULT).dirty).toBe(false);
+  });
+
+  it('upgrades a v1 record without a list when every row already says what it looks like, or there is none', () => {
+    const rows = [sphere('A', { visual: null }), sphere('B', { visual: { theme: 'quantum', manifestation: null, essence: null, signature: {} } })];
+    localStorage.setItem(`cipher.spheres.v1:${VAULT}`, JSON.stringify({ ...fullSynced(), version: 1, inventory: rows }));
+    expect(loadSphereMemory(VAULT)).toMatchObject({ version: 2, dirty: false });
+    localStorage.setItem(`cipher.spheres.v1:${VAULT}`, JSON.stringify({ ...defaultMemory(VAULT), version: 1 }));
+    expect(loadSphereMemory(VAULT)).toMatchObject({ version: 2, dirty: false, inventory: null });
   });
 
   it('fills missing nested fields from the defaults', () => {

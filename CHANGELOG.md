@@ -20,10 +20,20 @@
   off-screen orbs cost nothing; ~4.5 Mpx cap), an offline room environment
   for the metals, no image and no cache: a few hundred bytes per sphere.
   Motion stops under `prefers-reduced-motion`; without WebGL, or if the
-  canvas throws, the CSS orb stands in. Needs `cipher-runtime` ≥ 1.3.2 for
-  the `visual` field (`sphere list` / `sync` / `claim`); older runtimes get
-  the void theme for every sphere. `scripts/bundle-eidolon-runtime.mjs` now
-  pins `cipher-runtime-20260916c` (1.3.2) with both SHA-256.
+  canvas throws, the CSS orb stands in. The stage is transparent to the
+  pointer, canvas included — R3F's wrapper sets `pointer-events: auto`
+  inline, which beat the stage's `none` and swallowed every click on the
+  page while the grid was open. Each card is also framed in its tier's
+  colour (the rarity accent as the border, more present the rarer, brighter
+  on hover), so two spheres of one theme still tell their rarity apart.
+  Needs `cipher-runtime` ≥ 1.3.2 for the `visual` field (`sphere list` /
+  `sync` / `claim`); older runtimes get the void theme for every sphere.
+  `scripts/bundle-eidolon-runtime.mjs` now pins `cipher-runtime-20260916c`
+  (1.3.2) with both SHA-256. An inventory remembered by an older runtime
+  has no `visual` on its rows and would keep drawing every orb as void
+  until the daily sync: the sphere memory is now v2, and a v1 record whose
+  rows lack the field is upgraded on load with `dirty` set, so the next
+  open re-lists once, offline (`lib/spheresMemory.ts`).
 
 - **The Spheres and Escrow tabs get one visual language.** A hero band per
   ledger (emblem, kicker, stat tiles — final / waiting / to claim / total,

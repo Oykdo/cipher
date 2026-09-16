@@ -91,7 +91,8 @@ export type ClaimState = 'never' | 'done' | 'queued' | 'not_enrolled';
 export type SyncReason = 'first' | 'stale' | 'pending';
 
 export interface SphereMemory {
-  version: 1;
+  /** 2 since the rows carry the template's appearance (`visual`, runtime 1.3.2); a v1 record is upgraded on load. */
+  version: 2;
   vaultId: string;
   /** Host of the REST API the anchor fields below are about (null until a full sync). */
   anchorHost: string | null;
@@ -100,7 +101,11 @@ export interface SphereMemory {
   inventoryAt: number;
   /** From the last list (the runtime's trust root); null until known. */
   trustedIssuer: boolean | null;
-  /** A disk-changing call was started and its reply never applied (reload mid-call). */
+  /**
+   * The next open re-lists: a disk-changing call was started and its reply
+   * never applied (reload mid-call), or the rows predate a field the tab
+   * draws from (a v1 record without `visual`).
+   */
   dirty: boolean;
   /** Last sync that really reached the anchor (ok, no errors.owned / errors.queue). */
   syncOkAt: number | null;
@@ -126,7 +131,7 @@ export interface SphereMemory {
 
 export function defaultMemory(vaultId: string): SphereMemory {
   return {
-    version: 1,
+    version: 2,
     vaultId,
     anchorHost: null,
     inventory: null,
@@ -154,7 +159,16 @@ export function loadSphereMemory(vaultId: string): SphereMemory {
     const raw = localStorage.getItem(storageKey(vaultId));
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    if (parsed?.version !== 1 || parsed?.vaultId !== vaultId) return fallback;
+    if (parsed?.vaultId !== vaultId) return fallback;
+    if (parsed.version === 1) {
+      // A v1 record: what the anchor said still holds, but its rows were listed by a runtime that
+      // did not say what each sphere looks like (`visual`, 1.3.2) — every orb would draw as void.
+      // One offline list on the next open fills the field; a row that has it is left alone.
+      const rows: unknown[] = Array.isArray(parsed.inventory) ? parsed.inventory : [];
+      parsed.version = 2;
+      if (rows.some((row) => typeof row === 'object' && row !== null && !('visual' in row))) parsed.dirty = true;
+    }
+    if (parsed.version !== 2) return fallback;
     return {
       ...fallback,
       ...parsed,

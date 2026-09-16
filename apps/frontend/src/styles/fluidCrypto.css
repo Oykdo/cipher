@@ -2725,7 +2725,7 @@ body {
   padding: 1rem;
   border-radius: 1rem;
   background: rgba(6, 11, 24, 0.6);
-  border: 1px solid rgba(160, 180, 210, 0.12);
+  border: 1px solid var(--card-border, rgba(160, 180, 210, 0.12));
   transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms ease, box-shadow 220ms ease;
   overflow: hidden;
 }
@@ -2752,7 +2752,7 @@ body {
 
 .custody-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 240, 255, 0.28);
+  border-color: var(--card-border-hover, rgba(0, 240, 255, 0.28));
   box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.7), 0 0 30px -14px var(--card-accent, rgba(0, 240, 255, 0.4));
 }
 
@@ -2833,15 +2833,29 @@ body {
 
 .custody-card__actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
-/* Rarity accents: the rarer, the warmer / more luminous the tint. */
-.custody-card--primordial { --card-accent: #f0abfc; --card-glow: rgba(240, 171, 252, 0.16); }
-.custody-card--genesis    { --card-accent: #c4b5fd; --card-glow: rgba(196, 181, 253, 0.14); }
-.custody-card--mythic     { --card-accent: #a5b4fc; --card-glow: rgba(165, 180, 252, 0.13); }
-.custody-card--legendary  { --card-accent: #fcd34d; --card-glow: rgba(252, 211, 77, 0.13); }
-.custody-card--epic       { --card-accent: #d8b4fe; --card-glow: rgba(216, 180, 254, 0.12); }
-.custody-card--rare       { --card-accent: #7dd3fc; --card-glow: rgba(125, 211, 252, 0.11); }
-.custody-card--uncommon   { --card-accent: #6ee7b7; --card-glow: rgba(110, 231, 183, 0.10); }
-.custody-card--common     { --card-accent: #94a3b8; --card-glow: rgba(148, 163, 184, 0.08); }
+/* Rarity accents: the rarer, the warmer / more luminous the tint — and the more present the frame
+   (`--card-frame`): the accent is also the card's border, so each tier reads at a glance, even
+   between two spheres of the same theme. */
+.custody-card--primordial { --card-accent: #f0abfc; --card-glow: rgba(240, 171, 252, 0.16); --card-frame: 62%; }
+.custody-card--genesis    { --card-accent: #c4b5fd; --card-glow: rgba(196, 181, 253, 0.14); --card-frame: 56%; }
+.custody-card--mythic     { --card-accent: #a5b4fc; --card-glow: rgba(165, 180, 252, 0.13); --card-frame: 52%; }
+.custody-card--legendary  { --card-accent: #fcd34d; --card-glow: rgba(252, 211, 77, 0.13); --card-frame: 50%; }
+.custody-card--epic       { --card-accent: #d8b4fe; --card-glow: rgba(216, 180, 254, 0.12); --card-frame: 46%; }
+.custody-card--rare       { --card-accent: #7dd3fc; --card-glow: rgba(125, 211, 252, 0.11); --card-frame: 42%; }
+.custody-card--uncommon   { --card-accent: #6ee7b7; --card-glow: rgba(110, 231, 183, 0.10); --card-frame: 36%; }
+.custody-card--common     { --card-accent: #94a3b8; --card-glow: rgba(148, 163, 184, 0.08); --card-frame: 28%; }
+
+.custody-card--primordial,
+.custody-card--genesis,
+.custody-card--mythic,
+.custody-card--legendary,
+.custody-card--epic,
+.custody-card--rare,
+.custody-card--uncommon,
+.custody-card--common {
+  --card-border: color-mix(in srgb, var(--card-accent) var(--card-frame), transparent);
+  --card-border-hover: color-mix(in srgb, var(--card-accent) 85%, transparent);
+}
 
 /* Verdict accents (escrow). */
 .custody-card--ready    { --card-accent: #34d399; --card-glow: rgba(52, 211, 153, 0.12); }
@@ -2894,12 +2908,17 @@ body {
 }
 
 /* One WebGL canvas over the viewport (portaled to body); it only paints inside each .custody-orb3d.
-   Under the dialogs (z-40/50) and the menus, above the cards. */
+   Under the dialogs (z-40/50) and the menus, above the cards. Transparent to the pointer, descendants
+   included: R3F's wrapper sets `pointer-events: auto` inline, which beat the inherited `none` and
+   swallowed every click on the page while the grid was open. */
 .custody-orb-stage {
   position: fixed;
   inset: 0;
   z-index: 20;
-  pointer-events: none;
+}
+.custody-orb-stage,
+.custody-orb-stage * {
+  pointer-events: none !important;
 }
 
 .custody-card__theme {
